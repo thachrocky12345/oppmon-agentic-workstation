@@ -1,0 +1,106 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# python virtualenvs (tools/discord-journal-bot/, scratch/backfill scripts, etc.)
+.venv/
+.venv-*/
+venv/
+__pycache__/
+*.pyc
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# NOTE: .env.example IS tracked (template for setup)
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# database
+pgdata/
+
+# logs
+logs/
+*.log
+
+# test artifacts
+test-results/
+playwright-report/
+
+# archives
+*.tar.gz
+*.tgz
+
+# IDE
+.vscode/
+.idea/
+
+# Backup files
+*.bak
+
+# OS
+Thumbs.db
+
+# Screenshots with sensitive data (IP addresses, server topology)
+docs/screenshots/20-infrastructure.png
+
+# --- Internal docs & plans (never push to GitHub) ---
+CONTINUE-*.md
+ARKON-GTM-*.md
+ARKON-MASTER-BUILD-PLAN-*.md
+ARKON-BRAND-IDENTITY-*.md
+ARKON-OS-CARD-DESIGN-*.md
+DEPLOY-PLAN.md
+FLEET-ADMIN-PLAN.md
+HOFMI-FLEET-PLAN-*.md
+SESSION-*-PROMPT.md
+
+# --- Assets & legal ---
+*.zip
+legal-extracted/
+Arkon Brand Assets/
+.arkon/
+
+# --- Patch/migration scripts ---
+tier*-patch.py
+patch-*.py
+phase*-files/
+
+# --- Session backups ---
+*.bak-*

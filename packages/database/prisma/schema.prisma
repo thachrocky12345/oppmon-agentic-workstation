@@ -1,0 +1,553 @@
+// Arkon Database Schema
+// PostgreSQL with TimescaleDB and pgvector extensions
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector"), timescaledb]
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum Role {
+  TENANT_ADMIN
+  TEAM_ADMIN
+  MEMBER
+}
+
+enum TeamRole {
+  ADMIN
+  MEMBER
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  PENDING
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+enum OAuthProvider {
+  GITHUB
+  GOOGLE
+}
+
+enum SkillScope {
+  TENANT
+  TEAM
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  DENIED
+}
+
+// ============================================================================
+// Multi-tenancy
+// ============================================================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users       User[]
+  teams       Team[]
+  agents      Agent[]
+  skills      Skill[]
+  auditLogs   AuditLog[]
+  llmSessions LlmSession[]
+  embeddings  Embedding[]
+
+  @@map("tenants")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members TeamMember[]
+  agents  Agent[]
+  skills  Skill[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("teams")
+}
+
+// ============================================================================
+// Users & Authentication
+// ============================================================================
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  name         String
+  role         Role     @default(MEMBER)
+  tenantId     String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions             UserSession[]
+  teamMemberships      TeamMember[]
+  oauthAccounts        OAuthAccount[]
+  notifications        Notification[]
+  incidentUpdates      IncidentUpdate[]
+  skillsCreated        Skill[]          @relation("SkillCreatedBy")
+  skillVersionsCreated SkillVersion[]   @relation("SkillVersionCreatedBy")
+  auditLogs            AuditLog[]
+  llmSessions          LlmSession[]
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ipAddress String?
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("user_sessions")
+}
+
+model OAuthAccount {
+  id                String        @id @default(cuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  role      TeamRole @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([teamId])
+  @@map("team_members")
+}
+
+// ============================================================================
+// Agents & Events
+// ============================================================================
+
+model Agent {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  status      AgentStatus @default(PENDING)
+  tenantId    String
+  teamId      String?
+  config      Json        @default("{}")
+  lastSeen    DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  team      Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  events    Event[]
+  incidents Incident[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([teamId])
+  @@index([status])
+  @@map("agents")
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  agentId   String
+  eventType String
+  payload   Json     @default("{}")
+  severity  String   @default("info")
+  timestamp DateTime @default(now())
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, timestamp(sort: Desc)])
+  @@index([eventType, timestamp(sort: Desc)])
+  @@map("events")
+}
+
+// ============================================================================
+// Incidents
+// ============================================================================
+
+model Incident {
+  id          String           @id @default(cuid())
+  agentId     String
+  title       String
+  description String
+  severity    IncidentSeverity @default(MEDIUM)
+  status      IncidentStatus   @default(OPEN)
+  createdAt   DateTime         @default(now())
+  resolvedAt  DateTime?
+
+  // Relations
+  agent   Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  updates IncidentUpdate[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([agentId])
+  @@map("incidents")
+}
+
+model IncidentUpdate {
+  id         String   @id @default(cuid())
+  incidentId String
+  userId     String
+  message    String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId])
+  @@map("incident_updates")
+}
+
+// ============================================================================
+// Notifications
+// ============================================================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ============================================================================
+// Workflows
+// ============================================================================
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tenantId    String
+  definition  Json     @default("{}")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  runs WorkflowRun[]
+
+  @@index([tenantId, isActive])
+  @@map("workflows")
+}
+
+model WorkflowRun {
+  id          String    @id @default(cuid())
+  workflowId  String
+  status      String    @default("pending")
+  context     Json      @default("{}")
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  // Relations
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([status])
+  @@map("workflow_runs")
+}
+
+// ============================================================================
+// Skills Registry
+// ============================================================================
+
+model Skill {
+  id          String     @id @default(cuid())
+  tenantId    String
+  teamId      String?    // null for tenant-wide skills
+  name        String
+  description String?
+  version     Int        @default(1)
+  content     String     // skill definition/content
+  sha256      String     // hash of content for integrity
+  scope       SkillScope @default(TEAM)
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?  // soft delete
+
+  // Relations
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  team      Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdBy User           @relation("SkillCreatedBy", fields: [createdById], references: [id])
+  versions  SkillVersion[]
+
+  @@unique([tenantId, name, version])
+  @@index([tenantId])
+  @@index([teamId])
+  @@index([scope])
+  @@index([deletedAt])
+  @@map("skills")
+}
+
+model SkillVersion {
+  id          String   @id @default(cuid())
+  skillId     String
+  version     Int
+  content     String
+  sha256      String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  skill     Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("SkillVersionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([skillId, version])
+  @@index([skillId])
+  @@map("skill_versions")
+}
+
+// ============================================================================
+// Audit Logging
+// ============================================================================
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  tenantId     String
+  resourceType String      // e.g., 'skill', 'agent', 'workflow'
+  resourceId   String
+  action       AuditAction
+  actorId      String
+  beforeState  Json?       // null for CREATE
+  afterState   Json?       // null for DELETE
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?       // additional context
+  createdAt    DateTime    @default(now())
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User   @relation(fields: [actorId], references: [id])
+
+  @@index([tenantId, resourceType, createdAt(sort: Desc)])
+  @@index([resourceType, resourceId])
+  @@index([actorId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// LLM Sessions & Messages
+// ============================================================================
+
+model LlmSession {
+  id        String       @id @default(cuid())
+  tenantId  String
+  userId    String
+  title     String?
+  provider  String       // Last used provider ('ollama', 'cerebras', 'anthropic')
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  // Relations
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  LlmMessage[]
+
+  @@index([tenantId, userId])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("llm_sessions")
+}
+
+model LlmMessage {
+  id           String     @id @default(cuid())
+  sessionId    String
+  provider     String     // 'ollama', 'cerebras', 'anthropic'
+  model        String
+  role         String     // 'user', 'assistant', 'system'
+  content      String
+  inputTokens  Int        @default(0)
+  outputTokens Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  // Relations
+  session      LlmSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("llm_messages")
+}
+
+// ============================================================================
+// Embeddings & Semantic Search
+// ============================================================================
+
+model Embedding {
+  id          String   @id @default(cuid())
+  tenantId    String
+  sourceType  String   // 'skill', 'agent', 'journal', 'document', etc.
+  sourceId    String   // Reference to source record
+  content     String   // Text that was embedded
+  contentHash String   // SHA-256 hash for deduplication
+  // Note: embedding vector stored via raw SQL, Prisma doesn't support pgvector
+  // Use: embedding vector(1536) in migration
+  provider    String   // 'openai', 'gemini', 'voyage', 'cohere'
+  model       String   // e.g., 'text-embedding-3-small'
+  dimensions  Int      // Vector dimensions
+  metadata    Json?    // Additional context
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sourceType, sourceId, contentHash])
+  @@index([tenantId, sourceType])
+  @@index([tenantId, sourceId])
+  @@index([contentHash])
+  @@map("embeddings")
+}
+
+// ============================================================================
+// MCP Server Registry
+// ============================================================================
+
+model McpServer {
+  id          String     @id @default(cuid())
+  tenantId    String
+  teamId      String?    // null for tenant-wide servers
+  name        String     // Unique name within scope
+  description String?
+  command     String     // Executable command (e.g., "npx", "node")
+  args        String[]   // Command arguments
+  env         Json       @default("{}") // Environment variables
+  version     String     @default("1.0.0")
+  sha256      String     // Hash of configuration for sync
+  scope       SkillScope @default(TEAM)
+  enabled     Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?  // Soft delete
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([teamId])
+  @@index([scope])
+  @@index([deletedAt])
+  @@map("mcp_servers")
+}
+
+// ============================================================================
+// Tenant Settings
+// ============================================================================
+
+model TenantSettings {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  eventsEnabled Boolean  @default(false) // CRITICAL: Default false for privacy
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("tenant_settings")
+}
+
+// ============================================================================
+// Usage Events (Privacy-First Design)
+// ============================================================================
+// CRITICAL: NO user_id column - this is intentional for privacy
+// Events are aggregated at tenant level only
+
+model UsageEvent {
+  id              String   @id @default(cuid())
+  tenantId        String
+  resourceType    String   // 'skill', 'mcp_server', 'rag_query'
+  resourceId      String
+  action          String   // 'invoke', 'sync', 'search'
+  bucketTimestamp DateTime // 15-minute bucket for aggregation
+  count           Int      @default(1)
+  metadata        Json?    // Non-identifying metadata only
+  createdAt       DateTime @default(now())
+
+  // NO user_id - this is intentional!
+  // NO foreign key to users table - this is intentional!
+
+  @@unique([tenantId, resourceType, resourceId, action, bucketTimestamp])
+  @@index([tenantId, bucketTimestamp])
+  @@index([tenantId, resourceType])
+  @@map("usage_events")
+}

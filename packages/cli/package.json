@@ -1,0 +1,47 @@
+{
+  "name": "@arkon/cli",
+  "version": "0.1.0",
+  "description": "Arkon CLI - tag command for AI Gateway management",
+  "type": "module",
+  "bin": {
+    "tag": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "smoke:week2": "tsx scripts/smoke-week2.ts",
+    "smoke:week3": "tsx scripts/smoke-week3.ts",
+    "smoke:week4": "tsx scripts/smoke-week4.ts",
+    "smoke": "tsx scripts/smoke-week2.ts && tsx scripts/smoke-week3.ts && tsx scripts/smoke-week4.ts",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@arkon/shared": "workspace:*",
+    "commander": "^12.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1",
+    "keytar": "^7.9.0",
+    "open": "^10.1.0",
+    "conf": "^13.0.0"
+  },
+  "devDependencies": {
+    "@arkon/tsconfig": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

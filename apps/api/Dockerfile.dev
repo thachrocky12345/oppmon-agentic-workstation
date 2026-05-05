@@ -1,0 +1,42 @@
+# =============================================================================
+# Arkon API - Development Dockerfile
+# =============================================================================
+# Hot-reload enabled development container
+
+FROM node:20-alpine
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9 --activate
+
+WORKDIR /app
+
+# Copy workspace files
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
+COPY turbo.json ./
+
+# Copy package.json files for dependency resolution
+COPY packages/tsconfig/package.json ./packages/tsconfig/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/database/package.json ./packages/database/
+COPY apps/api/package.json ./apps/api/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile || pnpm install
+
+# Copy shared packages
+COPY packages/tsconfig ./packages/tsconfig
+COPY packages/shared ./packages/shared
+COPY packages/database ./packages/database
+
+# Copy API source
+COPY apps/api ./apps/api
+
+# Generate Prisma client
+RUN pnpm --filter @arkon/database db:generate
+
+WORKDIR /app/apps/api
+
+EXPOSE 3001
+
+# Hot reload with tsx watch
+CMD ["pnpm", "dev"]

@@ -1,0 +1,17 @@
+[package]
+name = "arkon-napi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Node.js bindings for Arkon engine (stub - to be implemented)"
+
+[dependencies]
+arkon-common.workspace = true
+
+# NAPI dependencies will be added when implementing bindings
+# napi = { version = "2", features = ["async"] }
+# napi-derive = "2"
+
+[dev-dependencies]
+tokio.workspace = true

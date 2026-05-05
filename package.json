@@ -1,0 +1,50 @@
+{
+  "name": "arkon-workstation",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:api": "turbo run dev --filter=@arkon/api",
+    "dev:web": "turbo run dev --filter=@arkon/web",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+
+    "db:generate": "pnpm --filter @arkon/database db:generate",
+    "db:push": "pnpm --filter @arkon/database db:push",
+    "db:migrate": "pnpm --filter @arkon/database db:migrate",
+    "db:migrate:deploy": "pnpm --filter @arkon/database db:migrate:deploy",
+    "db:seed": "pnpm --filter @arkon/database db:seed",
+    "db:studio": "pnpm --filter @arkon/database db:studio",
+    "db:reset": "pnpm --filter @arkon/database db:push --force-reset && pnpm db:seed",
+
+    "docker:up": "docker compose up -d db",
+    "docker:up:dev": "docker compose --profile dev up -d",
+    "docker:up:prod": "docker compose --profile prod up -d",
+    "docker:up:full": "docker compose --profile full up -d",
+    "docker:down": "docker compose down",
+    "docker:down:clean": "docker compose down -v --remove-orphans",
+    "docker:logs": "docker compose logs -f",
+    "docker:logs:api": "docker compose logs -f api-dev api",
+    "docker:logs:web": "docker compose logs -f web-dev web",
+    "docker:logs:db": "docker compose logs -f db",
+    "docker:ps": "docker compose ps",
+    "docker:build": "docker compose build",
+    "docker:build:no-cache": "docker compose build --no-cache",
+
+    "setup": "pnpm install && pnpm docker:up && sleep 3 && pnpm db:push && pnpm db:seed",
+    "setup:clean": "pnpm docker:down:clean && pnpm setup"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

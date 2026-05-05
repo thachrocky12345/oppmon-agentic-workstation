@@ -1,0 +1,37 @@
+# =============================================================================
+# Arkon Web - Development Dockerfile
+# =============================================================================
+# Hot-reload enabled development container
+
+FROM node:20-alpine
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9 --activate
+
+WORKDIR /app
+
+# Copy workspace files
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
+COPY turbo.json ./
+
+# Copy package.json files for dependency resolution
+COPY packages/tsconfig/package.json ./packages/tsconfig/
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/web/package.json ./apps/web/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile || pnpm install
+
+# Copy shared packages
+COPY packages/tsconfig ./packages/tsconfig
+COPY packages/shared ./packages/shared
+
+# Copy Web source
+COPY apps/web ./apps/web
+
+WORKDIR /app/apps/web
+
+EXPOSE 3002
+
+# Next.js dev server
+CMD ["pnpm", "dev"]

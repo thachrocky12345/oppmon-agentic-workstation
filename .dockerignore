@@ -1,0 +1,90 @@
+# =============================================================================
+# Docker Build Context Ignore
+# =============================================================================
+# This file prevents unnecessary files from being included in the Docker
+# build context, which speeds up builds and prevents "invalid file request"
+# errors from symlinked packages in node_modules.
+
+# Dependencies - CRITICAL: prevents "invalid file request" errors
+node_modules
+**/node_modules
+.pnp
+.pnp.*
+.yarn
+
+# Build output
+.next
+**/dist
+**/build
+out
+
+# Environment files (use docker-compose env_file or --env-file)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Database volumes
+pgdata
+
+# Testing
+coverage
+test-results
+playwright-report
+**/tests
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archives
+*.tar.gz
+*.tgz
+*.zip
+
+# Docs (not needed in image)
+docs
+*.md
+!README.md
+LICENSE
+CHANGELOG.md
+
+# Claude Code / AI context
+.claude
+ContextFiles
+ContextFiles2
+
+# Reference only directory (read-only, not needed in builds)
+arkon-reference-only
+
+# Misc
+*.bak
+*.pem
+.vercel
+.turbo
+*.tsbuildinfo
+
+# Prisma generated files (will be regenerated in container)
+**/prisma/generated
