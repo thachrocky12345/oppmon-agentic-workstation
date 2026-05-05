@@ -1,0 +1,679 @@
+BRD: New client onboarding
+Business Requirements Document (BRD)
+Feature Name: New Client OnboardingVersion: 1.0Date: Author: Kunal Singh BhatiStakeholders:Reviewers: DavidPaul
+1. Executive Summary
+Objective:
+To implement a primary account holder & sub-account system that allows a Primary user to manage multiple profiles under a single account while ensuring compliance with legal and regulatory requirements for minors and dependent adults.
+Business Problem:
+The current onboarding process only supports individual users, preventing minors and dependent adults from accessing care through a guardian/ health care agent. Regulatory restrictions require an authorized person to manage their access to licensed care providers.
+Proposed Solution
+Introduce Primary Account Holders who can create and manage sub-accounts.
+Ensure that Protected Health Information (PHI) remains private to each sub-account.
+Implement age-based classification to enforce regulatory compliance to minors.
+Allow parents or guardians to schedule telehealth appointments for minors or dependent adults.
+Key Benefits
+Expands accessibility for families while maintaining compliance.
+Enhances the user experience by simplifying account management.
+Strengthens regulatory adherence by implementing legal age restrictions.
+2. Business Goals & Success Metrics
+Goals
+Enable onboarding for minors and dependent adults.
+Ensure legal compliance with regional healthcare laws.
+Provide seamless account management for families.
+Success Metrics
+80%+ adoption rate among families requiring sub-accounts.
+100% compliance with PHI and regional regulations.
+Reduction in support tickets related to onboarding and account management.
+3. Scope of Work
+✅ In Scope
+Implementation of Primary Account Holder & Sub-Accounts.
+Role-based access control for medical data and booking permissions.
+Automated age verification and account classification.
+Integration with telehealth appointment booking system.
+Compliance with regional laws and PHI protections.
+❌ Out of Scope
+Account deletion & transfers (handled in future phases).
+Advanced parental controls beyond appointment management.
+Validating parent or guardian info uploaded on the platform.
+Regulatory requirements for multiple countries.(will cover HIPPA only)
+4. User Personas & Use Cases
+User Personas
+Primary Account Holder (Parent/Guardian) – Manages sub-accounts and schedules appointments.
+Not at age of consent /Dependent Adult (Sub-Account User) – Receives care but cannot directly manage bookings for Licensed Care Providers.
+Care Provider – Offers services while ensuring compliance with PHI regulations.
+Not at age of consent  (Independent user) - Receives care but cannot book a telehealth call with a licensed provider if guardian info is not added.
+Use Cases
+A parent wants to create a sub-account for their child under their account.
+A parent/Guardian schedules a telehealth appointment for a dependent adult/child/teen.
+A minor tries to book an appointment with a licensed care provider (the system prevents this action if guardian info isn’t added).
+5. Functional Requirements
+Ability to create single accounts.
+Ability to create and manage sub-accounts.
+Ability to switch profile ensuring PHI is segregated.
+Age validation during onboarding.
+Linking of sub-accounts to a primary account holder.
+6. Non-Functional Requirements (NFRs)
+HIPAA Compliance for data privacy.
+Scalability to support thousands of families.
+Usability to ensure a seamless onboarding experience.
+Security mechanisms to prevent unauthorized data access.
+7. Assumptions & Constraints
+Assumptions
+Users will provide accurate age information during onboarding.
+Regulatory requirements vary by country/region.
+Constraints
+PHI must remain private within sub-accounts.
+8. Risks & Mitigation Strategies
+Risk
+Mitigation
+Users may provide false guardian details
+Implement ID verification for 
+Users provide false age info
+Implement ID verification for age-sensitive accounts.
+PHI accessed by primary account holders
+Strict role-based access control (RBAC) policies.
+9. Technical Considerations
+RBAC implementation to enforce data restrictions.
+Scalable architecture to support future feature expansion.
+Encryption of PHI to prevent unauthorized access.
+10. Compliance Requirements
+HIPAA compliance for medical data protection.
+GDPR compliance for EU-based users.
+Country-specific regulations on minor consent in telehealth.
+11. Reporting & Analytics
+Track the number of sub-accounts created.
+Monitor appointment bookings via guardians.
+Analyze user feedback on the onboarding experience.
+12. Impacted Areas
+User Registration & Onboarding
+Appointment Scheduling System
+PHI Data Storage & Access Control
+13. Success Criteria
+Seamless onboarding of sub-accounts.
+No PHI access violations are to be reported.
+Regulatory compliance confirmed by legal audits.
+14. Approval & Sign-Off
+Timeline
+Requirement Gathering: 1 Week
+Development and Testing : 3 Weeks
+Launch and Monitoring: 1 Week
+Out of Scope Scenario :
+SCENARIO: As a Client user, I am a Primary Account Holder (above age of consent).
+What’s implemented
+As a client user, I can add a Sub-Profile while onboarding or via the client portal through the profile section.
+As a client user, to add a sub profile, I need to provide the following details.
+Name (First Name,Middle Name, Last Name) 
+Phone Number
+Date of Birth (MM/DD/YYYY)
+Gender
+Address
+Street Name
+Flat/Building No.
+City
+Country
+States
+Zip Code
+Email address
+As a Client User, Through the client portal I can  edit all profile details for a sub profile linked to my account , including the email address.
+The email field remains editable when I update the Sub-Profile.
+What is out of scope
+If, in the future, the sub profile  email is used by the individual to onboard independently after email verification and create their account,
+After the user has onboarded independently, the Primary User can still edit the Sub-Profile’s email. 
+SCENARIO: Link Between Underage Client and Parent/Guardian Details
+What’s implemented?
+As an underage client user (below the age of consent), I can provide my parent/guardian details during onboarding or later through the client portal in the profile section.
+I can my Parents/Guardian details for experiencing consultation with licensed Care Providers. I need to provide:
+Relationship ( Patient/Guardian) 
+Name ( First Name,Middle Name, last Name)
+Email Address
+Phone Number
+Street Name
+Flat/Building No.
+City
+Country
+States
+Zip code
+Upload Legal Authority Document
+As a Client user, I can update these details whenever I want to.
+What’s out of scope?
+This information allows us to establish a connection between the under-age user and their parent/guardian.
+If the parent/guardian is onboarded as a user in the future, their account will be created as a linked user associated with the under-age-of-consent user.
+User Stories
+USER STORIES: NEW CLIENT ONBOARDING
+OVERVIEW:
+The onboarding flow enables users to create a base account through email/password or third-party options like Google or Apple. It supports account creation for self, children, family members, or clients. The system adjusts based on user age, ensuring parental or guardian consent when needed. Once verified, users can create and manage personalized profiles, making the platform accessible for individuals, families, and professionals alike.
+Onboarding: Creating the Base Account
+Figma link : Onboarding - Creating the base account (For Myself)
+User Story 1: Account Creation
+Title:
+As a new user, I want to create a new account by entering my details to sign up for the platform and begin using the services.
+Description:
+The new user should be able to enter their first name, middle name (optional), last name, email, and phone number to create an account. The user must create and confirm a password that meets the security criteria. Users should be able to opt to sign up through Google or Apple sign-in options. The system should validate the user input in real-time to ensure all required fields are filled, and the email and phone number are formatted correctly before submission.
+Preconditions:
+The user should have a valid email address.
+The platform should be able to handle email validation for uniqueness.
+Acceptance Criteria:
+Form Fields: The "Create an Account" form should have fields for first name, middle name (optional), last name, email, and phone number (optional).
+Email Validation: The Email field should include validation for the correct format (e.g., correct email syntax).
+Password Requirements: The user must create a password that meets existing security criteria (HIPAA-compliant).
+Show/Hide Password: There should be a "show/hide" option for the password fields.
+Terms and Conditions: Users must check the "Terms and Conditions" box to proceed, with a link that opens in a new tab.
+Sign-Up Options: Users should have the option to sign up with Google or Apple, redirecting to their authentication pages and returning with details pre-filled if authorized.
+Error Handling: If any required field is missing or contains invalid input (e.g., invalid email format), an inline error message should appear.
+Security and Backend: Passwords must be hashed and stored securely; duplicate email addresses should not be allowed.
+Verification Email: Successful account creation should trigger an email verification request Via OTP.
+User Story 2: Email Verification
+Title:
+As a user, I want to verify my email address after signing up to securely proceed to profile creation.
+Description:
+After submitting the sign-up form, users should verify their email by entering a code sent to their registered email. This process ensures that only valid users can proceed.
+Preconditions:
+The system should have sent a unique verification code to the user’s email during account creation.
+The code should have an expiration period (e.g., 5 minutes). - Not managed on our end
+The code will not be sent if a user is onboarded using signup with google or apple.
+Acceptance Criteria:
+Email Sending: After account creation, an email should contain a one-time verification code (OTP) with a time limit.
+Verification Form: A form for the verification code should include fields for input, "Verify," and "Resend code."
+Resend Code: The "Resend code" button should become clickable after 30 seconds.
+Verification Process: If the code matches, the email is marked as verified. If not, an error is displayed, and "Resend code" is available.
+Resend Code: Users can resend the code after a designated period, triggering a new OTP.
+User Story 3: Profile Creation
+FIGMA:
+Onboarding - Create profile for my Child
+Onboarding - Create profile for my Teen
+Onboarding - Create profile for my Adult family member
+Onboarding - Create profile for my client
+Title:
+As a user, I want to create a personalized profile by entering details, preferences, and visibility settings to effectively use the platform.
+Description:
+After email verification, users should complete a profile with personal information, language preferences, and visibility settings.
+Preconditions:
+Email verification must be completed.
+Acceptance Criteria:
+Profile Types: Users can choose profile types: "Myself," "My Child," "Family Member," or "My Client."
+Personal Information: Fields for name, date of birth, gender, phone, and location, validated against backend APIs.
+Profile Image: Users can upload a profile picture (JPG/PNG, max 2MB), with a circular preview.
+Primary Language: Dropdown for language selection.
+Visibility Settings: Options for visibility, healthcare proxies, and decision-making preferences.
+Save and Continue: Enabled only when mandatory fields are filled; saves to backend.
+Onboarding: Signup with Google & Apple
+NOTE: The Google sign-up flow has been implemented and is functional. However, we are currently facing issues with the Apple Developer account, which is preventing us from progressing with the Apple sign-up flow. The team is actively looking into resolving this.
+User Story 1: Sign Up with Google
+Description:
+Allow users to sign up using their Google account for a faster and more seamless onboarding experience.
+Validations:
+A "Sign Up with Google" button is visible on the Sign Up screen.
+Clicking the button initiates the Google OAuth flow.
+Acceptance Criteria:
+When the "Sign Up with Google" button is clicked, the user is redirected to the Google authentication screen.
+If the user authorizes access, the app retrieves the user's Google account data (name, email) 
+If this is the user’s first time signing up, a new account is created using the retrieved data.
+If the user has previously signed up using Google, they are logged in directly.
+User Story 2: Sign Up with Apple
+Description:
+Users should be able to sign up with Apple.
+Validations:
+"Sign Up with Apple" button redirects to Apple authentication.
+Acceptance Criteria:
+Redirects to Apple, retrieves data if authorized.
+User Story 3: Error Handling for Google and Apple Signups
+Description:
+Display clear error messages for signup issues.
+User Story 4: Complete onboarding through Google/Apple
+Title:
+Register an Account via Google/Apple Authentication
+Description:
+As a client, I want to register my account using Google or Apple authentication, so that I can quickly create an account without manually entering my basic details.
+Acceptance Criteria:
+When a user selects "Sign Up with Google" or "Sign Up with Apple," they should be redirected to the respective authentication service.
+Upon successful authentication, the user should be redirected to the "Create an Account" screen with pre-filled fields (First Name, Last Name, Email Address, and Phone Number if available from Apple).
+The password fields should not be present or should be disabled.
+The user must check the required checkbox to proceed.
+Clicking "Sign Up" should redirect the user to the "Verify Your Phone Number" screen.
+The user must enter and verify their phone number using an OTP.
+Upon successful phone verification, the account is created, and the user is redirected to the "Create Your Profile" screen.
+The "Create Your Profile" screen should display pre-filled information from the previous step.
+User Story 6: Verify Phone No. : Google /Apple
+Title:
+Verify Phone Number During Registration through Google/Apple.
+Description:
+ As a client, I want to verify my phone number after signing up via Google or Apple authentication, so that my account is secure and verified.
+Acceptance Criteria:
+The user is redirected to the "Verify Your Phone Number" screen after creating an account signup through google/apple link.
+The user receives an OTP via SMS after entering a phone number.
+Entering the correct OTP redirects the user to the "Create Your Profile" screen.
+User Story 5: Login : Google/Apple
+Title:
+ Login via Google/Apple and Redirect to Homepage.
+Description:
+As a client, I want to log in to my account using Google or Apple authentication, so that I can quickly access my account without manually entering credentials.
+Acceptance Criteria:
+The user can log in using Google or Apple authentication.
+Upon successful login, the user is redirected to the homepage.
+If it is the user’s first login, they are redirected to the "Create Your Account" screen with prepopulated data from authentication before accessing the homepage.
+Onboarding Client Portal: Manage/View Profiles
+FIGMA:
+Client Portal - View Profiles For Parent
+Switch Profile
+User Story 1: View Profile List
+Title:
+As a client, I want to see a list of all profiles associated with my account so I can manage or view them as needed.
+Description:
+Users should be able to view a list of all profiles linked to their account, such as personal, child, family member, and client profiles, and have the option to select and view details for each.
+Preconditions:
+The user is logged in.
+Multiple profiles are associated with the account.
+Acceptance Criteria:
+The profile list displays all associated profiles with names and profile pictures (if available).
+Each profile entry has an option to EDIT profile details.
+Clicking on a profile directs the user to that profile's details page for editing.
+Once changes are made update the profile and redirect user to profile listing
+User Story 2: Switch Between Profiles
+Title:
+As a client(above age of consent), I want to switch between different profiles linked to my account to manage or view them separately.
+Description:
+Users should be able to select from a list of linked profiles, switching between them to view and manage specific profile details.
+Preconditions:
+The user is logged in and has multiple profiles linked to their account.
+Acceptance Criteria:
+A "Switch Profile" button is available on the homescreen.
+Clicking "Switch Profile" opens a modal with a list of linked profiles.
+Selecting a profile updates the view to show details specific to the selected profile.
+User Story 3: Profile Selection Modal Display
+Title:
+As a client, I want to see a modal with profile options when switching profiles so I can select the correct profile.
+Description:
+Users should see a modal that displays all profiles linked to their account with names and profile pictures (if available). Users should be able to close the modal without switching profiles.
+Preconditions:
+The user has multiple linked profiles.
+Acceptance Criteria:
+The modal displays names and pictures for each profile.
+Users can't close the modal without making a selection.
+Selecting a profile closes the modal and updates the view to the chosen profile.
+Edge Cases:
+Empty Profile List: If there are no profiles to switch to, disable the "Switch Profile" button in the Hamburger Menu.
+User Story 4: Profile-Specific Data Handling for Bookings
+Title:
+As a client, I want my bookings and other profile-specific data to be saved under the selected profile to avoid data mix-up across profiles.
+Description:
+When switching profiles, any actions like booking sessions or transactions should be linked to the selected profile only. This ensures that each profile’s data remains distinct.
+Preconditions:
+The user has multiple profiles and is performing an action (e.g., booking) after selecting a profile.
+Acceptance Criteria:
+Any actions like booking or assessment are associated only with the currently active profile.
+Profile data from one profile should not overlap with another when switching.
+Bookings and other data entries are stored and displayed under the correct profile only.
+User Story 5: Logout Option
+Title:
+As a client, I want to securely log out from my account to protect my information.
+Description:
+Users should have a logout option in the profile menu, which securely logs them out and redirects to the login page.
+Preconditions:
+The user is logged in.
+Acceptance Criteria:
+A "Logout" option is visible in the profile menu.
+Clicking "Logout" ends the session and redirects to the login page.
+USER STORY 6: verify Phone number
+Title: 
+Display Verification Alert for Unverified Phone Numbers
+Description:
+As a user, I want to be notified when my phone number is unverified while editing my profile so that I can take the necessary action to verify it. The system should display a clear alert with a call-to-action to initiate verification. If my phone number is already verified, the alert should not appear.
+Acceptance Criteria:
+If the user’s phone number is unverified, an alert message should be displayed on the profile edit screen.
+The alert should contain a "Click Here to verify your phone number" message.
+Clicking the alert should open the phone number verification modal.
+If the phone number is already verified, the alert should not be displayed.
+If the user updates their phone number, the system should reset verification status and prompt re-verification.
+The system should prevent saving an unverified phone number without prompting verification.
+Onboarding: Linking Accounts for Existing Users
+NOTE: This feature is not implemented at this time. We are currently focusing on other priorities and will evaluate this functionality at a later stage if needed.
+Linking Accounts for Existing Users
+Title:
+As an existing user, I want the option to link my Google or Apple account to my profile for easier future logins.
+Description:
+Existing users should be able to link their Google or Apple accounts from their account settings. Once linked, users can use either their standard login or the linked Google/Apple login for easier access.
+Preconditions:
+The user must be logged into their account.
+Acceptance Criteria:
+"Link with Google" and "Link with Apple" options are available in the account settings.
+Upon clicking either option, the user is redirected to the respective authentication page (Google or Apple).
+If authorized, the selected account is linked successfully, and a confirmation message appears.
+Users can log in using either standard credentials or Google/Apple after linking.
+Onboarding: Account Creation if Age of Consent is Below Required Level
+FIGMA:
+Parent/Guardian not added - View Profiles For Child
+User Story 1: Display Parent/Guardian Information Form
+Description:
+Clients below the age of consent must provide parent/guardian information for account creation if they like to receive services from a licensed care provider else they will only be able to hire Non Licensed care providers.
+Validations:
+Ensure the form appears only for clients below the age of consent.
+They can select a relationship to "Parent" or "legal Guardian".
+Acceptance Criteria:
+The form displays if the client is underage.
+They can select a relationship to "Parent" or "legal Guardian".
+User Story 2: Input Validation for Parent/Guardian Information
+Description:
+Each field in the parent/guardian form should validate for accuracy.
+Validations:
+Mandatory fields should not be blank.
+Validate email, phone, and address formats.
+Acceptance Criteria:
+Required fields display error messages if blank.
+Invalid inputs prompt specific errors.
+User Story 3: Upload Legal Authority Documentation
+Description:
+Upload a legal document to verify guardian consent.
+Validations:
+Accept only allowed file types (e.g., PDF, JPG).
+File size should not exceed 5 MB.
+Acceptance Criteria:
+Document types listed for selection.
+Only supported files accepted, with error messages for unsupported types.
+User Story 4: Save and Submit Parent/Guardian Information
+Description:
+Users should save and submit guardian information to complete registration.
+Validations:
+Enable "Save" only when all validations pass.
+Acceptance Criteria:
+Button remains disabled until fields are filled.
+Submission triggers a success message.
+User Story 5: Under-Age Consent User Can Only Add Parent/Guardian Details, NO ACTION OF SWITCH PROFILE AVAILABLE FOR THEM
+As a user under the age of consent,
+I want to be restricted from adding additional profiles or unrelated details,
+So that I can only provide my parent/guardian’s information for consent and supervision.
+Acceptance Criteria:
+Onboarding Restriction:
+After profile creation, the user will see a pop-up confirming that they are below the age of consent.
+Profile Management Restrictions:
+They cannot create additional profiles for other individuals.
+The "Switch Profile" functionality will not be available.
+Onboarding: Signup existing secondary profiles
+User Story 1: Onboarding Users with the Same Email
+Title:
+Users Onboarded with the Same Email Become Clients
+Description:
+As a user onboarding with the same email as added by their primary user, I want to be automatically onboarded.
+Acceptance Criteria:
+If a user registers using an email already under some other primary account profile, they are onboarded.
+After verifying your email address, the user will be redirected to the profile screen where his/her profile will be available with an option to edit.
+The new client user can see all their past data, including appointments, favorites, and cases, from the primary account.
+USER STORY 2: Viewing & Editing Profile Data for Onboarded Users
+Title: 
+Onboarded Users Can View and Edit Their Own Data
+Description:
+As an onboarded client user, I want to view and edit my own profile information while still allowing the primary account user to manage certain aspects.
+Acceptance Criteria:
+Onboarded client users can edit their own profile details. --This will basically be having same edit page as we show for primary account user editing sub profiles
+Provide an alert to verify phone number
+The primary account user can still manage and edit the onboarded user's profile.
+The onboarded user as well as primary user can perform all standard activities available to them (e.g., booking appointments).
+User Story 3: Managing Data Across Profiles
+Title: 
+Primary Account User Can Manage Onboarded Profiles
+Description:
+As a primary account user, I want to manage the onboarded profiles and continue performing activities under them.
+Acceptance Criteria:
+The primary account user can switch between their own profile and onboarded profiles.
+Actions performed under an onboarded profile will reflect within that profile’s account.
+The primary user can view and manage the onboarded profiles’ appointments, favorites, and cases.
+The onboarded user can independently manage their own data while still being linked to the primary account.
+Test Cases
+Test Case 1 : Verify User Can Create a Client Account by Clicking on the "Create an Account" Button from the Hamburger Menu on the Home Page Preconditions:
+The user is on the home page.
+The hamburger menu icon is visible and functional on the home page.
+The login form and "Create an Account" button are available within the login form.
+Test Steps:
+Navigate to the home page.
+Click on the hamburger menu icon (represented by three horizontal lines) located in the top-right corner of the home page.
+On clicking the hamburger icon, Verify that the login form appears on the screen.
+On the login form, click the "Create an Account" button.
+Verify that the user is redirected to the "Create Account" form.
+Expected Result:
+Clicking the hamburger menu icon should display the login form.
+After clicking the "Create an Account" button, the user should be redirected to the "Create Account" form to start the account creation process.
+—------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 2: Verify that the User should be able to Fill the "Create an Account" Form. Preconditions:
+The user is on the "Create an Account" form.
+All necessary fields are visible and functional.
+The email entered during the sign-up process is valid.
+Test Steps:
+Navigate to the "Create an Account" form.
+Fill all the Necessary information in the form.
+After filling out all the required fields correctly, ensure that no validation errors are present.
+Click on the Continue button.
+Verify that the system processes the form and redirects the user to the Email Verification screen.
+Expected Result:
+The user should be able to fill out the "Create an Account" form with all required details without any validation errors.
+Clicking on the Continue button should successfully redirect the user to the Email Verification screen where they will be prompted to enter the OTP received on their email address.
+-------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 3: Verify User Can Enter OTP Received on Registered Email Address on the Email Verification Screen 
+Preconditions:
+The user has successfully filled out the "Create an Account" form and clicked "Continue."
+The user has received a One-Time Password (OTP) on the email address they entered during the sign-up process.
+The user is on the Email Verification screen.
+Test Steps:
+After clicking Continue on the "Create an Account" form, ensure that the user is redirected to the Email Verification screen.
+On the Email Verification screen, verify that there is a field to enter the OTP received in the registered email address.
+Check the registered email inbox for an OTP sent by the system.
+Enter the OTP from the registered email address into the OTP input field on the Email Verification screen.
+Click on the Verify or Submit button to submit the OTP.
+Expected Result:
+The user should be able to enter the OTP received on their registered email address.
+If the OTP is valid, the user should be successfully redirected to the next screen (e.g., Create Your Profile screen).
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 4: Verify User Needs to Fill Parent Detail Form of Underage Based on Date of Birth and Country Selected
+ Preconditions:
+The user is on the "Create Your Profile" screen.
+The user has already selected a date of birth and country.
+Test Steps:
+Navigate to the "Create Your Profile" screen.
+Select a Country from the country dropdown.
+Select a Date of Birth that makes the user underage according to the selected country's legal age.
+Verify that if the user is underage, the Parent Detail Form appears below the profile creation form.
+Verify that the Parent Detail Form includes fields such as "Parent Name," "Parent Email," "Parent Phone," etc.
+Fill out the required fields in the Parent Detail Form (optional).
+Verify that the Submit button is enabled only after filling the necessary fields.
+Expected Result:
+The system should display the Parent Detail Form only if the user is underage according to the country selected.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 5 : Verify Dynamic Calculation of Age Based on Date of Birth and Country Selected
+ Preconditions:
+The user is on the "Create Your Profile" screen.
+The user has already selected a Country and a Date of Birth.
+Test Steps:
+Navigate to the "Create Your Profile" screen.
+Select a Country from the dropdown (e.g., United States, Germany, India, etc.).
+Select a Date of Birth that should place the user underage or of legal age based on the country's laws.
+Verify that the system correctly calculates the user’s age based on the country and date of birth selected.
+Verify that if the user is underage, the Parent Detail Form is displayed.
+Test with different Countries and Date of Births to ensure that the system correctly handles different legal age thresholds dynamically (e.g., under 18 in the US, under 21 in Germany).
+NOTE : Please Refer to the provided Excel Sheet for testing valid underage age calculations for different countries and dates of birth (Age).
+Expected Result:
+The system should correctly calculate the user's age dynamically based on the country selected and the date of birth entered.
+If the user is underage according to the legal age requirements of the selected country, the Parent Detail Form should be displayed.
+The Parent Detail Form should not be shown for users of legal age according to the selected country.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 7: Verify That an Over-Age User Can Add Multiple Sub-Profiles During Onboarding
+ Preconditions:
+User has successfully completed the primary profile creation and is on the onboarding screen where sub-profiles can be added.
+The user is of legal age (over the age threshold set by the system).
+The system allows users to add multiple sub-profiles.
+Test Steps:
+Navigate to the "Create Your Profile" screen.
+Select a Country from the dropdown (e.g., United States, Germany, India, etc.).
+Select a Date of Birth that should place the user overage or of legal age based on the country's laws.
+Submit the form >> Popup Appears
+Click On Add New Profile (Sub Profile)
+Fill the form >> Submit
+Expected Result:
+The system should allow an over-age user to add multiple sub-profiles during the onboarding process.
+Each sub-profile added should appear in the list of profiles under the main account Portal page.
+The user should be able to continue adding more sub-profiles without any restrictions related to age, as long as the system supports adding multiple profiles.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 8: Verify That an Underage User Should Not Have the Option to Add Sub-Profiles During Onboarding.
+ Preconditions:
+The user has successfully completed the primary profile creation and is on the onboarding screen.
+The user is under the legal age (as per the country selected during registration).
+The system should restrict underage users from adding sub-profiles.
+Test Steps:
+Navigate to the "Create Your Profile" screen.
+Select a Country from the dropdown (e.g., United States, Germany, India, etc.).
+Select a Date of Birth that should place the user Underage or of legal age based on the country's laws.
+Submit the form.
+Expected Result:
+For underage users, the system should not display any option or button to add sub-profiles during the onboarding process.
+The user should be unable to navigate to or access any sub-profile creation feature.
+If applicable, an informative message may be displayed, informing the user why the option is unavailable.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 9: Verify that the primary user can see a listing of sub-profiles and their profile on the portal page.
+Test Case Description: This test case verifies that the primary user can see a list of sub-profiles along with their names and associated tags on the portal page. Additionally, the primary profile should be displayed with the "PRIMARY" tag, and sub-profiles should be displayed with appropriate tags such as "CHILD," "TEEN," "ADULT," etc.
+Test Steps:
+Login as a Client / Redirect to the portal page after onboarding
+Navigate to the portal page On clicking the PROFILE button under hamburger icon.
+Expected Results:
+The primary user's profile is displayed with the "PRIMARY" tag.
+All sub-profiles are displayed with their respective tags (e.g., "CHILD," "TEEN," "ADULT").
+Profile names and tags are correctly aligned and clearly visible.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 10 : Verify Primary User Can Add Sub-Profile via Portal Page
+Preconditions:
+The primary user should be registered and have valid credentials.
+The primary user should have access to the portal and profile management features.
+The portal page should have the "Add New Profile" button visible and functional.
+Test Steps:
+Login as Primary User
+Click on Hamburger Menu Icon
+Click on Profile Button
+Click on "Add New Profile" Button
+On the Profile Page, locate the "Add New Profile" button (usually labeled as "Add Sub-Profile" or similar).
+Fill in the Sub-Profile Form
+Verify Sub-Profile is Added Successfully:
+After submitting, check that the new sub-profile is listed on the Portal Page.
+Expected Results:
+Sub-Profile Creation:
+The primary user should be able to access the "Add New Profile" form from the portal page.
+After submitting the form, a new sub-profile should be successfully added in the Portal listing.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 11: Verify Primary User Can Edit Profile and Sub-Profiles from the Portal Page
+Preconditions:
+The primary user is registered and has valid login credentials.
+The primary user is logged into the portal and has access to their profile and sub-profile information.
+The portal page is fully loaded and functional.
+Test Steps:
+Login as Primary User:
+Click on Hamburger Menu Icon:
+Click on Profile Button:
+Click on Edit Icon for Primary Profile:
+On the Profile Page, click on the "Edit" icon (pencil or similar) next to the primary user's profile listing.
+Edit Primary Profile Data:
+Update the necessary fields (e.g., name, email, phone number).
+Click the "Save" or "Submit" button to save the changes.
+Click on Edit Icon for Sub-Profile:On the Profile Page, locate the sub-profile section and click on the "Edit" icon next to the sub-profile you want to edit.
+Edit Sub-Profile Data:
+Update the necessary sub-profile details (e.g., name, DOB, Address).
+Click the "Save" or "Submit" button to save the changes.
+Expected Results:
+The primary user should be able to edit their profile and see the changes after submitting the form.
+The primary user should be able to edit sub-profiles, and the changes should be reflected correctly in the profile listing after submission.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 12 : Verify that the primary user can switch to a sub-profile if added
+Preconditions:
+The primary user is registered and has valid login credentials.
+The primary user is logged into the portal.
+At least one sub-profile has been added to the primary user's profile.
+The portal page is fully functional and the "Switch Profile" feature is implemented.
+Test Steps:
+Login as Primary User:
+Click on Hamburger Menu Icon
+Verify Switch Profile Button:Check if the "Switch Profile" button is visible on the profile page.
+Expected Result: The "Switch Profile" button should only be visible if there is at least one sub-profile added.
+If no sub-profile is added, the "Switch Profile" button should not be visible.
+Click on Switch Profile Button
+Select Sub-Profile to Switch:
+Click on Submit:
+Verify Profile Switch
+Expected Results:
+Switch Profile Button Visibility:
+The "Switch Profile" button should be visible only if there is at least one sub-profile added. If no sub-profile exists, the button should be hidden.
+Profile Switch:
+After clicking "Submit," the primary user should successfully switch to the selected sub-profile, and the portal interface should display the details of the sub-profile.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 13: Verify Primary User Can Book a Session with Both Licensed and Non-Licensed Care Providers
+Preconditions:
+The primary user is registered and has valid login credentials.
+The primary user is logged into the portal or application.
+The primary user has access to book sessions with care providers.
+The system has care providers available, including both licensed and non-licensed care providers.
+The care providers' profiles (both licensed and non-licensed) are set up and available for session booking.
+Test Steps:
+Login as Primary UserNavigate to Care Providers Section:
+On the dashboard, navigate to the section where care providers are listed.
+Select a Licensed Care Provider
+Book a Session with the Licensed Care Provider or Non Licensed Care Provider.
+Verify Booking Confirmation for Licensed Care Provider or Non Licensed Care Provider.
+Expected Results:
+Booking with Licensed Care Providers:
+The primary user should be able to successfully select and book a session with a licensed care provider.
+A confirmation message should be shown after booking the session.
+Booking with Non-Licensed Care Providers:
+The primary user should also be able to successfully select and book a session with a non-licensed care provider.
+A confirmation message should be shown after booking the session.
+Booking Confirmation:
+After booking, the session should be listed in the primary user’s MY Appointments page for both licensed and non-licensed care providers.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 14: Verify Booking Made Under Sub-Profile Account Is Only Visible to That Sub-Profile
+Preconditions:
+The primary user has at least one sub-profile associated with their account.
+The primary user is logged in to the portal.
+The portal is set up to allow switching between primary and sub-profile accounts.
+The user has permission to book sessions with care providers under both the primary and sub-profile accounts.
+The care provider booking system is functional, and there are available sessions for booking.
+Test Steps:
+Login as Primary User
+Switch to Sub-Profile Account
+Navigate to the Care Provider Booking Section
+Book a Session with a Care Provider
+Verify Booking Confirmation for Sub-Profile
+After submitting the booking, verify that a confirmation message is displayed confirming that the session is booked under the sub-profile account.
+Ensure that the booking appears in the sub-profile’s My Appointment page.
+Expected Results
+ If a booking is made by a sub-profile user, it should be displayed on their profile page. The booking should not be visible on the Primary user's or any other sub-profile user's "My Appointments" page.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 15: Restriction on Booking Licensed Care Providers for Under-Age Users Without Parent Details.
+Preconditions:
+The under-age user is logged into the portal.
+The system is configured to require parent details for under-age users before they can book licensed care providers.
+The under-age user does not have parent details added in their profile.
+Test Steps:
+Login as Under-Age User
+Navigate to Care Provider Booking Section
+Select a Licensed Care Provider:
+Choose a licensed care provider (Therapist or Nurse) from the list of available providers.
+Attempt to Book a Session with the Licensed Care Provider
+Verify Restriction Message:
+If the parent details are not added, the system should prevent the booking.
+A restriction message should appear, informing the under-age user that they cannot book a session with the licensed care provider without adding parent details first.
+The message should prompt the user to add the parent details before proceeding with the booking.
+Verify Redirection to Parent Details Section:
+Expected Results:
+The under-age user should be restricted from booking a session with a licensed care provider (Therapist or Nurse) without parent details.
+A clear restriction message should be displayed, prompting the user to add parent details before they can proceed with the booking.
+The user should be able to navigate to the parent details section to complete the required information.
+--------------------------------------------------------------------------------------------------------------------------------------------
+Test Case 16: Allow Under-Age User to Book Non-Licensed Care Provider Sessions Without Parent Details.
+Preconditions:
+The under-age user is logged into the portal.
+The system is configured to allow under-age users to book sessions with non-licensed care providers (Coaches and Mentors) even if their parent details are not added.
+The under-age user does not have parent details added in their profile.
+Test Steps:
+Login as Under-Age User
+Navigate to Care Provider Booking Section
+Select a Non-Licensed Care Provider:
+Choose a non-licensed care provider (Coach or Mentor) from the list of available providers.
+Attempt to Book a Session with the Non-Licensed Care Provider
+Verify Booking Confirmation for Non-Licensed Care Provider:
+The system should allow the under-age user to successfully book the session with the non-licensed care provider, even without parent details being added.
+A booking confirmation message should appear indicating the session has been successfully booked.
+Expected Results:
+The under-age user should be able to successfully book a session with a non-licensed care provider (Coach or Mentor) without any issues, even though their parent details are added or not added.
+The booking should be confirmed and visible in the under-age user’s session history or upcoming appointments.

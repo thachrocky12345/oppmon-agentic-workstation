@@ -1,0 +1,75 @@
+Business Requirements Document (BRD)
+1. Feature Name
+Off-Site Booking Link
+2. One-Paragraph Summary
+The Off-Site Booking Link enables a provider to share a single, focused booking link that allows a client to schedule and pay for a session without navigating the Really Global marketplace or the provider’s public profile. The experience is intentionally designed as a contained purchasing funnel: clients see the provider’s availability, select a service (if applicable), choose a date and time, authenticate, and complete payment in one uninterrupted flow. This feature reduces friction when a client already knows who they want to book, increases provider confidence in sharing Really Global links, and supports provider-driven growth while preserving platform economics.
+3. Problem Statement
+Providers frequently interact with prospective clients off-platform (DMs, email, communities, chat, referrals) and are often hesitant to send those clients to a full marketplace experience. The risk of distraction, comparison shopping, or abandonment reduces conversion and discourages providers from routing demand through Really Global. Without a focused, off-site booking experience, providers lack a frictionless way to close a booking while still using the platform’s scheduling, payment, and reminder infrastructure.
+4. Strategic Context
+The Off-Site Booking Link is a core conversion and trust mechanism for provider-driven demand. It allows Really Global to function as the transaction and operational layer while staying out of the way of the provider–client relationship. Strategically, this supports faster conversions, higher provider adoption, and long-term defensibility by embedding Really Global into real-world workflows without forcing marketplace exposure at the point of purchase.
+This feature is intentionally scoped as an MVP conversion surface, not a full embedded platform or API product.
+5. Goals
+Enable providers to convert off-platform conversations into completed bookings with minimal friction
+Increase provider confidence in sharing Really Global booking links
+Preserve a focused, distraction-free purchase flow for clients
+Ensure all off-site bookings still run through Really Global’s scheduling, payment, and reminder systems
+Incentivize providers to use Off-Site Booking Links by applying the same 5% provider‑attributed platform fee reduction used by the Direct Booking Link****
+6. Non-Goals (Out of Scope) (Out of Scope)
+Marketplace browsing, search, or provider discovery
+Switching between providers within the off-site flow
+Embedded iframe widgets or white-label components
+Talk Now / instant session variants
+Advanced analytics dashboards or conversion reporting
+Full public API productization
+7. Primary Users / Actors
+ProvidersProviders who have already established trust with a client and want to share a direct purchase link.
+ClientsClients who already know which provider they want to book and want to schedule and pay quickly.
+Platform (System)Responsible for enforcing provider context, availability, authentication, payment, attribution, and pricing rules.
+8. User Motivation & Incentives
+ProvidersProviders want a clean, reliable way to close bookings without risking distraction or losing the client to marketplace comparison. The off-site link also qualifies eligible bookings for reduced platform fees.
+ClientsClients want a fast, simple way to book a known provider without unnecessary steps or exploration.
+PlatformThe platform benefits from higher conversion of provider-driven demand and increased trust from providers.
+9. Core Experience (Outcome-Level)
+When a client clicks an Off-Site Booking Link, they enter a contained booking flow focused solely on that provider. The experience presents availability, allows service selection if applicable, supports authentication, and completes payment without exposing marketplace navigation or other providers.
+The experience should feel similar to a dedicated checkout flow (e.g., a Stripe-style purchase link), optimized for both desktop and mobile, and designed to minimize friction, distraction, and abandonment.
+10. Success Metrics / Signals
+Percentage of active providers using Off-Site Booking Links
+Conversion rate from off-site link click to completed booking
+Share of total bookings originating from off-site links
+Provider satisfaction and continued usage of the feature
+11. Constraints & Guardrails
+The flow must remain single-provider and focused end-to-end
+Clients must authenticate so bookings are associated with a full client account
+Client onboarding requirements (email verification, phone number, age/date of birth, address/location, and vulnerability questions) remain mandatory for compliance
+Client profile image upload is optional during onboarding and must not block booking
+Payment is required upfront for all bookings
+Off-site bookings must use the same calendar, availability, payment, and reminder logic as on-platform bookings
+The experience must be mobile-friendly and work in common in-app browsers
+Really Global branding and a backlink must be present, even if minimal
+All bookings completed via an Off-Site Booking Link qualify for the same 5% provider-attributed platform fee reduction applied to Direct Booking Link bookings
+12. Risks & Open Questions & Open Questions & Open Questions
+Balancing minimal friction with required authentication
+Handling social and in-app browser limitations
+Deciding between provider-level vs service-specific link structure
+Future expectations around API or embedded usage beyond MVP
+13. Dependencies
+Provider calendar and availability systems
+Existing booking and checkout flow
+Authentication and session handling
+Payment processing (Stripe and PayPal)
+Attribution and pricing logic
+13a. Payment Processor Capability (Technical Reality)
+Off-site bookings rely on the platform’s existing ability to process payments and apply a variable platform fee at the time of transaction.
+Stripe (Standard connected accounts): The platform can set the platform fee per transaction, enabling reduced fees for eligible off-site bookings.
+PayPal: The platform can specify a platform fee during order creation, allowing the same pricing logic to apply.
+Payment processors do not determine eligibility; they execute the fee specified by the platform.
+14. Definition of “Done” (Outcome-Based)
+Providers can generate and share an off-site booking link
+Clients can complete scheduling and payment without visiting the marketplace or provider profile
+All bookings use existing platform scheduling, payment, and reminder infrastructure
+Bookings completed via the Off-Site Booking Link are correctly marked as provider‑attributed and receive the same 5% platform fee reduction as Direct Booking Link bookings****
+The experience functions reliably on desktop and mobile
+15. Open Design & Implementation Space
+Open Design & Implementation Space
+This document defines what must be achieved, not how it must be built.
+Engineering, Design, and QA are encouraged to propose solutions that satisfy the outcomes and constraints above while keeping the implementation minimal, focused, and extensible for future use cases.

@@ -1,0 +1,73 @@
+Business Requirements Document (BRD)
+1. Feature Name (Working Title)
+MVP Customer Support Chatbots (Provider Bot + Client/Public Bot) – OpenAI
+2. Summary
+We currently spend $240/month on Microsoft Copilot to power simple customer-support Q&A experiences based on internal Word documents.
+This MVP replaces Copilot with a cheaper solution using OpenAI-managed file storage and retrieval so we can deliver “good enough” customer support at low volume without building production-grade infrastructure.
+We will ship two separate bots: - Provider Bot: available on the provider funnel page(s), provider onboarding, and inside the provider portal - Client/Public Bot: available on the public website for visitors/clients and inside the client portal
+We will reuse the existing chatbot UI code currently used for Copilot as the baseline and adjust only as needed.
+3. Problem / Opportunity
+What friction or limitation exists today? - We are paying $240/month for low incremental value at our current support volume. - We want a lightweight way to answer common questions from existing internal docs without creating a full public Help Center yet.
+Why is this worth solving now? - Cost reduction is immediate. - This unlocks a practical support experience while we build higher-leverage assets later (public blog/Help Center, improved documentation, deeper support tooling).
+Do not describe the solution.
+4. Goals
+Reduce recurring spend by replacing Microsoft Copilot for these bots.
+Deliver a natural, helpful Q&A experience grounded in the existing Word docs.
+Maintain strict separation between Provider knowledge and Client/Public knowledge.
+Capture learning: what users ask, what the docs do not cover, and what needs to become a real public Help Center later.
+Provide a simple fallback when the bot cannot help (collect email + problem statement).
+5. Primary Users / Actors
+Providers
+Providers exploring signup (funnel pages)
+Providers completing onboarding
+Providers using the provider portal
+Clients/Public
+Public visitors evaluating the platform
+Clients using the client portal
+Internal Team
+Support/Admin receiving escalations
+Team members reviewing logs to identify missing documentation
+6. Core Outcome / Experience
+Provider Bot - Provider asks a question. - Bot responds naturally using only Provider documents. - If the bot cannot answer from the documents, the bot offers a simple fallback: - Ask for the provider’s email address - Ask for a short description of the issue - Send this to the support team via email
+Client/Public Bot - Visitor/client asks a question. - Bot responds naturally using only Client/Public documents. - If the bot cannot answer from the documents, the bot offers a simple fallback: - Ask for the user’s email address - Ask for a short description of the issue - Send this to the support team via email
+Important note (current constraint) - There is currently no public blog / Help Center, and these internal documents are not publicly accessible. - Therefore, the bot should not attempt to “send users to the document.” - Until we have a public Help Center, the bot should provide direct instructions in the answer and use the fallback escalation when needed.
+7. Constraints / Guardrails
+MVP scope and simplicity - MVP only. Keep it simple. - Use the Word documents as-is (the same documents currently uploaded to Copilot). - No fine-tuning required for MVP. - Prefer OpenAI’s managed file storage + retrieval rather than building custom retrieval infrastructure.
+Knowledge sources - Two knowledge sources will be provided by the business: - Knowledge Source A: Provider documents - Knowledge Source B: Client/Public documents - Document titles and descriptions can be copied directly from Azure (where the documents already have Copilot-ready descriptions).
+Separation - Provider Bot must only use Provider documents. - Client/Public Bot must only use Client/Public documents.
+UI - Existing chatbot UI code will be provided for reference and reuse. - Engineering may improve or adjust the UI code as needed, but should not rebuild the UI from scratch for MVP.
+Privacy and safety - The bot should discourage users from sharing sensitive personal information in chat. - Escalation collection should be minimal: email + short problem description.
+8. Success Signals
+Monthly Copilot spend reduced or eliminated for these bots.
+Users can get correct answers to common questions without contacting support.
+When the bot cannot help, escalation is clean and actionable (email + problem description sent to the team).
+Internal visibility exists into:
+Top questions asked
+Top unanswered questions
+Topics that should become formal public Help Center content
+9. Risks / Open Questions
+Email escalation feasibility - Requirement: the bot must be able to collect an email address and send an email to the support team with the user’s problem. - This is feasible, but depends on selecting the outbound email method (e.g., existing Microsoft 365 mailbox/SMTP or an email service).
+Doc conflicts / outdated guidance - If documents contain conflicting instructions, the bot may answer inconsistently. - Mitigation (MVP): prefer newer docs when metadata is available; capture unresolved issues via escalation/logs.
+No public docs to link - Users cannot be sent to the underlying documents until a public Help Center exists. - Mitigation (MVP): answers must be self-contained; escalation fills the gap.
+Security / prompt injection - Users may attempt to manipulate the bot to reveal provider-only content or internal instructions. - Mitigation (MVP): strict separation of knowledge sources and conservative response behavior.
+10. Definition of “Done”
+Provider Bot is live in:
+Provider funnel page(s)
+Provider onboarding
+Provider portal
+Client/Public Bot is live in:
+Public website pages
+Client portal
+Each bot uses only its assigned knowledge source.
+Existing chatbot UI code is working end-to-end with the new backend.
+Escalation flow works end-to-end:
+Collect email + problem
+Send the issue to the support team via email
+Basic logging exists for questions and escalation outcomes.
+A documented process exists to update/replace the underlying Word documents.
+11. Open Design & Implementation Space
+Keep it simple.
+Engineering should optimize for the minimum viable build that replaces Copilot and supports low volume, while leaving room for later improvements.
+MVP-friendly approach - Use OpenAI-managed file storage + retrieval to ground answers in documents. - Reuse existing chatbot UI code. - Implement a minimal escalation flow (email + problem description) rather than broader ticketing/CRM integrations.
+Future expansion (not required for MVP) - Add stronger “source transparency” in the UI when it becomes useful (internal document references now; public links later). - Build a public Help Center/blog and convert the internal docs into public articles. - Use support logs to prioritize what to publish first. - Add analytics dashboards and deeper workflows when volume justifies it.
+Inputs needed from the business to complete implementation - The two document sets (Provider documents and Client/Public documents) - The support inbox destination (where escalation emails should be sent) - The existing chatbot UI code location (repo/path) and where it is currently embedded - Any message you want shown when the bot can’t answer and needs to escalate

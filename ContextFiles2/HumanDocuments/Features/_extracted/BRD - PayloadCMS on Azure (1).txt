@@ -1,0 +1,55 @@
+Business Requirements Document (BRD)
+1. Feature Name - PayloadCMS on Azure
+2. One‑Paragraph Summary
+This project establishes the self-hosted backend infrastructure for "Really Global’s" Content Engine. It involves deploying PayloadCMS on our existing Azure Virtual Machines to act as the centralized management system for 100,000+ programmatic SEO pages and the company blog. This feature is for the Engineering and Content teams to enable scalable, code-first content management without relying on fragile CSV scripts, ultimately supporting our 57-language global expansion strategy. 3
+3. Problem Statement
+Who experiences this problem? The Engineering team and Content/SEO stakeholders. 4
+What friction exists today? Currently, SEO content is managed via local CSV scripts and manual database updates. This process is unscalable, prone to breaking with single-character formatting errors, and cannot support the complexity of 20+ languages or dynamic content blocks. 5
+Why does this problem matter now? We are approaching a critical growth phase where we must scale from hundreds of pages to over 100,000. Continuing with the current manual workflow will turn Engineering into data janitors and prevent us from executing our global localization strategy. 6
+4. Strategic Context
+What behaviors should this feature encourage? This infrastructure encourages a "Headless" architecture where content is decoupled from code. It allows us to manage content programmatically (via API) and safely (via a typed schema). 7
+How does it support speed and defensibility? It creates a "Single Source of Truth" for all text content. By configuring the system for 57 languages now, we create a long-term advantage by being "Global Ready" instantly when we choose to turn on translation features, rather than facing a massive database migration later. 8
+5. Goals
+Establish a secure Admin Panel: A developer can log into a live URL and manage content. 9
+Enable Global Schema: The database is initialized with support for 57 distinct locales (languages). 10
+Eliminate Infrastructure Waste: The system runs on existing Azure resources (VMs/Postgres) with minimal cost overhead. 11
+6. Non‑Goals (Out of Scope)
+Frontend Integration: This project does not include modifying the Next.js frontend to display the content. 12
+Data Migration: We are not importing the v13 CSV data or WordPress content in this phase. 13
+Translation: We are not translating actual content; only the infrastructure for holding translations is being built. 14
+7. Primary Users / Actors
+Lead DevOps Engineer: The primary implementer who provisions the infrastructure and configures the application. 15
+Lead Developer: The reviewer who ensures the schema configuration matches the application's type requirements. 16
+Product Owner (CEO): The validator who logs in to confirm the system is accessible and localization-ready. 17
+8. User Motivation & Incentives
+DevOps: Motivates engagement by removing the need to run manual scripts for content updates. It provides a stable, containerized environment that is easier to monitor and maintain. 18
+Product Owner: Reduces the pain of "fragile" deployments. Creates value by visibly demonstrating that the platform is ready for global scale. 19
+9. Core Experience (Outcome‑Level)
+The user should feel secure knowing that the Content Engine is isolated from the Patient Data. 20
+It should be obvious that the system is built for scale; the Admin UI should load instantly and show the language switching capabilities immediately. 21
+The system should naturally support the creation of new SEO pages without requiring a code deployment or a database migration. 22
+10. Success Metrics / Signals
+Operational Indicator: The Admin URL (e.g., cms.really.global/admin) returns a 200 OK status and allows login. 23
+Database Signal: A new schema (content_engine) exists in Postgres and contains the payload_ tables. 24
+Configuration Signal: The API response for a page request includes keys for all 57 supported languages. 25
+11. Constraints & Guardrails
+Must integrate with existing systems: Must run on the current Azure VM and connect to the existing Azure Postgres instance. 26
+Must comply with security policies: Content data must be strictly isolated in a separate database schema (content_engine) and never touch the public schema containing PHI (Patient Health Info). 27
+Must support specific locales: The configuration must include the specific 57 ISO language codes defined in the Technical Appendix to match our Translation API capabilities. 28
+12. Risks & Open Questions
+Risk: Potential port conflicts if running on the same VM as the Next.js application without proper Nginx proxying. 29
+Risk: Memory constraints on the Azure VM when running both the application and the CMS simultaneously. 30
+13. Dependencies
+Internal platform: Access to the Azure Portal and SSH access to the specific VM. 31
+Internal platform: PostgreSQL Admin credentials to create the new schema and user. 32
+14. Definition of “Done” (Outcome‑Based)
+The PayloadCMS application is running as a background service (Docker/PM2) on the Azure VM. 33
+Nginx is configured to route traffic securely to the CMS. 34
+The "Landing Page" collection exists in the database with the correct fields. 35
+The "Localization" dropdown in the Admin UI shows English as default but contains the underlying structure for 57 languages. 36
+15. Open Design & Implementation Space
+This document defines what must be achieved (a scalable, localized, self-hosted CMS), not how it must be built. Engineering is encouraged to propose the most efficient deployment strategy (e.g., specific Docker compose configurations or PM2 setups) that satisfies the constraints of our Azure environment. 37
+Technical Appendix: Configuration Requirements
+To satisfy the Constraint regarding localization, the payload.config.ts must use this specific configuration:
+TypeScript
+localization: {  // Strategy: "Really Global" Coverage (57 Languages)  // Aligned strictly with our Automated Translation API capabilities.  // Only 'en' will be active for MVP, but DB must be pre-provisioned.  locales: [    'en', // English (Default)    // Tier 1: The Giants    'zh', 'es', 'ar', 'hi', 'pt', 'fr', 'ru', 'de', 'ja', 'id',    // Tier 2: Strategic Markets    'ur', 'sw', 'tr', 'ko', 'vi', 'it', 'th', 'pl', 'uk', 'fa',    'ms', 'nl', 'ro', 'el', 'cs', 'hu', 'he', 'tl',    // Tier 3: Nordics    'sv', 'da', 'fi', 'no', 'is',    // Tier 4: Extended Europe & Eurasia    'sk', 'hr', 'sr', 'bg', 'ca', 'lt', 'sl', 'lv', 'et', 'hy',    'az', 'kk', 'be', 'bs', 'mk',    // Tier 5: Additional Supported Languages    'mr', 'kn', 'ta', 'ne', 'af', 'gl', 'cy', 'mi'  ],  defaultLocale: 'en',  fallback: true,}

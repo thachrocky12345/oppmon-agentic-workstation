@@ -1,0 +1,107 @@
+BRD - Session Notifications
+Purpose
+This document defines the requirements for session-related email and SMS notifications for both Clients and Providers on the Really Global platform. The goal is to increase attendance, reduce confusion around refunds and scheduling, and ensure Providers are reliably prepared for sessions.
+This BRD groups related notification behavior into a single document for speed. Engineering may split this into separate epics or tasks for implementation.
+Feature Name
+Session Notifications
+Summary
+This feature establishes a standardized notification system covering the full lifecycle of a scheduled session, including booking confirmation, refund-policy reminders, session reminders, and schedule changes. Notifications must be clear, minimal, and operationally reliable across time zones.
+Problem / Opportunity
+There is currently no consistent session notification system for Clients or Providers. This leads to missed sessions, refund confusion, provider uncertainty after changes, and unnecessary support burden. Improving notification reliability directly improves marketplace trust and liquidity.
+Goals
+Increase session attendance and reduce no-shows
+Ensure Clients clearly understand the 24-hour refund and rescheduling policy
+Ensure Providers receive timely, low-noise reminders
+Eliminate confusion when sessions are canceled or rescheduled
+Primary Users / Actors
+ClientsIndividuals booking sessions on the platform.
+ProvidersIndependent care providers offering sessions.
+PlatformResponsible for triggering and delivering notifications.
+EngineeringResponsible for implementation and integrations.
+Core Outcome / Experience
+Clients feel confident they are booked, understand their options, and are reminded at the right moments. Providers trust that they will not miss sessions and are only interrupted when it matters. The system operates automatically without manual intervention.
+Constraints / Guardrails
+Email is required for all key lifecycle notifications
+SMS is reserved for time-sensitive reminders and schedule changes
+Refund policy must be communicated at booking and before the refund cutoff
+All notifications must be timezone-correct
+Notifications must not require manual internal intervention
+SMS must support STOP and HELP and honor opt-out globally
+Definition of Done
+Architecture and Dependencies
+Transactional notifications must be sent from a dedicated Twilio sender separate from any marketing traffic
+Carrier-level opt-outs must be honored and logged
+Client Notifications
+General Rule for Late BookingsIf a session is booked after a reminder window has passed, that reminder is skipped. Future reminders that have not yet passed must still be sent.
+Booking Confirmation
+Email is sent immediately with session details, refund policy, and a calendar invite or add-to-calendar link
+SMS is not sent unless the session begins within 12 hours of booking
+48 Hours Before Session
+Email reminder is sent including refund-policy reminder
+SMS reminder is sent including manage-appointment link
+24 Hours Before Session
+Email reminder is sent
+SMS reminder is sent without refund-policy language
+1 Hour Before Session
+SMS reminder is sent with join link
+10 Minutes Before Session
+SMS reminder is sent with join link
+Provider Notifications
+Booking Confirmation
+Email is sent with session details and calendar invite
+SMS is not sent
+24 Hours Before Session
+Email reminder is sent
+1 Hour Before Session
+SMS reminder is sent
+10 Minutes Before Session
+SMS reminder is sent
+Schedule Changes
+When a session is rescheduled, all pending reminders for the old time are canceled and a new set is created for the new time.
+Client-Initiated Cancellation
+Client receives email confirmation
+Provider receives email and SMS
+Provider-Initiated Cancellation
+Client receives email and SMS
+Provider receives email confirmation
+Dependencies
+Background job scheduler with delayed send and cancellation support
+Mailmodo for email delivery
+Twilio for SMS delivery
+Implementation Note
+The assigned developer must contact DavidPaul Doyle to obtain access to Mailmodo and Twilio before implementation begins.
+Developer Handoff Checklist
+Verify Mailmodo API access and template permissions
+Verify Twilio access and transactional sender configuration
+Confirm calendar invite generation with correct timezone handling
+Test late booking scenarios
+Test reschedule cancellation and re-queue behavior
+Handle Twilio STOP errors gracefully without retries
+1. Credentials & Access
+[ ] Mailmodo: Verified API access and template creation permissions.
+[ ] Twilio: Verified access to buy/configure numbers.
+[ ] Sender ID Strategy:
+Action: Purchase or configure a dedicated phone number (or Messaging Service) for these transactional alerts.
+Verification: Ensure this number is NOT used by any marketing campaigns.
+2. Calendar Implementation (.ics)
+[ ] Library Selection: Select a library (e.g., ical-generator for Node, icalendar for Python) to generate valid .ics files on the fly.
+[ ] Timezone Check: Ensure the .ics file content explicitly defines the start/end times in UTC or includes the correct timezone offset to prevent "floating time" errors in Outlook/Google Calendar.
+3. The "Late Booking" Unit Test
+Requirement: If I book a session that starts in 2 hours...
+[ ] Pass: System sends "Confirmation Email" (with ics).
+[ ] Pass: System skips "48h" and "24h" triggers.
+[ ] Pass: System DOES schedule/send the "1 Hour" and "10 Minute" SMS reminders.
+4. The "Reschedule" Integration Test
+Requirement: User moves Friday 2 PM session to Monday 4 PM.
+[ ] Pass: Friday 2 PM reminders (48h/24h/1h) are deleted from the job queue.
+[ ] Pass: Monday 4 PM reminders are created in the job queue.
+[ ] Pass: Client receives "Rescheduled" confirmation email.
+[ ] Pass: Provider receives "Rescheduled" SMS + Email.
+5. Failure Handling
+[ ] Twilio 21610 Error: Ensure the code catches error 21610 (User hit STOP) gracefully and logs it as "Opted Out" rather than retrying endlessly and clogging the error logs.
+Review Session NOTE:  1/9/2025 
+Follow with DavidPaul on the idea of having a dashboard module to show the upcoming events 
+User profiles 
+Clinician 
+Patient 
+This module would be visible to click on the “Meeting Event” to view details. 

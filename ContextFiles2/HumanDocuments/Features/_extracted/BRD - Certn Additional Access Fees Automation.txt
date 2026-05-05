@@ -1,0 +1,112 @@
+BRD - CERTN ADDITIONAL ACCESS FEES AUTOMATION
+Purpose
+This document defines the requirements to automate the handling of additional third‑party access fees incurred during provider verification on the Really Global platform. The goal is to eliminate manual intervention, ensure transparency and compliance with prior provider consent, and reliably recover verification costs without degrading provider trust.
+This BRD covers ingestion of monthly access‑fee reports from Certn, provider notification with a 24‑hour notice, and automated follow‑up charging via Stripe.
+Feature Name
+BRD - Certn Additional Access Fees Automation
+Summary
+Really Global charges providers upfront for standard verification costs (licenses, education, background checks) using a flat global fee. However, some universities, certification boards, or private institutions impose additional record‑access fees that are not known at the time of purchase. These fees are charged by the institution directly to Certn and passed through to Really Global.
+Providers explicitly pre‑authorize these potential additional fees during checkout. When Certn later reports these access fees, Really Global must notify the provider with a 24‑hour advance notice and then charge the saved payment method.
+Today, this process is handled manually. This feature automates the end‑to‑end workflow.
+Problem / Opportunity
+Manual handling of access fees is time‑consuming, error‑prone, and unscalable. Each month, Certn provides reports identifying which verifications incurred additional access fees, but there is no automated mechanism to:
+Notify affected providers consistently
+Enforce the required 24‑hour notice
+Reliably charge the correct payment method
+Maintain an auditable trail
+Automating this process reduces operational risk, ensures policy consistency, and allows Really Global to scale verification without absorbing third‑party costs.
+Goals
+Fully automate additional verification access‑fee handling
+Ensure providers receive a clear 24‑hour advance notice
+Charge providers only after the notice period expires
+Eliminate manual Stripe charging and email sending
+Maintain alignment with Stripe authorization and compliance requirements
+Primary Users / Actors
+ProvidersCare providers purchasing verification on Really Global
+CertnThird‑party verification partner supplying monthly access‑fee reports
+Platform (System)Processes reports, sends notifications, and triggers charges
+Finance / OperationsMonitors outcomes but does not execute manual steps
+Core Outcome / Experience
+Providers understand why an additional charge is occurring, recognize it as something they previously approved, receive advance notice, and experience a predictable, professional charge process.
+Internally, the system handles ingestion, notification, delay, and charging without human intervention, while maintaining logs and traceability.
+Constraints / Guardrails
+Providers must have explicitly pre‑authorized additional access fees during checkout
+A minimum 24‑hour notice is required before charging
+Charges must use the existing saved payment method from the original verification purchase
+All charges must be processed through Stripe
+The system must distinguish access fees from standard verification fees
+The system must tolerate partial or manual report ingestion
+Background Context
+Certn charges Really Global monthly for both standard verification fees and additional access fees
+Access fees are institution‑specific and variable
+Certn reports explicitly identify access fees versus standard fees
+Providers are informed of this possibility during checkout and agree to it
+Really Global already stores Stripe payment credentials using proper authorization flows
+High‑Level Flow
+Certn provides a monthly report identifying access fees
+Report is imported into Really Global (manual upload acceptable)
+System matches report rows to provider accounts via email
+System sends a 24‑hour notice email via Mailmodo
+System waits 24 hours
+System automatically charges the provider via Stripe
+Charge outcome is logged
+Definition of Done
+The feature is considered complete when the following conditions are met:
+A. Report Ingestion
+System supports importing Certn access-fee reports (CSV or equivalent)
+Access fees are programmatically distinguished from standard verification fees
+Each fee row can be matched to a provider account using email
+B. Provider Notification (24-Hour Notice)
+A separate notification email is sent for each individual access fee reported by Certn.
+Providers may receive multiple emails if multiple access fees apply; the email copy must clearly explain this behavior.
+Each email must include:
+Institution name (exact source of the access fee)
+Clear description of why the institution requires an additional access fee
+Total amount that will be charged
+Reminder that this fee was pre-authorized during verification checkout
+Clear statement that the charge will occur automatically after 24 hours
+The notification must not itemize internal processing or payment costs.
+Email must be sent using the Mailmodo template titled: “Verification - Additional Charge - 24 hour notice”
+C. Charging Logic
+Each Certn access fee is charged as a separate Stripe transaction.
+The final charge amount must fully recover all third-party and payment-processing costs incurred by Really Global.
+Any internal uplift or adjustment applied to recover processing costs must remain an internal calculation and must not be exposed to providers.
+Stripe charges must be executed off-session using the previously authorized payment method.
+Charge descriptions must reference the institution name and access-fee context.
+No charge may occur if the corresponding notification email fails to send.
+Each Certn access fee is charged as a separate Stripe transaction.
+The final charge amount must be calculated as: Certn access fee + 10% processing surcharge.
+The surcharge exists to fully recover Stripe transaction and card-processing costs.
+Stripe charges must be executed off-session using the previously authorized payment method.
+Charge descriptions must include the institution name and access-fee context.
+No charge may occur if the corresponding notification email fails to send.
+D. Failure Handling
+Failed charges are logged with error details.
+Failed emails prevent charge execution.
+Duplicate charges are prevented.
+E. Audit & Traceability
+Each access fee has a clear lifecycle record:
+Imported
+Notified
+Charged or failed
+Dependencies
+Certn monthly access-fee report with institution-level detail
+Mailmodo (email API / template variables)
+Stripe (off-session charging, saved payment methods)
+Internal job scheduler with delayed execution support
+Certn monthly access-fee report with institution-level detail
+Mailmodo (email API / template variables)
+Stripe (off-session charging, saved payment methods)
+Internal job scheduler with delayed execution support
+Certn monthly access‑fee report
+Mailmodo (email API / webhook support)
+Stripe (stored payment methods and off‑session charges)
+Internal job scheduler with delayed execution support
+Open Design & Implementation Space
+This BRD defines required outcomes, not implementation specifics. Engineering may choose the simplest reliable approach for report ingestion, per-fee notification handling, surcharge calculation, scheduling, and charging, provided all guardrails and behaviors above are met.
+Implementation Note for Assigned Developer
+The developer assigned to this feature must coordinate with DavidPaul Doyle to obtain:
+Mailmodo API access and the approved email template
+Stripe configuration details for off-session charges
+Sample Certn reports for testing
+Access and clarification are required before development begins.

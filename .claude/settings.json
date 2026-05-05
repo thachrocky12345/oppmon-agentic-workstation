@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "post_init": ".claude/hooks/post_init.sh"
+  },
+  "skills": {
+    "init": ".claude/skills/init/SKILL.md",
+    "diagrams": ".claude/skills/diagrams/SKILL.md"
+  },
+  "auto_load_skills": ["init", "diagrams"]
+}

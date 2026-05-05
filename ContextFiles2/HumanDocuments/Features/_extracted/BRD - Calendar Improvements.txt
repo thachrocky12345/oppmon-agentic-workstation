@@ -1,0 +1,117 @@
+BRD - Calendar Improvements
+Loom Walkthrough (Required Viewing)
+https://www.loom.com/share/d1ee6de09e9d4ceba6cbd9bcc7660a30
+Figma Reference (Current Calendar Designs)
+https://www.figma.com/design/8HzhLJfW7I3csHz0K7E5ZP/Really-Global-FINAL-DESIGN?node-id=1-54
+Roadmap Thread (Context + Comments)
+https://roadmap.really.global/b/y0gzrk1v/feature-ideas/calendar-improvements-share-your-ideas#comment_l0on94el
+Purpose
+Improve provider scheduling so Care Providers can easily stay bookable and visible on the platform, while ensuring clients only see providers they can book soon.
+This BRD groups multiple related improvements into one document for speed. The Lead Dev may split this into separate BRDs/epics for implementation.
+Required Setup for Designers and Developers
+Designers and Developers should each create and maintain:
+1 Provider account
+1 Client account
+These accounts should be created on the Development server and used continuously to validate:
+Provider experience (availability, calendar sync, service settings)
+Client experience (viewing availability, booking)
+Edge cases (visibility gating, conflicts, durations, buffers)
+The goal is to stop designing/building blind. Everyone should be able to log in, reproduce issues quickly, and confirm fixes before shipping.
+Background and Current Issues
+No recurring availability, so providers must repeatedly add availability within the next ~2 weeks to stay visible.
+Providers fall out of visibility over time, reducing marketplace liquidity.
+Calendar sync appears limited (currently one Google and one Microsoft connection).
+Calendar sync horizon into the future appears limited (exact window unknown).
+Service duration appears locked to 60 minutes and there is no buffer time between sessions.
+Overall calendar UX/UI feels clunky and non-standard.
+Marketplace Rule That Must Be Preserved
+Providers should only be visible to clients if they have bookable availability soon.
+The Loom mentions this is currently configured as availability within the next 2 weeks. This must be confirmed (exact value and where it is enforced). Visibility should update quickly when availability changes.
+Goals
+Make it easy for providers to remain continuously visible without repeated manual effort.
+Add recurring availability (weekly working hours + repeat rules + overrides).
+Add Apple Calendar sync.
+Allow syncing multiple calendars per provider (within defined MVP limits).
+Extend calendar sync horizon (target: at least 6 months; stretch: 12 months if feasible).
+Confirm and document the visibility gating rule and ensure fast, reliable propagation.
+Enable providers to set session durations (common options; ideally 5-minute increments).
+Enable providers to set buffer time between sessions.
+Improve UX/UI so the calendar feels modern, intuitive, and trustworthy.
+Non-Goals
+Building a full Calendly replacement.
+Implementing every advanced recurrence edge case on day one.
+Reworking payments or session delivery flows.
+Changing marketplace discovery logic beyond enforcing availability gating correctly.
+Scope Overview
+Recurring availability (daily/weekly/monthly patterns)
+General working hours (baseline availability settings)
+Apple Calendar sync
+Multiple calendar connections per provider (X calendars)
+Extend sync horizon (6–12 months)
+Visibility gating confirmation + provider-facing visibility status messaging
+Service duration configuration (30/45/50/60/etc., ideally 5-min increments)
+Buffer time between sessions
+Overall UX/UI improvements
+Functional Requirements
+A) Recurring Availability
+Requirements:
+Providers can set recurring availability using simple patterns (weekly minimum; daily/monthly if feasible).
+Providers can define baseline working hours (general availability).
+Providers can add one-off overrides (time off, special hours).
+Recurring availability must not create bookable slots that conflict with booked sessions or synced busy times.
+MVP recommendation: weekly working-hours template + one-off overrides; expand patterns later if needed.
+B) Apple Calendar Sync
+Requirements:
+Add Apple Calendar as a sync option alongside Google and Microsoft.
+Synced busy times block booking availability (prevents double-booking).
+UI makes clear what sync does (blocks time) and what it does not do (does not auto-create availability unless designed).
+C) Multiple Calendars per Provider (X Calendars)
+Requirements:
+Allow providers to connect multiple calendars (define an MVP limit X).
+Provider can choose which connected calendars block time (simple toggle per calendar).
+Default behavior should minimize mistakes (recommended default: connected calendars block time).
+D) Extend Sync Horizon
+Requirements:
+Increase how far ahead busy time is synced and considered for conflict prevention.
+Target 6 months minimum; stretch 12 months.
+Document the chosen horizon and reasoning.
+E) Visibility Gating + Propagation
+Requirements:
+Confirm the exact gating rule (X days) and where it is enforced (API/search/index/cache).
+Ensure visibility changes propagate reliably and fast when availability changes.
+Add provider-facing visibility status messaging with a direct fix action (e.g., add availability).
+F) Session Duration Options
+Requirements:
+Providers can set session duration per service.
+MVP options: 30, 45, 50, 60, 75, 90 minutes (minimum).
+Preferred: allow 5-minute increments with reasonable min/max boundaries.
+Client booking only shows slots that can fit the duration (and buffer, if enabled).
+G) Buffer Time Between Sessions
+Requirements:
+Provider can set buffer time (e.g., 0, 5, 10, 15 minutes).
+Buffer is enforced so back-to-back sessions are prevented when buffer > 0.
+Buffer applies consistently across booking surfaces.
+H) UX/UI Improvements
+Requirements:
+Core actions are obvious without relying on hidden info icons/videos.
+Provider can quickly understand: working hours, recurring availability, overrides, calendar connections, visibility status.
+Calendar interactions feel modern and predictable (drag, click, edit, delete).
+QA / Test Scenarios (Must Test)
+Provider with no availability within X days is not visible.
+Provider adds availability within X days and becomes visible.
+Provider removes near-term availability and becomes not visible.
+DST transition week in provider timezone.
+Multiple calendars connected: events in any connected calendar block time.
+All-day and multi-day external events block the correct ranges.
+External recurring events block correctly.
+50-minute session + 10-minute buffer behaves as expected.
+Buffers prevent back-to-back sessions when enabled.
+Open Questions (Designer + Developer Checklist)
+What is the exact visibility gating window (X days) and where is it enforced?
+Is visibility computed in real time or via a background index/cache job? What is the target propagation time?
+How is availability represented today (explicit blocks vs rule-based)? Which approach will we extend for recurring rules?
+Will providers be able to offer multiple services with different durations? If yes, how does the client choose without confusion?
+What is the MVP Apple Calendar sync approach that fits our current auth model and architecture?
+What should the MVP limit X be for connected calendars, and how will we message limits in the UI?
+Where should working hours, recurring availability, service duration, and buffers live so providers can actually find them?
+How do we message visibility status so it drives the correct action and reduces support load?

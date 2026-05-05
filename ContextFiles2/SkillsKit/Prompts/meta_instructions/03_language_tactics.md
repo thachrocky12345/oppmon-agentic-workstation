@@ -1,0 +1,9 @@
+# Language‑Specific Tactics
+
+Different languages and frameworks require different heuristics. The following tactics address VB.NET, ASP.NET MVC, WebForms and common C# patterns:
+
+- **VB.NET modules and forms**: Search for `Module` declarations and `Sub Main` functions to find entry points. Forms are partial classes that inherit from `System.Windows.Forms.Form`. The `.Designer.vb` file lists controls and wires up events; review it to see which methods handle user actions.
+- **ASP.NET MVC**: Start with `Program.cs` or `Startup.cs` and `Global.asax`. The `RouteConfig` class registers routes that map URLs to controllers. Controllers derive from `Controller` and contain actions returning `IActionResult`. Look for dependency injection registration in `services.AddSingleton` or similar calls in the startup configuration to see how services are wired.
+- **ASP.NET WebForms**: Identify `.aspx` pages and their code behind files. The page lifecycle methods (`Page_Init`, `Page_Load`, `Page_PreRender`) control execution. Controls on the page have event attributes that map to handlers in the code behind.
+- **Service and data patterns in C#**: Search for interfaces with names ending in `Service`, `Repository` or `Manager`. Implementations often use dependency injection. For database access, look for classes using `DbContext` or executing `SqlCommand`. Recognise anti patterns such as static classes storing state or tightly coupled layers.
+- Be aware of language specific traps. VB.NET allows global variables in modules, leading to hidden state. WebForms mixes markup and code, which can obscure flow. Always cross check event registration with handler definitions to avoid missing code paths.

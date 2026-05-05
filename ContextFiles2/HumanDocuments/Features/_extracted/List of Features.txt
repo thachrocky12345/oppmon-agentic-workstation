@@ -1,0 +1,64 @@
+List of Features
+Product Development Goals and Priorities
+Red items are priorities.
+DevOps - Robert Oliver
+PayloadCMS on Azure (Must be done before Features in Green below.)
+Discoverability - Clients and Providers (Public Facing)
+SEO
+Technical SEO
+Update Therapist URLs
+Suicde Hotline Pages Directory - (BRD - Global Suicide & Crisis Hotline Pages - English)
+Therapist SEO Page Implementation V2
+Nav Bar UX/UI improvements
+Symantec Search
+Review System
+Location-based navigation content
+Customer Support Blog
+Profile page content
+General Content Blog
+On-Page Schema/Meta-Data for all pages
+Language Translation
+MCP / LLM Integration - In-Chat Discoverability
+Real-Time Audio Translation
+Provider Activation (Provider Onboarding & Portal)
+Ease
+Simplicity
+Speed
+Conversion - Clients (Public Facing)
+Ease
+Simplicity
+Trust
+Sufficient Choice -> Match
+3 Primary Surface Areas of the Site:
+Red items are priorities due to cost savings and current user bugs/issues.
+Public Facing
+SEO
+Suicide Hotline Pages (Same as above)
+Navigation SERPs (Same as above)
+Custom Support Chatbots
+Talk Now
+Find Matches (Survey)
+US Booking Location Confirmation
+Provider Onboarding / Portal
+Calendar Improvements
+Session Notifications
+Video popups
+Therapy and Support Groups
+Improve Session management inside portal (Start/Join button)
+Direct Booking Link
+Offsite Booking Link
+Clients can purchase recurring sessions
+Provider / Client Direct Messaging inside Portal for session re-scheduling, coordination, homework, questions
+Provider / Provider Direct Messaging inside Portal for Team Collaboration and Referrals
+A method for Providers and/or Clients to more easily book follow-up appointments during an appointment or via Direct Messages after a call (Provider lead)
+Company Accounts
+YouTube Improvements
+Client Onboarding / Portal
+Mailmodo kicking off wrong email after signup
+Admin Tool
+Approve Verified Badge in Admin Tool
+Certn Additional Access Fees Automation
+Add providers and their data to Go High Level
+MixPanel reports
+Provider activation reporting/fall off
+Homepage visitors

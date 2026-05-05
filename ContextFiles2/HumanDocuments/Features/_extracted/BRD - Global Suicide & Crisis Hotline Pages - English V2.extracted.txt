@@ -1,0 +1,306 @@
+Business Requirements Document (BRD)
+
+1. Feature Name (Working Title)
+
+BRD - Global Suicide & Crisis Hotline Pages - English V2
+
+This Feature must be done after this Feature Below.BRD - PayloadCMS on Azure
+
+2. One-Paragraph Summary
+
+This initiative establishes the production infrastructure to publish approximately 100 pre-researched, country-specific suicide and crisis hotline pages. Currently existing as unique Google Docs, these pages must be migrated into our PayloadCMS on Azure environment with 100% fidelity. This is a high-risk content preservation and international SEO execution project, not a standard content generation task. The primary requirement is the perfect preservation of content, structure, metadata, manual schema, and URL logic while rendering high-quality, crawlable HTML pages via Incremental Static Regeneration (ISR). Critical to success is the Manual Human Entry of content to guarantee safety and accuracy, moving away from automated scripts.
+
+3. Problem Statement
+
+Who experiences this problem? Users in distress seeking immediate help, search engines crawling for authoritative data, and the Really Global platform risking liability. What friction, inefficiency, or limitation exists today?
+
+User Safety: Users arriving via our "Safety Banner" or Google search need immediate, verified, clickable access to local crisis resources. Currently, this data is locked in Google Docs.
+
+SEO & Discovery: Without explicit country and language signals, search engines may serve generic or irrelevant pages (e.g., a US hotline to a user in Italy).
+
+Data Integrity: Automated ingestion scripts pose a life-safety risk by potentially mangling phone numbers or stripping critical schema distinctions (e.g., NGO vs. Government services). Why does this problem matter now? We are launching a global mental health marketplace. We must defensively own the "Crisis Hotline" search intent to prevent harm, ensuring users find correct local resources immediately.
+
+4. Strategic Context
+
+What behaviors should this feature encourage? Immediate trust and action. Users should feel safe clicking verified links. How does it support speed, innovation, or defensibility?
+
+Defensive SEO: By capturing "Suicide Hotline [Country]" search intent with verified data, we build domain authority and prevent users from finding low-quality spam sites.
+
+Global Scale: This infrastructure sets the foundation for our 57-language expansion, proving we can handle complex, localized data at scale.
+
+Trust: The "Verified" badge and transparent "Last Updated" dates differentiate us from stale directories.
+
+5. Goals
+
+100% Fidelity Migration: All content from ~100 Google Docs is manually migrated to PayloadCMS without error.
+
+Geo-Discovery: A user in Italy searching "suicide hotline" finds the /en-IT/ page, not a generic global page.
+
+Performance: Pages load instantly (<200ms TTFB) using ISR architecture on Azure.
+
+Trust: Social sharing (OG Images) and on-page signals (Verified Date) clearly communicate safety.
+
+6. Non-Goals (Out of Scope)
+
+Automated Content Ingestion: We will not use scripts to parse the Google Docs narrative content due to safety risks.
+
+Legacy Redirects: There are NO legacy URLs to redirect. This is a fresh build.
+
+User Accounts: This feature does not require user login or account creation.
+
+7. Primary Users / Actors
+
+End User (In Crisis): Needs immediate, friction-free access to a clickable phone number.
+
+Search Bot (Googlebot): Needs structured data (Schema) and clear URL signals to index the page correctly.
+
+Content Editor: Needs a rigid CMS structure to input verified data without breaking the layout.
+
+Developer: Needs explicit component specs to build the frontend.
+
+8. User Motivation & Incentives
+
+End User: Motivated by Urgency. They need a number now.
+
+Search Bot: Motivated by Clarity. Structured data and unique URLs make indexing easier.
+
+Platform: Motivated by Safety & Reputation. Providing accurate data prevents harm and builds brand trust.
+
+9. Core Experience (Outcome-Level)
+
+The user should feel relieved to find a verified, local number immediately.
+
+It should be obvious that the page is specific to their country (Flag, Title) and is up-to-date (Verified Date).
+
+The system should naturally support sharing. Sending a link to a friend in need should generate a trustworthy preview image.
+
+10. Success Metrics / Signals
+
+Migration Accuracy: 100% of published pages match source Google Docs (Visual QA).
+
+SEO Validation: 0 Errors in Google Rich Results Test for Schema.
+
+Performance: Core Web Vitals (LCP) < 2.5s.
+
+Indexation: All valid country pages are indexed by Google within 30 days of launch.
+
+11. Constraints & Guardrails
+
+Manual Migration Mandate: Content migration must be performed manually by humans. Automated scripts are forbidden for narrative content.
+
+URL Structure: Must strictly follow the /en-[COUNTRY]/ pattern (e.g., /en-IT/).
+
+Schema Source of Truth: Schema must be manually pasted from Google Docs, not auto-generated.
+
+Mobile First: All phone numbers must be tel: links.
+
+Visual Assets: Flags must be rendered via local SVG library (flag-icons), not external CDNs.
+
+12. Risks & Open Questions
+
+Risk: Manual entry errors. Mitigation: Strict QA gate requiring visual comparison to Google Docs.
+
+Risk: "Clean Paste" failure. Mitigation: Configure Payload's Rich Text Editor to strip div, span, and style tags on paste.
+
+Risk: Non-Latin script URL handling. Mitigation: Ensure slug fields support UTF-8 characters.
+
+13. Dependencies
+
+PayloadCMS on Azure: Infrastructure from Phase 1 must be operational.
+
+Source Google Docs: The ~100 verified documents are the sole source of truth.
+
+Design Assets: Default "Verified" background image for dynamic OG generation.
+
+14. Definition of “Done” (Outcome-Based)
+
+Infrastructure is live on Azure (Payload + Next.js).
+
+All ~100 country pages are published with 100% content fidelity.
+
+Global Index Page is live with Region Taxonomy and Intro Content.
+
+Dynamic OG Images are generating correctly.
+
+All pages pass the SEO Acceptance Gate (Appendix A).
+
+15. Open Design & Implementation Space
+
+Component Design: Developers have freedom in how to construct the React components (e.g., using Tailwind or CSS Modules) as long as the visual output matches the requirements.
+
+Search Filter: The client-side filter on the Index Page can be a simple text input or a more complex dropdown, provided it is fast.
+
+
+
+Technical Appendix & Specifications
+
+A. Canonical URL Strategy (Non-Negotiable)
+
+To maximize geo-relevance and SEO discovery, every country page must use an explicit Language-Country identifier.
+
+A.1 URL Pattern
+
+Required Pattern: https://really.global/[language]-[COUNTRY]/[slug]/
+
+Examples:
+
+/en-IT/crisis-suicide-hotlines/ (Italy - English)
+
+/en-BS/crisis-suicide-hotlines/ (Bahamas - English)
+
+https://really.global/ar-EG/الخطوط-الساخنة-للانتحار/ Egypt (Arabic - Future)
+
+Forbidden: really.global/en/hotlines/italy/ (Generic), really.global/hotlines/bahamas/ (No language).
+
+A.2 Routing Middleware (Developer Requirement)
+
+Since Next.js defaults to /en/IT/, the developer must use Next.js Middleware to rewrite the URL.
+
+Logic: Regex match ^/([a-z]{2})-([A-Z]{2})/ -> Extract Locale (en) and Country (IT) -> Query Payload for page with countryCode: IT.
+
+Constraint: Do not rely on default i18n routing.
+
+B. Data Architecture (PayloadCMS Schema)
+
+B.1 Collection Design
+
+The developer must configure PayloadCMS with specific collections to support the manual migration.
+
+1. Regions Collection (Taxonomy)
+
+Fields: Name (e.g., "North America"), Slug (e.g., north-america).
+
+Purpose: Grouping countries in the Global Index Page for Topical Authority.
+
+2. Hotline_Pages Collection
+
+Field: Country Code (ISO): Select field (e.g., IT, US) to drive URL/Flag logic.
+
+Field: Region: Relationship link to Regions.
+
+Field: Content (Narrative): Rich Text field (Lexical/Slate).
+
+Clean Paste Config: Must STRIP div, span, style, class. Must ALLOW h2, h3, p, ul, li, strong, em.
+
+Field: Hotline Entries (Repeater Field): See Section B.2 for details.
+
+Field: SEO Override:
+
+Meta Title (Manual override).
+
+Meta Description (Manual override).
+
+JSON-LD Schema (Code block for pasting manual Schema).
+
+Canonical URL (Manual override).
+
+B.2 Hotline_Card Component (Flexible Repeater Architecture)
+
+To handle the extreme variance between countries (e.g., USA's "Text HOME" vs. Philippines' network-specific numbers), the "Hotline Entry" must not be a static form. It must be a Nested Repeater.
+
+Level 1: The Organization Container
+
+Organization Name (Text) - e.g., "NCMH Crisis Hotline"
+
+Description (Rich Text) - Brief details about who they serve.
+
+Service Tags (Select - Multi): Options: 24/7, Free, Government, NGO, LGBTQ+.
+
+Level 2: The Contact Methods (Nested Repeater)
+
+The Content Editor can stack as many of these as needed per Organization.
+
+Method Type (Select): Phone Call, SMS/Text, WhatsApp, Web Chat, Website Link.
+
+Label/Instruction (Text): e.g., "Landline (Luzon)", "Veterans Press 1", "Text 'HOME'", "Globe/TM Subscribers".
+
+Action Value (Text):
+
+If Phone: The clean number for dialing (e.g., 1553).
+
+If Web: The URL.
+
+SMS Body (Text - Optional): Specific keyword to text (e.g., "START").
+
+Is Primary? (Checkbox): Highlights this specific button as the main CTA (e.g., for 988).
+
+C. Frontend & UI/UX Specifications
+
+C.1 Global Index Page (/hotlines/)
+
+Hub Content: Must include a 300-word introductory section (managed in CMS) explaining verification protocols to establish Topical Authority.
+
+Taxonomy: List countries grouped by Region (H2 tags).
+
+Visual Assets: Use flag-icons NPM package for local SVG flags. NO external CDNs.
+
+Filter: Simple client-side text filter ("Find your country...").
+
+C.2 Dynamic Social Trust (OG Images)
+
+Requirement: Sharing a link must generate a specific verified image.
+
+Implementation: Use @vercel/og or next/og to generate images on the edge.
+
+Logic: Input Country Name -> Overlay on Brand Template -> Output: "Suicide & Crisis Hotlines in [Country] | Verified Resources".
+
+C.3 SEO Fallbacks
+
+Description: If Meta Description is empty, auto-generate: "Find crisis and suicide prevention hotlines in [Country Name]. Verified, free, and confidential resources."
+
+D. Technical SEO & Schema
+
+D.1 Schema Injection
+
+Source: Raw JSON-LD from Google Docs.
+
+Method: Inject directly into <head>. Do NOT auto-generate.
+
+Validation: Must include ContactPoint with contactType: "crisis-support".
+
+D.2 Hreflang & Canonicals
+
+Canonical: Mandatory self-referencing tag.
+
+Hreflang: Auto-generate based on Country Code cluster (e.g., /en-IT/ self-reference).
+
+E. Migration & DevOps
+
+E.1 Manual Migration Process
+
+Developer: Deploys Payload Collections & Frontend.
+
+Content Team: Manually copies Title, Content, Phone Data, and Schema from Google Docs to Payload.
+
+Why: Ensures 100% fidelity.
+
+E.2 Hosting
+
+Stack: PayloadCMS + Next.js on Azure.
+
+Caching: Incremental Static Regeneration (ISR) with 60-second revalidation.
+
+
+
+Appendix A: SEO Acceptance Gate (Checklist)
+
+Engineering cannot mark a ticket "Resolved" until these pass for a sample of 5 countries.
+
+[ ] URL Check: URL follows ISO format (/en-MX/) via Middleware and returns 200 OK.
+
+[ ] Canonical Check: Canonical tag matches browser URL exactly.
+
+[ ] Schema Validation: Passes Google Rich Results Test (0 errors). Check for contactType: "crisis-support".
+
+[ ] Mobile Click-Test: Clicking phone number launches dialer with correct digits (sanitized).
+
+[ ] Social Check: OG Image generates correctly with Country Name.
+
+[ ] Primary CTA: Primary Button numbers are visually distinct.
+
+[ ] Bot Access: Page has index, follow meta tag.
+
+[ ] Data Integrity: Phone number matches Master Google Doc exactly.
+
+
+

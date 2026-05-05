@@ -1,0 +1,387 @@
+Business Requirements Document (BRD)
+1. Feature Name (Working Title)
+Review System V4 (Marketplace Model)
+2. One-Paragraph Summary
+This feature adds an Amazon-style review system to Really Global provider profiles so clients can quickly decide if a provider is a good fit. A client can leave a public review after a verified completed session, and the review appears publicly right away after automated safety checks. Reviews focus on two things: (1) a star rating plus a short written explanation, and (2) “fit signals” that describe the provider’s style (for example, gentle vs direct). Providers can publicly reply to reviews, but they cannot block reviews before publication. The system also captures private, non-public feedback and internal technical issue reports so client concerns can be addressed without harming a provider’s reputation for platform problems.
+3. Problem Statement
+Right now, clients have limited proof that a provider is a good match for them before they spend meaningful money and time. This creates three problems.
+First, clients hesitate to book because they cannot easily judge fit. Mental health is not like ordering food or buying a product. Two providers can both be excellent but have very different styles. Without fit evidence, clients make guesses.
+Second, providers lack consistent, trustworthy social proof on their profiles. That hurts bookings and harms marketplace growth.
+Third, when the platform has technical issues (for example, video problems), clients may blame the provider even when it is not the provider’s fault. That is unfair and damages provider trust in the platform.
+4. Strategic Context
+Really Global is a two-sided marketplace. We must help clients choose with confidence while also protecting providers from unfair or unsafe content.
+This review system is designed to behave like a modern marketplace:
+Low friction, so reviews actually get written (to avoid a “ghost town”)
+Fast publication, so content stays fresh and trustworthy
+Strong verification and abuse prevention, so reviews cannot be easily gamed
+Fit-focused signals, so clients can find the right provider (not just “a good provider”)
+Long-term, the “fit signals” also become structured data that can improve matching and retention.
+5. Goals
+Increase client confidence to book by showing credible, verified public reviews
+Help clients self-select based on provider style (fit), not just star ratings
+Increase bookings and repeat bookings by improving match quality
+Protect providers from platform-related negative reviews (video, audio, connection, site bugs)
+Provide a safe path for clients to give private feedback when they do not want to post publicly
+Create clean, indexable review pages that can be discovered through search
+6. Non-Goals (Out of Scope)
+A mobile app specific review experience (this is web only, responsive)
+Provider identity verification changes (review eligibility relies on session completion status)
+AI-written “summary” paragraphs of reviews in V1 (added later when volume exists)
+A complex dispute-mediation process before reviews go live
+Allowing providers to remove reviews directly (removal is only via defined abuse reporting and moderation)
+7. Primary Users / Actors
+Client
+A person who books and completes sessions with a provider and can leave reviews.
+Provider
+A professional with a public profile on Really Global who can receive reviews and reply to them.
+Public Visitor
+Anyone viewing a provider profile or reviews page. They do not need an account to read reviews.
+Platform Operations (Internal)
+Staff or admins who review queued items (safety issues, technical-issue reviews) and handle abuse reports.
+Platform (System)
+The software that determines eligibility, collects reviews, runs automated checks, publishes reviews, and powers review pages.
+8. User Motivation & Incentives
+Client
+Wants to avoid wasting money on a poor fit.
+Wants signals like style, warmth, directness, structure, and competence.
+May want anonymity due to stigma and privacy.
+Provider
+Wants more bookings from credible social proof.
+Wants fair treatment when platform issues occur.
+Wants the ability to respond professionally without getting into a public argument.
+Platform
+Wants more bookings and better retention through better matches.
+Wants reviews to be trusted by users and search engines.
+Must avoid publishing unsafe content or personal medical information.
+9. Core Experience (Outcome-Level)
+After a verified completed session, a client should naturally be invited to leave a review.
+Leaving a review should feel simple and safe, with clear anonymity.
+Reviews should go live quickly (after automated checks), without providers being able to block them.
+A provider’s profile should make it obvious what kind of provider they are (fit signals), not only “how good.”
+If a review is really about a platform failure (video did not load), it should not appear publicly as a provider review.
+Providers should be able to reply in a short, calm way.
+Visitors should be able to scan reviews quickly (histogram, helpful votes, filters).
+10. Success Metrics / Signals
+Review conversion rate: percent of eligible clients who submit a review
+Time to first review for a provider after their first completed session
+Average number of reviews per active provider
+Booking conversion rate on provider profiles that show reviews vs do not show reviews
+Repeat booking rate for clients after using reviews
+Share of negative reviews that are classified as “platform/tech-only” and removed from public display
+Abuse rate: percent of reviews/replies that require moderation actions
+11. Constraints & Guardrails
+V1 is web and responsive only.
+We must assume some clients will be on mobile even if the experience is not ideal.
+Reviews must be anonymous to the public by default.
+Providers cannot see the client’s real identity in the review UI.
+Reviews must be tied to verified session completion.
+Reviews must not reveal personal health information, contact information, or sensitive identifying details.
+The dedicated reviews page must be a clean URL path, not a tab or query parameter.
+Required pattern: https://really.global/[provider-handle]/reviews
+12. Risks & Open Questions
+Risk: Mandatory text could lower review volume.
+Risk: Providers may attempt to infer reviewer identity.
+Risk: Abuse or retaliation attempts (review bombing, fake reviews, provider harassment).
+Risk: Over-moderation can reduce trust if users feel reviews are being censored.
+Open questions (to answer during implementation planning):
+Final minimum word count for written reviews (this BRD sets it; we may adjust after data).
+Whether “helpful vote” requires login (this BRD requires login; see details below).
+Whether provider replies are allowed in all languages on day one (assumed yes, since site is translated).
+13. Dependencies
+Session lifecycle state in the database (must know when a session is truly completed)
+Session duration tracking (needed for minimum duration eligibility)
+Email and in-app notification systems
+Provider profile page and routing system (provider-handle at root)
+Internal admin tooling for moderation queues and abuse reports
+The existing site-wide translation system (for displaying reviews in multiple languages)
+14. Definition of “Done” (Outcome-Based)
+This feature is done when all of the following are true:
+A client who completes an eligible session can submit exactly one public review for that provider
+Reviews publish immediately after automated checks (no provider veto)
+Provider can post a reply that appears under the review, with clear content rules
+Tech-related low “Tech Score” reviews are queued and can be removed from public display if confirmed as tech-only
+Provider profile shows star average, histogram, fit-signal summary, and a review list sorted by helpful votes
+A dedicated reviews page exists at /[provider-handle]/reviews with pagination
+Reviews and the reviews page are crawlable by search engines (server-rendered HTML, proper canonical tags, included in sitemap)
+Abuse reporting exists for providers (and optionally clients) with clear moderation outcomes
+15. Open Design & Implementation Space
+Engineering and design may choose the exact UI components (sliders vs mutually exclusive tag pairs) and the exact internal architecture, as long as all requirements below are met.
+Functional Requirements (Detailed)
+This section defines the specific behaviors that must exist.
+A. Eligibility and Access Control
+A1. Verified Session Definition (non-negotiable)
+A client becomes eligible to leave a review only when all conditions below are true:
+The session record status in the database equals COMPLETED
+The session is not marked as NO_SHOW
+The session is not marked as CANCELLED_LATE
+The session duration is greater than 3 minutes
+Reason: prevents reviews from accidental connects, immediate drops, or instant hang-ups
+A2. One Review Per Client–Provider Pair
+A client may have only one active public review for a given provider.
+If the client attempts to review again after more sessions, the system must prompt them to update their existing review instead of creating a second review.
+A3. Review Update History Log
+Every time a review is updated, the system must store the prior version in an immutable history log.
+The public page shows only the latest version.
+The history log is internal-only and used for audits and trust & safety investigations.
+A4. Helpful Vote Reset on Review Update
+If a client updates their review, the “Helpful” vote count must reset to 0.
+Reason: votes were earned by the old text. They must not carry over to new text.
+B. Review Submission (Client Form)
+B1. Step 1: Star Rating (Mandatory)
+Client must select 1, 2, 3, 4, or 5 stars.
+B2. Step 2: Fit Signals (Mandatory)
+V1 ships with 4 fit signal pairs. Each pair describes a spectrum of valid styles.
+Pair 1: Gentle / Supportive ↔ Direct / Challenging
+Pair 2: Mostly Listens ↔ Actively Guides with Tools
+Pair 3: User-Led Processing ↔ Structured with Homework
+Pair 4: Practical Solutions ↔ Insight and Emotions
+No default rule (non-negotiable):
+Each fit signal must have no pre-selected value.
+The client must actively set each one.
+If any fit signal is untouched, the form must block submission and show a clear message like: “Please answer all 4 style questions.”
+Implementation freedom:
+These can be implemented as sliders or as mutually exclusive tag pairs.
+If implemented as tag pairs, the client chooses one option from each pair.
+B3. Step 3: Written Review (Mandatory in V1)
+Written text is mandatory.
+Minimum length: 50 characters.
+Reason: we want meaningful content and avoid empty 5-star spam.
+This is a V1 decision based on a desktop-first assumption. We will measure drop-off.
+Required guidance text (plain English):
+A short note above the text box: “Your review is public, but your name is not shown.”
+A short note below the text box: “Do not include phone numbers, email addresses, or personal medical details.”
+B4. Step 4: Tech Experience (Internal Only)
+This is not public and must never show on the provider profile.
+Question: “Did you have technical issues during the session?”
+Response options:
+Option A: Yes / No
+Option B: 1 to 5 rating
+Trigger rule for operations queue:
+If “Yes” is selected, or if a 1–5 tech score is 2 or lower, the review must go to the Operations Queue (see Moderation section).
+If “Yes” (or tech score ≤ 2), show a text box:
+“What went wrong? (This is private and helps us fix the platform.)”
+B5. Step 5: Private Notes (Optional)
+These notes are not public. They are separate from the public review text.
+Field 1: “Private note to the provider (optional)”
+Explain: “Only the provider can see this. It will not appear on their public profile.”
+Field 2: “Private note to Really Global (optional)”
+Explain: “Only the Really Global team can see this. It will not appear on any public page.”
+Important rule
+If a client writes something in either private field, that content must not be copied into the public review automatically.
+C. Publication and Moderation
+C1. Immediate Publication Rule
+Reviews are intended to publish immediately after submission.
+There is no “hold period” for provider negotiation or mediation.
+The only delay allowed is the automated checks and/or queue routing described below.
+C2. Automated Checks Before Publication
+Automated checks must run before a review can appear publicly.
+Auto-Block (reject immediately):
+Phone numbers
+Email addresses
+Physical addresses
+Social media handles intended as contact info
+Hate speech or slurs
+Clear threats of violence directed at a person or group
+Auto-Queue (needs human review):
+Mentions of self-harm or suicide
+Claims of criminal activity
+Claims that suggest immediate danger
+Important clarity:
+Some words can be used in a positive context (example: “They helped me with self-harm”). That is why these go to a queue, not auto-block.
+C3. Operations Queue (Tech Score Protection)
+If the tech indicator is “Yes” or tech score is 2 or lower:
+The review must not publish immediately.
+It must enter an Operations Queue for review.
+Operations Queue outcomes:
+Outcome 1: Tech-only complaint
+Definition: the text is solely about platform issues (video, audio, connection, login, payment failure) and does not describe provider care.
+Result:
+Do not publish the review publicly.
+Do not count the star rating toward the provider’s average.
+Store the content internally for bug tracking and internal analytics.
+Outcome 2: Mixed (tech + provider feedback)
+Definition: the text includes meaningful provider experience plus mentions technical issues.
+Result:
+Publish the review publicly.
+Count the star rating toward the provider’s average.
+Rationale (plain English): If the client took the time to review the provider, the star rating reflects their overall experience. A tech hiccup does not automatically make the provider rating “invalid.”
+Public display rule for tech-only:
+Show nothing publicly.
+Do not show a greyed-out item.
+Do not show “removed” placeholders.
+C4. Provider Abuse Reporting (Post-Publication)
+Providers can report a review after it is published.
+Reporting does not remove the review immediately.
+Reports go to a moderation queue.
+Required report reasons:
+Not a real client
+Harassment or threats
+Contains personal medical details or identifying details
+Hate speech
+Technical issue (if provider believes it should have been classified as tech-only)
+Moderation outcomes:
+Keep review as-is
+Remove review from public display (and exclude from averages)
+Edit/redact specific text (only if absolutely necessary; prefer removal)
+D. Provider Right of Reply
+D1. Provider Reply Rules
+Providers can reply to any published review.
+Reply publishes immediately after automated checks (same checks as reviews).
+Reply constraints:
+Maximum length: 500 characters.
+Plain text only (no links, no formatting).
+D2. Allowed and Forbidden Content (plain English)
+Allowed:
+Thanking the reviewer
+General statements about improving service
+General clarification that does not identify the client
+Forbidden:
+Anything that identifies the client
+Mentioning session details
+Mentioning diagnoses, medications, treatment plans, or personal history
+Asking the client to contact them privately in a way that reveals contact info
+Threats, insults, or harassment
+D3. Editing Provider Replies
+Providers may edit their reply.
+The reply must show an “Edited” timestamp.
+Editing a reply must not trigger a new notification to the client.
+E. Helpful Votes (Most Helpful Sorting)
+E1. Voting Rules
+Each review has two buttons: Helpful and Not Helpful.
+A user must be logged in as a client account to vote.
+One vote per user per review.
+Users can change their vote (example: from Helpful to Not Helpful).
+E2. Anti-Brigading Basics (V1)
+Rate limit voting per account (example: no more than 20 votes per day).
+Rate limit voting per internet address (reasonable limits to avoid bots).
+Track suspicious voting patterns for internal review.
+F. Review Display (Provider Profile)
+F1. Review Summary Header (Amazon-style)
+On the provider profile page, show:
+Average star rating (example: 4.7 out of 5)
+Total number of reviews
+Rating histogram (bar chart showing count of 5-star down to 1-star)
+F2. Fit Signal Summary (Distribution, not average)
+The profile must summarize fit signals as distributions.
+Example outputs:
+“Mostly Gentle/Supportive (80%)”
+“Mixed opinions: 50% Gentle, 50% Direct”
+Important rule:
+Do not show a single “middle” slider position as an average.
+If opinions are split, the UI must say it is split.
+F3. Review List
+Default sorting:
+Sort by Most Helpful (highest Helpful count first).
+If all Helpful counts are zero (for example, new provider), fall back to Most Recent.
+Filters (V1):
+Filter by star rating (example: show only 5-star reviews)
+Filter by fit signals
+Example: “Show reviews that describe the provider as Mostly Listens.”
+F4. Provider Replies
+Display provider replies directly under the review.
+Label clearly: “Response from [Provider Display Name]” and show date.
+G. Dedicated Reviews Page and Search Discoverability
+This section is intentionally written for a team that knows nothing about search.
+G1. Dedicated Reviews Page URL (non-negotiable)
+Every provider must have a dedicated reviews page at:
+https://really.global/[provider-handle]/reviews
+Examples:
+https://really.global/johndalton/reviews
+https://really.global/healthcoach/reviews
+Hard requirement:
+This must be a distinct page.
+It must not be a tab that loads by JavaScript.
+It must not be a query parameter like ?tab=reviews.
+G2. Crawlable Links
+The provider profile must include a normal HTML link () to the /reviews page.
+Example: Read all reviews.
+Do not rely on click handlers that do not create real links.
+G3. Page Content Requirements
+The /reviews page must include:
+The review header (average, count, histogram)
+The fit signal summary
+A list of reviews (paginated)
+G4. Pagination (Performance and usability)
+The review list must be paginated.
+Load 20 reviews per page.
+Use clean path-based pagination:
+Page 1: /[provider-handle]/reviews
+Page 2: /[provider-handle]/reviews/page/2
+Page 3: /[provider-handle]/reviews/page/3
+G5. Canonical Tags (prevent duplicates)
+Each reviews page must include a canonical tag in the page header.
+Page 1 canonical points to itself.
+Page 2 canonical points to itself.
+Why this matters (plain English):
+Search engines often see the same content in multiple places. Canonical tags tell them which exact page they should treat as the “official” version.
+G6. Sitemap Inclusion
+All /[provider-handle]/reviews pages must be included in the site’s XML sitemap.
+All pagination pages do not need to be in the sitemap, but Page 1 must be.
+G7. Structured Data (Optional but recommended)
+If the platform already supports it, add a machine-readable block that describes ratings.
+Include aggregate rating and review data.
+Do not include personal medical details.
+Author should be “Anonymous” or a pseudonym.
+H. Notifications and Prompts
+H1. Review Prompt Timing
+Scheduled sessions:
+Send a review prompt 2 hours after the session becomes COMPLETED.
+Channels:
+Email
+In-app notification
+Talk Now sessions:
+Show an immediate modal prompt at session end (in the browser window).
+If the modal is dismissed or not completed, send the email prompt 2 hours after completion.
+H2. Reminders (avoid spam)
+If no review is submitted, send 1 reminder 48 hours later.
+Do not send more than 2 total emails per eligible session (one prompt + one reminder).
+H3. Provider Notifications (debounce)
+When a review is created or updated:
+Notify the provider, but delay the notification by 15 minutes.
+If the client edits the review multiple times during that window, send only one final notification.
+Additional anti-spam rule:
+If a client updates their review multiple times within 1 hour, the provider must receive only one notification for that hour.
+I. Private Feedback (Captured inside the main Review Form)
+We will not run a separate “thumbs up / thumbs down” feedback flow after every session in V1.
+Reason (plain English): Asking the client for feedback twice (once immediately and once later by email) will reduce review completion. People feel like they already responded.
+Instead, private feedback is captured inside the same public review form as optional fields.
+Where it appears in the form
+After the public written review text, show:
+“Private note to the provider (optional)”
+“Private note to Really Global (optional)”
+Rules
+These private notes are never shown on the provider’s public profile or /reviews page.
+The provider can see only the “Private note to the provider.”
+The Really Global team can see the “Private note to Really Global.”
+If both are empty, nothing is sent.
+Prompt timing impact
+This change keeps the prompt system simple:
+Talk Now: one review prompt at session end (modal), with one email fallback later if skipped.
+Scheduled: one review email prompt later, with limited reminders.
+J. Abuse Prevention
+J1. Anti-Fake Reviews
+Only verified completed sessions can generate review eligibility.
+Review submission requires a logged-in client account.
+J2. Anti-Retaliation
+Provider must not be shown the client’s identity in the review system.
+Provider must not receive session timestamps tied to reviews.
+If we show any session context at all, use coarse buckets only (example: “Client had 1–3 sessions”).
+J3. Anti-Brigading
+Rate-limit review submissions and helpful voting.
+Flag unusual patterns for internal review (example: many 5-star reviews from brand-new accounts in a short window).
+Appendices
+Appendix A: Terms
+Provider handle
+The provider’s chosen public URL at the root of really.global (example: really.global/johndalton).
+Verified completed session
+A session record with status COMPLETED and duration greater than 3 minutes.
+Public review
+A star rating + fit signals + written text that appears on the provider profile and /reviews page.
+Private feedback
+Client feedback that is not public and is intended to help the provider or platform improve.
+Appendix B: Mermaid Diagrams (copy/paste)
+These diagrams are included so engineering and QA can confirm the logic quickly.
+Diagram 1: Eligibility and Submission Logic
+graph TD    A[Session Ends] --> B{Status = COMPLETED?}    B -- No --> C[Not Eligible]    B -- Yes --> D{Duration > 3 minutes?}    D -- No --> C    D -- Yes --> E[Eligible for Review]    E --> F[Client Clicks Review]    F --> G{Existing Review for this provider?}    G -- Yes --> H[Update Existing Review]    G -- No --> I[Create New Review]    I --> J[Form: Stars + Fit Signals + Text]    H --> J    J --> K{Tech Issue = Yes OR Tech Score <= 2?}    K -- Yes --> L[Route to Operations Queue]    K -- No --> M[Automated Safety Checks]    M -- Pass --> N[Publish Immediately]    M -- Fail --> O[Block or Safety Queue]
+Diagram 2: Tech Voiding Logic
+graph TD    A[Review in Operations Queue] --> B{Is complaint purely about platform/tech?}    B -- Yes (Video/Audio/Connection only) --> C[Outcome 1: Tech-Only]    C --> D[Void Provider Review]    D --> E[Do NOT Publish Publicly]    D --> F[Exclude Star Rating from Provider Average]    B -- No (Includes provider experience) --> G[Outcome 2: Mixed]    G --> H[Publish Review Publicly]    H --> I[Count Star Rating in Provider Average]    H --> J[Display on Profile and /reviews page]

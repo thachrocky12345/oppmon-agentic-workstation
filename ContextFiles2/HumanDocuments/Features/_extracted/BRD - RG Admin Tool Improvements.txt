@@ -1,0 +1,92 @@
+Business Requirements Document (BRD)
+1. Feature Name
+BRD - RG Admin Tool Improvements
+2. Simple Explanation of the Problem
+The Really Global Admin Tool is an internal, restricted tool that is currently accessible only to the platform administrator.
+Today, the tool supports only two actions: - Updating a user’s email address - Deleting a user’s account
+While these actions are critical, the tool is missing two important capabilities that are needed to operate the platform reliably and responsibly:
+A usability improvement that allows the administrator to easily copy and paste a multi‑digit email verification code when logging in.
+A controlled, manual way for the administrator to grant a verified badge to a provider when third‑party verification (via Certn) fails for technical or procedural reasons, despite the provider being legitimately qualified.
+This BRD defines those two improvements while keeping the Admin Tool intentionally narrow, auditable, and safe.
+3. Background and Context
+Why the Admin Tool Exists
+The Really Global Admin Tool exists to handle rare but high-impact operational situations that cannot always be resolved through automated or self-service workflows.
+It is not a general user-management system and is not intended for day-to-day operations. It is used only when:
+A user is blocked by a technical issue
+An automated system fails in a way that affects a legitimate user
+Immediate, careful intervention is required to maintain trust or continuity
+The Admin Tool is intentionally limited in scope to reduce risk and misuse.
+RG Admin Tool Infrastructure Context
+The RG Admin Tool is hosted on a separate, dedicated virtual server in Azure, internally referred to as RGAdmin.
+This server is intentionally isolated from the main Really Global application. It is not part of the client-facing or provider-facing platform and does not share the same runtime environment.
+Access to RGAdmin is highly restricted and currently limited to a single trusted administrator. This isolation is a deliberate security and operational decision that limits blast radius and ensures sensitive actions remain clearly separated from the core product.
+The Admin Tool is not intended to evolve into a general-purpose admin dashboard or role-based system. It should remain narrow, controlled, and explicit in purpose.
+Certn Verification Constraint (Important Context)
+Really Global relies on Certn as a third-party service to perform provider verification, including identity, education, licensing, and background checks.
+Certn’s verification process is highly constrained and automation-driven. If a provider:
+Submits documents in the wrong order
+Uses slightly mismatched naming
+Uploads the wrong document at the wrong step
+Encounters a timing or technical issue
+Certn may fail to complete verification even when the provider is legitimately qualified.
+When this happens:
+Certn does not trigger the verification success API back to Really Global
+The provider does not receive a verified badge
+Really Global currently has no internal way to correct the outcome
+This creates a failure mode where providers are blocked due to process or technical issues rather than actual qualification. The Admin Tool exists, in part, to responsibly address these edge cases.
+4. Scope
+In Scope (Stage 1)
+Improve admin login usability by allowing copy‑paste of verification codes
+Add a manual admin action to grant a verified badge to a provider
+Ensure manual verification actions are explicit, intentional, and auditable
+Out of Scope
+Delegating admin access to additional roles
+Automating verification overrides
+Replacing or bypassing Certn as the primary verification provider
+Making verification decisions visible to clients beyond the existing badge
+5. Functional Requirements
+This section explains each requirement in plain English. Technical notes labeled ChatGPT suggestion describe one possible implementation approach and are not mandates.
+FR-01 — Allow copy and paste of email verification codes
+When logging into the Admin Tool, the administrator receives a multi‑digit verification code by email.
+Currently, each digit must be typed manually. This is unnecessary friction and increases the chance of error.
+The system must allow the administrator to paste the full verification code directly into the input fields.
+ChatGPT suggestion: Support pasting a full numeric string into the verification input and auto‑populate all code fields sequentially.
+FR-02 — Add a manual “Grant Verified Badge” admin action
+The Admin Tool must allow the administrator to manually grant a verified badge to a provider when there is a legitimate reason to do so.
+This action exists specifically to handle cases where: - Certn verification failed due to process or technical issues - The provider’s credentials have been reviewed manually - The administrator has high confidence the provider is legitimately verified
+This is not meant to replace Certn. It is a controlled override.
+ChatGPT suggestion: Add a new admin action labeled clearly (for example, “Grant Verified Badge”) within the provider’s admin detail view.
+FR-03 — Manual verification must mirror the Certn success state
+When a verified badge is granted manually, the system must behave exactly as if Certn had completed successfully.
+From the platform’s perspective: - The same internal flags are set - The same badge appears on the provider profile - The same downstream behavior occurs
+ChatGPT suggestion: Trigger the same internal verification‑success handler used by the Certn webhook, but with an internal source flag.
+FR-04 — Require explicit confirmation before granting verification
+Granting a verified badge is a sensitive action.
+Before the action is completed, the administrator must explicitly confirm that: - They have reviewed the provider’s credentials - They understand this is a manual override
+This confirmation step reduces the risk of accidental misuse.
+ChatGPT suggestion: Show a confirmation modal with a clear warning and require an explicit confirm action before proceeding.
+FR-05 — Record an audit trail for manual verification
+Every manual verification action must be logged.
+The system must record: - Who performed the action - When it occurred - That the verification was granted manually
+This protects the platform, the provider, and future operators.
+ChatGPT suggestion: Write an audit record with fields such as verified_by = 'admin', verified_source = 'manual', and timestamp.
+6. User Stories and Acceptance Criteria
+Admin User
+ADMIN‑1 As an administrator, I can paste a full verification code when logging in so I don’t have to type each digit. Acceptance Criteria: Pasting a valid code fills all fields and allows login.
+ADMIN‑2 As an administrator, I can manually grant a verified badge to a provider when Certn fails for non‑substantive reasons. Acceptance Criteria: The provider receives the verified badge and the system behaves as if Certn succeeded.
+ADMIN‑3 As an administrator, I am warned before granting a verified badge and must explicitly confirm my intent. Acceptance Criteria: The action cannot proceed without confirmation.
+ADMIN‑4 As an administrator, I know that all manual verification actions are logged. Acceptance Criteria: An audit record is created for every manual grant.
+7. Security and Risk Considerations
+The Admin Tool must remain access‑restricted
+Manual verification actions must not be available to providers or clients
+Audit logs must not be editable
+Manual overrides should be rare and intentional
+8. Success Criteria
+This work is considered complete when:
+Admin login supports copy‑paste verification codes
+Legitimate providers are no longer blocked due to Certn process failures
+Manual verification actions are explicit and auditable
+No changes are required to the client‑facing verification experience
+9. Final Notes
+This BRD intentionally keeps the Admin Tool narrow.
+It exists to solve edge cases responsibly, not to weaken verification standards or bypass third‑party systems. It provides operational control where automation alone is insufficient.

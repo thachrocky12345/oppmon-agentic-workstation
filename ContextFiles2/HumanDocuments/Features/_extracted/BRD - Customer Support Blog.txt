@@ -1,0 +1,96 @@
+Business Requirements Document (BRD)
+IMPORTANT: Please Read First
+Before reviewing this document or beginning any design work, you must watch both Loom recordings linked at the top of this BRD.
+BRD - Customer Support Blog - Part 1 - https://www.loom.com/share/6ca55c1ae0dc4675a6833ddee8a4df34BRD - Customer Support Blog - Part 2 - https://www.loom.com/share/fcbe2fa77319478db327addcacae0704
+Those recordings explain the intent, philosophy, and visual inspiration for this feature far better than written text alone. This document exists to formalize and align on that intent, not to replace the recordings.
+1. Feature Name
+BRD - Customer Support Blog 
+2. Problem Statement
+Really Global does not currently have a true customer support blog or help center.
+Today, users who need help understanding how to use the platform, what features mean, or how certain workflows operate have limited options. While a chatbot exists and has been populated with some support content, not all users will use a chatbot, and the platform lacks a clear, browsable, trustworthy source of written customer support information.
+This creates three problems:
+Users cannot easily find clear answers to common questions about how the platform works
+The platform lacks visible signals of maturity, trust, and user support
+Search engines and large language models see limited first-party support content, which weakens trust and SEO signals
+3. Goal and Intent
+The goal of this feature is to create a simple, clean, and highly usable customer support blog that serves as the primary source of general help and platform-related content for Really Global.
+This is not an educational mental health content blog.
+This blog exists to:
+Help users quickly understand how to use the platform
+Answer common questions about features, workflows, and policies
+Act as a trust signal for users, search engines, and AI systems
+The core values of this feature are:
+Simplicity
+Clarity
+Speed
+Elegance
+The experience should feel calm, professional, and effortless — never busy, flashy, or overwhelming.
+4. Inspiration and Design Direction
+The primary design inspiration for this feature is Airbnb’s customer support and help center.
+This inspiration is intentional.
+The Airbnb help center is:
+Text-forward
+Clean and uncluttered
+Fast and responsive
+Easy to browse
+Focused on getting users answers as quickly as possible
+While the design does not need to be an exact copy, the end result should feel very similar in spirit and usability.
+This is not about creativity for its own sake. It is about proven usability.
+The designer is encouraged to:
+Take inspiration from Airbnb’s structure, layout, and navigation patterns
+Keep visuals minimal and purposeful
+Prioritize readability and speed over decoration
+5. Scope
+In Scope
+A dedicated customer support blog for Really Global
+A clean, browsable home page for support content
+Individual support articles explaining how to use the platform
+Categories and navigation that make it easy to find answers
+A content management system that allows ongoing article creation and updates
+Explicitly Out of Scope
+Educational mental health articles
+Thought leadership or marketing content
+Heavy imagery, animations, or visual storytelling
+Feature promotion or sales content
+This blog is about help, not persuasion or entertainment.
+6. Content Philosophy
+Content in this blog should:
+Be written in plain, clear language
+Focus on helping users complete tasks or understand features
+Avoid jargon wherever possible
+Be structured for easy scanning and reading
+Examples of content include:
+How to book a session
+What the verified badge means
+How payments work
+How provider profiles function
+How to use specific platform tools
+Hundreds of articles may exist over time.
+Depth is good. Flashiness is not.
+7. Technology and Platform
+WordPress is the preferred content management system for this feature.
+The site is hosted on Kinsta, which provides:
+A robust WordPress environment
+HIPAA-compliant hosting
+Strong backup and recovery tools
+Separate staging and production environments
+If there is a strong reason to consider an alternative approach, it can be discussed as an architectural decision, but the default assumption is WordPress.
+8. SEO and Metadata (Future Requirements)
+This customer support blog is expected to play an important role in SEO and trust signaling.
+Strict SEO requirements will be added, including:
+Metadata standards
+Proper heading hierarchy (H1, H2, etc.)
+Indexability and crawlability best practices
+A separate SEO consultant will provide detailed specifications.
+Design and structure should anticipate these requirements, even if the full specs are added later.
+9. Success Criteria
+This feature is considered successful when:
+Users can easily find answers to common platform questions
+The experience feels clean, simple, and professional
+The blog is fast, responsive, and easy to navigate
+The platform clearly signals that it supports and cares about its users
+The foundation is in place to scale to hundreds of support articles
+10. Final Notes
+This BRD intentionally gives strong direction without micromanaging execution.
+Design decisions should prioritize clarity, simplicity, and proven usability patterns.
+If there are questions or alternative ideas, they should be raised early. This feature is foundational and should be done thoughtfully from the start.

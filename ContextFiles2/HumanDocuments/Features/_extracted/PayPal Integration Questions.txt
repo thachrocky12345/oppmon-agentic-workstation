@@ -1,0 +1,50 @@
+PayPal Integration Questions
+Login & Signup
+Can existing users log in with their PayPal accounts, and once authenticated, will they be able to receive payments globally? (Provide link to the documentation if any)
+Yes, existing users can log in with their PayPal accounts using PayPal's OAuth 2.0 authentication. Once authenticated, they can receive payments globally, provided their account is set up to accept international payments.
+Documentation:
+PayPal OAuth 2.0 Integration
+Is there a way to redirect users to create a PayPal account, and upon successful registration, retrieve a token that enables them to receive payments?(Provide link to the documentation if any)
+Yes, you can redirect users to create a PayPal account and, upon successful registration, retrieve an OAuth token that enables them to receive payments.
+Documentation:
+PayPal Sign Up and Login Integration
+Transactions
+Our platform needs to support multiple payment methods, including debit cards, credit cards, and UPI. These options may vary by country. How can we dynamically manage available payment methods based on the user’s location?
+PayPal provides APIs that allow you to dynamically manage available payment methods based on the user's location. You can use the Payment Experience API to customize the payment experience.
+Documentation:
+Payment Experience API
+Currently, we have a conditional charging system: (Provide a link to the documentation if any)
+If a session is scheduled within the next 6 hours, we charge the client upfront.
+If a session is scheduled beyond 6 hours, we generate a token and charge the client when only 6 hours remain. How can we replicate this payment flow using PayPal?
+ To replicate the conditional charging system:
+For sessions scheduled within the next 6 hours, charge the client upfront using the Payments API.
+For sessions scheduled beyond 6 hours, generate an authorization token and capture the payment when only 6 hours remain.
+Documentation:
+Payments API
+Authorization and Capture
+What is the typical settlement time for a transaction to be processed and transferred to our company’s account? (e.g., 2 days, 5 days, 7 days?)
+The typical settlement time for a transaction to be processed and transferred to your company's account is usually 2-3 business days, but it can vary depending on the country and the bank.
+What is the best approach for handling payments to care providers while ensuring our platform retains a commission? (Provide a link to the documentation if any)
+Example: If a client pays $100 for a session, our platform keeps 10% ($10) as commission, and PayPal charges 5% ($5) as a transaction fee, leaving $85 for the provider.
+Can this be processed in a single transaction, or do we need two separate API calls (one for charging the client and another for transferring funds to the provider)?
+If two API calls are required, will there be separate transaction fees for each?
+No need for two API calls—this functionality is already built into the Connected Path integration.
+In this setup:
+PayPal deducts a transaction fee
+The partner fee is applied
+The provider receives the remaining amount
+Other Considerations
+What are the transaction fees for different operations such as booking a session, refunds, and cancellations? Will It vary country by country? 
+Transaction fees vary by country and type of operation. PayPal provides detailed information on fees for different operations on their website.
+Documentation:
+PayPal Fees
+Does PayPal provide an API for real-time currency conversion based on current market rates?
+Yes, PayPal provides an API for real-time currency conversion.
+Documentation:
+Currency Conversion API
+Are there additional fees for international payments, such as cross-border transaction charges or currency conversion fees?
+Yes, there are additional fees for international payments, including cross-border transaction charges and currency conversion fees.
+Documentation:
+PayPal International Fees
+ https://www.paypal.com/us/webapps/mpp/cross-border-and-conversion-fees
+ 

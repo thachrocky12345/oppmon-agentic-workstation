@@ -1,0 +1,87 @@
+Business Requirements Document (BRD)
+Feature Name: BRD - Update Therapist URLs
+Version: 9.0 (Therapist Vertical Update)
+Status: Locked for Engineering
+Master File - Master Nav Bar File for this Feature  - Therapist Tab only - Navigation Bar 2.3.5
+Do not edit file. Do not change file.Watch Loom - https://www.loom.com/share/ab07249ee7f048a2bbaa5e97d91d00f6
+1. Feature Name
+BRd - Therapist URL Optimization
+2. One-Paragraph Summary
+What this feature is: This project updates the URL routing logic and Navigation Menu structure for the Therapist vertical. We are moving from a programmatically generated, nested URL structure to a curated, "flattened" URL structure.
+Who it is for: The Engineering Team (to update the routing table) and the End User (for cleaner navigation).
+Why it exists: Deeply nested URLs (e.g., /therapists/types/psychotherapists/clinical-social-workers) create unnecessary friction and dilute SEO authority. We must decouple the "Visual Menu" (which remains nested) from the "Target URL" (which must be flat).
+Data Source of Truth:
+The strict source for all URL slugs and menu hierarchy is: Navigation Bar 2.3.5_download.xlsx (Sheet: Therapists).
+3. Problem Statement
+The User: Currently navigates extremely long, complex URLs which are difficult to read and share.
+The Business: We are currently using an automated logic that couples our URL structure to our menu depth. This forces high-priority pages 4-5 sub-folders deep, hurting our indexability.
+The Technical Friction: The current router assumes that if a menu item is nested, the URL must also be nested. We need to break this dependency.
+4. Strategic Context
+"Decoupled Navigation": We are separating the UI Hierarchy (how links are grouped in the drop-down menu) from the Route Structure (the actual URL address the browser resolves).
+SEO Prioritization: By flattening the slugs (e.g., /clinical-social-workers), we treat these pages as primary entities rather than sub-sub-categories.
+Canonical Clarity: Multiple menu paths (e.g., "Family Conflict" appearing in two different menu sections) will now clearly point to a single, canonical URL defined in the Source of Truth.
+5. Goals
+Flatten Therapist URLs: Update the routing engine to accept the manual slugs from the "URL" column in Navigation Bar 2.3.5, strictly ignoring the parent hierarchy for route generation.
+Maintain Menu Hierarchy: Ensure the Navigation Bar UI still renders the visual nesting (Parent > Category > Subcategory) defined in the source file.
+Location Concatenation: Ensure the global "Location Page" logic allows these flat slugs to append correctly to geo-parameters (e.g., .../seattle/clinical-social-workers).
+6. Non-Goals (Out of Scope)
+Updating Non-Therapist Verticals: We are NOT updating URLs for Coaches, Nurses, or other provider types in this sprint. They retain the old V8.1 logic. Once the Therapist links have been updated and tested, we will provide you with updated links/files for the remaining Provider Categories.
+Visual UI Redesign: This BRD dictates the structure, hierarchy, and links of the menu. It does not dictate the CSS/Styling (Refer to the separate Visual UI BRD).
+Manual Page Edits: Engineering should not manually edit page content. This task is strictly limited to URL routing and Menu generation.
+7. Primary Users / Actors
+The Searcher: Arrives via Google on a clean, short URL.
+The Explorer: Browses the "Therapists" menu using the nested categories but lands on flattened pages.
+Engineering: Updates the ingestion pipeline to map the new URL columns from the provided Excel sheet.
+8. Core Experience & Navigation Logic
+The user experience in the Menu remains hierarchical, but the Browser experience becomes flat.
+8.1 The Decoupled Menu Logic
+Source: Navigation Bar 2.3.5_download.xlsx (Sheet: Therapists).
+Visual Layer: The Navbar must render the nesting defined by Columns A (Parent), B (Category), and C (Subcategory).
+Example: User sees "Therapists" -> Hover "Types of Therapy" -> Click "Art Therapist".
+Functional Layer: When clicked, the link MUST resolve to the string in the URL Column (Column F) of the source file.
+Example: Clicking "Art Therapist" goes to /art-therapist, NOT /therapists/types/art-therapist.
+8.2 Duplicate Link Handling
+Scenario: Some items appear twice in the navigation (e.g., "Family Conflict" might appear under "Issues" and "Relationships").
+Behavior: Both menu items must point to the exact same URL defined in the Source of Truth.
+Outcome: This self-canonicalizes the navigation. We do not create duplicate pages; we simply have multiple entry points in the menu that lead to the same destination.
+9. URL Structure & Constraints
+CRITICAL CHANGE FROM V8.1
+9.1 The New Therapist URL Pattern
+Old Logic: /{root}/{parent}/{category}/{slug}
+New Logic: /{manual_slug_from_excel}
+Note: The system must strictly respect the leading slash and exact string provided in the Excel file.
+9.2 Impact on Global Location Pages
+The "Location Infrastructure" must accept these flat slugs as the terminal node of the geo-path.
+Pattern: /{country}/{state}/{city}/{manual_slug_from_excel}
+Example (Old): really.global/us/wa/seattle/therapists/types/clinical-social-workers
+Example (New): really.global/us/wa/seattle/clinical-social-workers
+Constraint: The system must check the Therapists ingestion source for these slugs. If a slug matches (e.g., clinical-social-workers), it treats it as a valid Provider Type page for that city.
+10. Functional Requirements & Technical Implementation
+10.1 Ingestion Pipeline Update
+Source File: Navigation Bar 2.3.5_download.xlsx (Tab: Therapists).
+Mapping Logic:
+Menu Hierarchy: Derived from Columns A, B, and C.
+Display Label: Derived from Column D.
+Target Route: Derived strictly from the "URL" Column (Column F).
+Execution: The application must update the internal routing table for the "Therapist" collection to use these flat paths instead of the generated nested paths.
+10.2 "No Index" Maintenance
+Requirement: If specific URL patterns or menu items are flagged as "No Index" in the source data or legacy system, those flags must be respected.
+Clarification: Active menu links from Navigation Bar 2.3.5 are intended to be live, indexable pages unless the source file explicitly indicates otherwise.
+11. Content Engineering & Page Templates
+Template: Standard Provider Location Page (as defined in BRD V8.1).
+Modification: No layout changes. The only change is the Route used to access the page.
+12. Roadmap & Phasing
+Phase 1: Therapist Update (Current Scope)
+Update Therapist routing logic using Navigation Bar 2.3.5.
+Run migration to update URL slugs for all Therapist pages.
+Verify 301 Redirects (Old Nested URLs -> New Flat URLs).
+Phase 2: Remaining Verticals (Future Scope)
+Once Phase 1 is tested and verified, we will provide updated Source Files for Coaches, Nurses, and Allied Health.
+Until then, these verticals remain on the V8.1 nested logic.
+13. Risks & Mitigations
+Risk: Broken Links / 404s from old nested structure.
+Mitigation: System must automatically generate 301 Redirects from the old programmatic URLs to the new manual flat URLs.
+Risk: Visual Menu vs. Link mismatch.
+Mitigation: QA must verify that clicking a nested menu item (3 levels deep) correctly resolves to the flat URL (root level).
+Risk: Cross-Contamination with other verticals.
+Mitigation: Strictly scope the ingestion/update script to the "Therapists" tab of the Excel file. DO NOT touch other provider types.

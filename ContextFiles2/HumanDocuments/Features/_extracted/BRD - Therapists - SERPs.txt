@@ -1,0 +1,157 @@
+Business Requirements Document (BRD)
+1. Feature Name
+Therapists - SERPsNote: This Feature must be done after these two Features below.
+Update Therapist URLs
+PayloadCMS on Azure
+Content:
+The SEO content for this Feature implementation is located here. Please be mindful that this is the Source file for all of this content. Do not edit or change this file. If you need to edit it, make a copy. This file is located at the root of your Feature Folder:Team > 01 - Team Documentation > BRDs > “Therapists - SERPs”therapists-nav-content-final.csv
+Attention Designer: This Feature significant design work that will apply to ALL navigation pages. The look and feel of this page had previously been designed by the previous team, but I cannot find the document. The only document I have is below, which exists in the Feature Folder:SERP mockup design.pdf
+When designing the page, please do what you can to elevate the page’s current look and feel. It’s a great opportunity to notch the design of the page up. We will also need to implement strong SEO practices for schema and tags.
+Watch Loom below: 
+https://www.loom.com/share/e4b3e59af2c74c9ebc3e4fa09e1f842c
+2. One-Paragraph Summary
+This project phase involves building an ingestion engine to import the "Therapist" CSV content into our system and displaying it on a high-performance "Sandwich" page layout. Crucially, this document defines the Server-Side Rendering (SSR) architecture required to serve "pre-built" pages to Google for instant indexing. It also implements strict Quality Gates and International URL Structures (/en/) to protect our global domain reputation.
+3. Problem Statement
+Who experiences this problem? Search Bots (Googlebot) and Users on slow connections. What friction exists today? Currently, our pages may rely on client-side fetching, which can result in "blank" initial loads for bots. Additionally, we lack logic to prevent the indexing of empty or low-quality result pages. Why does this problem matter now? As we scale to 100,000+ pages, technical efficiency is everything. If our pages are slow or empty, Google will ignore them. We need a "Pre-Assembled" architecture to ensure every page is indexed.
+4. Strategic Context
+What behaviors should this feature encourage? Instant page loads (< 200ms) and high trust from search engines. How does it support defensibility? By implementing "Quality Gates" (rules about when to show/hide pages), we ensure we only show our best content to Google. This automated quality control sets us apart from low-quality directory sites.
+5. Goals
+Perfect "Pre-Assembly": The HTML code sent to the browser must contain all text and provider names instantly. No "Loading..." spinners allowed.
+International URL Structure: All pages must live under the /en/ subfolder (e.g., really.global/en/therapists/anxiety) to support our future 57-language roadmap.
+Audit-Proof SEO: The page passes technical tests for Speed (Core Web Vitals) and Structure (Schema) with 0 errors.
+6. Non-Goals (Out of Scope)
+Ingesting Non-Therapist Types: Focused strictly on "Therapist" CSV for this sprint.
+Phase 3 (V2) Content: The "Related Specialties" linking block is deferred to Phase 3.
+7. Primary Users / Actors
+Googlebot: The primary "customer." It is a robot that reads code. It needs clean, fast, structured HTML.
+End User (Patient): A human looking for a provider. They need the page to load instantly.
+DevOps Engineer: The person setting up the servers.
+8. User Motivation & Incentives
+Googlebot: Wants to save time. If we give it static files (fast), it will visit us more often.
+Product Owner: Wants to avoid penalties. Hiding "thin" pages protects the brand's reputation.
+9. Core Experience (Outcome-Level)
+The system should naturally support "Instant Loading." When a user clicks a link, the content should appear immediately.
+It should be obvious that the page is alive. The "Last Updated" date should always show the full current date (e.g., "May 12, 2026") to build trust.
+10. Success Metrics / Signals
+Time to First Byte (TTFB): < 200ms. (The server responds in < 0.2 seconds).
+Schema Validation: Google's Rich Results Test shows valid "FAQPage", "BreadcrumbList", and "ItemList".
+URL Structure: All generated pages successfully resolve to /en/therapists/[slug].
+11. Constraints & Guardrails (The "Must Haves")
+A. URL Structure & Canonicals
+MUST Use Language Subfolders:
+Requirement: All pages must be served at https://really.global/en/...
+Why: We are a global site. We cannot have root-level pages because we will eventually have /es/, /fr/, etc.
+MUST Enforce Canonical Tags:
+What is it? A canonical tag tells Google "This is the Master Copy of this page." It prevents "Duplicate Content" penalties when URLs have extra junk at the end (like sorting parameters).
+The Rule:
+Scenario: User is on https://really.global/en/therapists/anxiety?sort=price
+Canonical Tag: Must point to https://really.global/en/therapists/anxiety
+Result: Google ignores the ?sort=price version and gives all credit to the main page.
+B. SEO Quality Gates
+MUST Enforce "Noindex" Logic:
+Rule:
+If provider_count >= 3 → Set meta tag to index, follow.
+If provider_count < 3 → Set meta tag to noindex, follow.
+Why: We do not want Google sending users to "Ghost Town" pages with 0 or 1 doctor.
+C. Freshness
+MUST Implement Dynamic Dates:
+Requirement: Display "List updated: [Month] [Day], [Year]" (e.g., May 12, 2026) near the top of the list.
+Implementation: Use the current server date at the time of page generation.
+D. Title Tag Logic (Crucial for Legal Accuracy)
+MUST Use Full final_h1 for Title Tag:
+Do NOT abbreviate. We must preserve the inclusive phrasing ("and other mental health providers") to ensure accuracy for licensed/non-licensed providers.
+H1 (On Page): {{final_h1}} (from CSV)
+Title Tag (Browser Tab): {{final_h1}} | Really Global
+Note: This will be long. That is acceptable. Accuracy > Length.
+12. Risks & Open Questions
+Risk: Pre-assembling pages is slow if the API is slow.
+Mitigation: Use ISR (see below) to cache pages.
+13. Infrastructure & Performance Specs
+Compute: Standard_D2as_v5 (Azure VM).
+ISR Configuration (The "Once Per Minute" Rule):
+Requirement: In Next.js getStaticProps, set revalidate: 60.
+Explanation: This tells the server: "Build this page once, save it to the hard drive, and show that file to everyone for the next 60 seconds. After 60 seconds, if someone visits, build it again in the background."
+Why: This drastically reduces database load.
+14. Phase 3 (V2): Future Requirements
+Deferred: The "Related Specialties" linking block (random links to 5 other CSV pages) is deferred until after all V1 content is published.
+Technical Appendix C: Schema Templates (For Developers)
+You must inject these JSON-LD blocks into the <head> of the page. Use the variables from the CSV and API.
+1. FAQ Schema (Source: CSV Columns) This gets our questions to appear directly in Google.
+JSON
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "{{faq1_question}}",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{{faq1_answer}}"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "{{faq2_question}}",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{{faq2_answer}}"
+      }
+    }
+    // ... Repeat for all 6 FAQs
+  ]
+}
+</script>
+2. Breadcrumb Schema This shows the path "Home > Therapists > Keyword" in search results.
+JSON
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{
+    "@type": "ListItem",
+    "position": 1,
+    "name": "Home",
+    "item": "https://really.global/en"
+  },{
+    "@type": "ListItem",
+    "position": 2,
+    "name": "Therapists",
+    "item": "https://really.global/en/therapists"
+  },{
+    "@type": "ListItem",
+    "position": 3,
+    "name": "{{keyword_name}}", // Use Column A (e.g., 'ADHD') for the Breadcrumb text
+    "item": "https://really.global/en/{{slug}}"
+  }]
+}
+</script>
+3. ItemList Schema (Source: Provider API) This tells Google "Here is a list of providers." Iterate through your top 20 providers.
+JSON
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "item": {
+        "@type": "Physician", // Use 'LocalBusiness' or 'Person' if non-licensed
+        "name": "{{Provider Name}}",
+        "image": "{{Provider Photo URL}}",
+        "url": "https://really.global/en/provider/{{provider_slug}}",
+        "telephone": "{{Provider Phone}}",
+        "priceRange": "{{Provider Rate}}"
+      }
+    },
+    // ... Repeat for all 20 providers on the page
+    {
+      "@type": "ListItem",
+      "position": 2,
+      ...
+    }
+  ]
+}
+</script>

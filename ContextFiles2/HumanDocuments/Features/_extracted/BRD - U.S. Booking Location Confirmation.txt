@@ -1,0 +1,182 @@
+Business Requirements Document (BRD)
+1. Feature Name
+U.S. Booking Location Confirmation (Checkout Only)
+2. Simple Explanation of the Problem
+In the United States, many professional licensing boards require that a licensed provider only deliver telehealth services when the client is physically located in a state where that provider is licensed.
+Really Global is global by default. People should be able to browse and choose providers without thinking about geography. However, when a client in the United States books a session with a U.S. licensed provider, we need a narrow, legally‑required confirmation at checkout.
+This feature is intentionally limited to a single moment: the final booking step. It does not change global discovery, does not add location messaging during browsing, and does not add persistent location banners.
+3. Scope
+This section defines what is included now and what is intentionally excluded so the feature stays global‑first.
+In Scope (Stage 1)
+The following items must be included:
+A checkout‑only location attestation for U.S. clients booking U.S. licensed providers
+The attestation state is pre‑filled using the platform’s current best guess of the client’s state (typically the same state context that allowed the client to discover the provider)
+The attestation uses the final, approved wording (see FR‑02)
+A lightweight “Wrong state? Change” option at checkout that lets the client update the state for this session
+State selection in the “Change” flow must be limited to states where that provider is licensed
+Booking cannot be completed unless the required attestation is checked
+The booking record must store:
+attested_state (the state the client confirmed for the time of the session)
+attested_at (the timestamp when the client confirmed)
+Out of Scope / Future Work
+The following items are explicitly not part of Stage 1:
+Any persistent banner, ribbon, or location notice during browsing
+Any change‑location modal during browsing
+Any browser storage dismissal flags for ribbons (not applicable)
+Any requirement to manage or “set” a user’s location globally on the platform
+Province or territory notices for other countries
+GPS‑based or precise location tools
+Syncing location choices across devices
+Provider auto‑reminders to verify client location
+Country‑level location attestation outside the United States
+Provider dashboard display of attested state (planned for later)
+4. Functional Requirements
+This section explains, in plain English, what the system must do and why. Under each requirement, a clearly labeled ChatGPT suggestion describes one possible way the team could implement it. These technical notes are suggestions only, not mandates.
+FR-01 — Only ask for location confirmation when the law requires it
+The platform must keep the experience global by default. The location confirmation step should appear only when it is legally relevant.
+This confirmation is required only when:
+The client is in the United States, and
+The provider being booked is a U.S. licensed provider whose license is tied to specific U.S. states
+ChatGPT suggestion: Gate the entire attestation UI behind a server‑verified condition such as userCountry === 'US' and provider.isUSLicensed === true (and state‑based licensing applies).
+FR-02 — Use a clear, pre‑filled attestation statement
+When the attestation is required, show a checkbox statement that is already filled in with the state the platform believes applies. In most cases, this will match how the client discovered the provider, so the client can simply confirm and proceed.
+Approved wording (Option 1): “I confirm that I will be physically located in {State}, United States at the time of this session.”
+ChatGPT suggestion: Render a checkbox with the label exactly as written above, substituting {State} with the current state context.
+FR-03 — Let the client correct the state for this session (only if needed)
+Sometimes the pre‑filled state can be wrong (for example, the client is traveling or using a VPN), or the session will take place when they are in a different state. In that case, the client must be able to correct the state at checkout.
+This must be a small, checkout‑only option (not a global “set my location” feature).
+ChatGPT suggestion: Provide a small link near the checkbox such as “Wrong state? Change” that opens a simple state picker.
+FR-04 — Only allow the client to choose states where the provider is licensed
+When the client chooses “Change,” the platform must only let them select from states where the provider is licensed. This avoids confusion and prevents invalid bookings.
+ChatGPT suggestion: Populate the state picker from provider.licensedStates and validate server‑side that the chosen state is allowed.
+FR-05 — Block booking until the required confirmation is completed
+If the attestation is required, the booking cannot be completed unless the client checks the box.
+ChatGPT suggestion: Disable the final “Schedule” action until attestationChecked === true, and re‑validate on the server before creating the booking.
+FR-06 — Save a clear compliance record on the booking
+When the client completes booking and attestation was required, the system must store:
+The confirmed state (attested_state)
+The time of confirmation (attested_at)
+This is stored in the booking record. It does not need to be displayed to providers in Stage 1.
+ChatGPT suggestion: On successful booking, write attested_state and attested_at into the booking row/document, alongside the rest of the booking payload.
+FR-07 — Future: show the confirmed state to the provider (not Stage 1)
+In a later phase, providers may be shown the confirmed state for audit purposes. This should not block Stage 1.
+ChatGPT suggestion: In a future release, add a provider dashboard field/column that reads attested_state from the booking record.
+FR-08 — Measure whether the checkout‑only step harms conversion
+We need basic analytics to confirm the feature is working and not causing unexpected booking drop‑off.
+ChatGPT suggestion: Emit analytics events such as AttestationDisplayed, AttestationChecked, and StateChangedAtCheckout (names can be decided by the team).
+5. User Stories and Acceptance Criteria
+Clients Booking a U.S. Licensed Provider
+US‑C1 As a U.S. client booking a U.S. licensed provider, I am required to confirm the state I will be in at the time of the session. Acceptance Criteria: If the attestation is required, the booking cannot be completed unless the checkbox is checked.
+US‑C2 As a client who is traveling or using a VPN, I can correct the state shown at checkout so my confirmation matches where I will be during the session. Acceptance Criteria: The client can change the state at checkout, and the attestation text updates to the chosen state.
+US‑C3 As a client, I am never forced to think about state location during browsing. Acceptance Criteria: No banners, ribbons, or browsing‑time location notices are shown as part of this feature.
+Providers (Future)
+US‑P1 As a U.S. licensed provider, I may later be able to view the client’s confirmed state for audit purposes. Acceptance Criteria: The booking record stores attested_state and attested_at in Stage 1; provider display is deferred.
+6. User Interface and Visual Behavior
+What the Team Is Free to Design
+The exact visual layout, formatting, spacing, typography, colors, and component styling are intentionally left to the design and engineering teams.
+This includes, but is not limited to:
+Visual styling of the state detection ribbon
+Exact placement and spacing relative to other banners or navigation
+Visual treatment of the change‑location modal or sheet
+Typography, font sizes, iconography, and button styling
+Desktop and mobile visual differences
+The goal is clarity, accessibility, and minimal disruption — not adherence to a fixed visual spec.
+What Must Be True Regardless of Design
+No matter how the team designs the interface, the following behaviors must still occur:
+The promotional banner (if present) remains visible and is not replaced
+The state detection notice is visible and understandable to U.S. users
+Users can clearly change their state or declare they are outside the United States
+The booking confirmation checkbox is clearly visible before a booking can be completed
+The booking action is blocked until the checkbox is confirmed when required
+Non‑Negotiable Accessibility Requirements
+Color contrast must meet or exceed accessibility standards
+Interactive elements must be keyboard accessible
+Assistive technology labels must be present where appropriate
+7. Technical Notes
+The attestation step is checkout‑only. It does not change search, navigation, or global provider visibility.
+The default {State} used in the checkbox should come from the platform’s existing state context for the client (typically derived from the same logic that governs which U.S. licensed providers appear during discovery).
+The “Wrong state? Change” selection applies to this booking/session, not as a permanent profile setting.
+The state picker must be constrained to the provider’s licensed states and must be validated server‑side.
+The attestation record must store only:
+state code/name (attested_state)
+confirmation timestamp (attested_at)
+No precise location (address, GPS coordinates) is stored.
+8. Success Metrics and Monitoring
+Booking completion impact (U.S. licensed provider bookings):
+Target: no more than a small increase in drop‑off (team can set the exact threshold)
+Source: booking funnel dashboard
+Attestation coverage (when required):
+Target: 100 percent of applicable bookings store attested_state and attested_at
+Source: database checks / logging
+Support or legal issues attributable to missing confirmation:
+Target: zero
+Source: legal and support ticket tagging
+9. How Provider Discovery and Visibility Work Today (Context for the Team)
+This section exists purely for education and shared understanding. It explains how provider visibility works on Really Global today so that this checkout‑only compliance feature is implemented in a way that aligns with the platform’s global‑first philosophy.
+The Global‑First Principle
+Really Global is designed so that people do not need to think about geography when choosing a provider.
+By default:
+Providers are discoverable globally
+Provider location is not emphasized to clients
+Clients are encouraged to choose providers based on fit, expertise, and availability — not where the provider lives
+Geography is only introduced when licensing law requires it, and even then, only as narrowly as possible.
+Non‑Licensed Providers (Global by Default)
+Non‑licensed providers (such as coaches, mentors, and other unregulated roles):
+Are visible to clients worldwide
+Appear in search results and navigation in all countries
+Are not filtered by country, state, or region
+Are never subject to U.S. state‑based licensing rules
+From a discovery perspective, these providers are always global.
+Licensed Providers Outside the United States
+Licensed providers who are licensed outside the United States:
+Are also visible globally by default
+Appear to clients in all countries
+Are not restricted by U.S. state licensing rules
+Their licensing is not governed by U.S. state boards, so no U.S. state‑based filtering is applied to them during discovery.
+U.S. Licensed Providers (The One Exception)
+U.S. licensed providers are the only group whose discovery is affected by client location.
+During search and navigation:
+A U.S. licensed provider is shown only to clients who appear to be located in a state where that provider is licensed
+For example:
+A provider licensed only in New York appears to clients in New York
+That same provider does not appear in California search results
+This filtering:
+Happens automatically and silently
+Is not explained to the client during browsing
+Exists to prevent illegal or confusing discovery paths
+This means that in most cases, if a client can see a U.S. licensed provider through search or navigation, the state context is already correct.
+Direct Profile Access (Intentional and Allowed)
+Even though discovery is filtered:
+Any provider profile can still be visited directly if someone has the URL
+This can happen via external search, shared links, or bookmarks
+This behavior is intentional and supported
+Compliance is enforced at booking time, not by blocking profile access.
+Global Discoverability Toggle (Applies to All Licensed Providers)
+All licensed providers — including U.S. licensed providers and licensed providers outside the U.S. — have a Global Discoverability setting in their provider portal.
+Key points:
+This setting exists for all licensed providers globally
+It is enabled by default (Global Discoverability = On)
+Licensed providers can choose to disable or re-enable it at any time
+When this setting is:
+Enabled: the provider’s profile is visible to clients worldwide (subject to U.S. licensing rules where applicable)
+Disabled: the provider’s profile is only visible to clients in the country or state(s) where the provider is licensed
+This toggle gives licensed providers control over how broadly they are discoverable, while keeping the platform’s default experience global-first.
+How This Context Relates to the Checkout Attestation
+Because discovery already handles licensing constraints:
+The checkout attestation is not a discovery correction tool
+It exists solely to confirm where the client will be physically located at the time of the session
+In most cases, the pre‑filled state at checkout is already correct
+The “Wrong state? Change” option exists only for edge cases (travel, VPNs, direct links)
+This keeps the platform global‑first while still meeting U.S. legal requirements.
+10. When This Work Is Complete
+This work is considered complete when all of the following are true:
+U.S. users see a clear state detection message
+Users can correct or override their state
+The ribbon does not reappear unnecessarily
+Location confirmation is required when legally necessary
+Booking records store confirmation data
+Non‑U.S. users are unaffected
+Support and legal teams can rely on consistent behavior
+10. Final Notes
+This document defines what must happen and why.
+It does not dictate implementation details beyond the preserved requirements. Engineering and design teams are free to choose solutions as long as every requirement above is fully satisfied.

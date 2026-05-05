@@ -1,0 +1,123 @@
+BUSINESS REQUIREMENTS DOCUMENT (BRD) – LIGHT
+1. Feature Name (Working Title)
+Therapy Groups and Support Groups
+2. Summary
+This feature introduces bookable group sessions on Really Global surfaced as two navigation entry points: Therapy Groups and Support Groups. It enables Providers to publish a scheduled group event with a defined capacity so multiple Clients can book the same time slot and attend together. Therapy Groups are restricted to licensed provider types. Support Groups are available to all provider types. The goal is to expand access and affordability for Clients, unlock a high‑leverage revenue format for Providers, and create new inventory that can scale without requiring 1:1 time for every incremental Client.
+3. Problem / Opportunity
+Today, the platform’s booking model assumes a 1:1 session: when a Client books a time slot, it becomes unavailable to all other Clients. That makes groups impossible because groups require a single scheduled time block to remain bookable until capacity is reached.
+This is worth solving now because group sessions: - Expand access to care via lower per‑person pricing and shared support. - Increase provider earning potential per hour and reduces the need for constant 1:1 availability. - Creates new marketplace inventory types that are highly discoverable and can become a major acquisition surface.
+4. Goals
+Enable Providers to publish group events that multiple Clients can book until capacity is reached.
+Support two clear group categories with appropriate eligibility rules:
+Therapy Groups: licensed provider types only.
+Support Groups: all provider types.
+Make it obvious to Clients what they are booking (group vs 1:1) and what to expect.
+Ensure group bookings work end‑to‑end with scheduling, payment, and notifications.
+Prevent overbooking, double booking, or broken calendar behavior.
+5. Primary Users / Actors
+Clients
+People who want a lower-cost or community-based option instead of 1:1 sessions.
+Providers (Licensed)
+Licensed providers who want to run Therapy Groups and/or Support Groups.
+Providers (Non‑licensed)
+Coaches, mentors, allied providers who want to run Support Groups.
+Platform (System)
+Enforces eligibility rules, capacity logic, booking/payment, and communications.
+Support / Ops
+Handles disputes, cancellations, attendance issues, and policy edge cases.
+6. Core Outcome / Experience
+A Provider can create a group event with a start time, duration, price per attendee, and a maximum number of attendees.
+A group event remains bookable until the attendee limit is reached.
+A Client can discover group sessions via the top navigation entry points (Therapy Groups and Support Groups) and book a seat.
+Clients experience group booking as a first-class product, not a hacked 1:1 appointment.
+All attendees receive the same standard communications (confirmation, reminders, changes/cancellation notices), tailored to group context.
+The system prevents the “slot disappears after first booking” behavior for group events.
+7. Constraints / Guardrails
+Eligibility
+Therapy Groups can only be created by licensed provider types.
+Support Groups can be created by any provider type.
+A licensed provider may choose to run a Support Group.
+Capacity
+Group pricing is assumed to be per attendee.
+The platform must support a configurable attendee limit per event, with an upper bound of 50 participants.
+Once capacity is reached, the event must become unbookable.
+Booking integrity
+Group events must never overbook.
+Group events must be visually and structurally distinct from 1:1 appointments on the Provider calendar so Providers can immediately tell the difference.
+Scheduling
+Date, time, duration, and time zone behavior must behave exactly the same as existing session types (video/audio).
+Recurring behavior must be supported in the future, but is not required for initial release.
+Single-instance group events must still be distinguishable from 1:1 sessions on the calendar.
+Communications
+All attendees must receive the standard booking lifecycle notifications, treated the same as 1:1 sessions.
+Payments
+Group bookings must use existing payment, cancellation, and refund logic with no special-case rules.
+Visibility
+Capacity remaining and sold-out states may exist functionally but do not need to be prominently advertised to Clients in early stages.
+8. Success Signals
+Providers create and publish group events (adoption).
+Group events receive bookings (activation).
+Group attendance rate is comparable to or better than 1:1 sessions.
+Lower support burden than expected (few disputes around “what I booked,” refunds, or access).
+Incremental GMV attributable to group sessions.
+9. Risks / Open Questions
+Calendar clarity
+Ensuring Providers can clearly differentiate group sessions from 1:1 sessions at a glance.
+Eligibility enforcement
+Confirming that non-licensed providers cannot access or publish Therapy Groups under any circumstance.
+Recurrence readiness
+Ensuring group events created today will not block or complicate future recurring-session support.
+10. Definition of “Done”
+Therapy Groups and Support Groups are visible as distinct navigation entry points.
+Providers can create group events with a maximum attendee count and price per attendee.
+Clients can book a seat in a group event until capacity is reached.
+Group events stop accepting bookings immediately when capacity is reached.
+Group bookings trigger the correct lifecycle notifications to all attendees and the Provider.
+Group events reliably connect attendees to the session experience at the scheduled time.
+Eligibility rules are enforced (licensed-only for Therapy Groups).
+11. Open Design & Implementation Space
+This document defines what must be achieved, not how it must be built.
+Engineering, Design, and QA are encouraged to propose solutions that best achieve the outcomes above, including approaches not explicitly anticipated here.
+This freedom is intentional.
+Brainstorm: What this BRD likely needs to cover (for completeness)
+Provider setup requirements
+Create group event:
+Group type: Therapy Group or Support Group (eligibility enforced)
+Title and description
+Date, time, duration (existing behavior)
+Capacity (max attendees) with platform max of 50
+Price per attendee
+Calendar differentiation so Providers can distinguish group events from 1:1 sessions
+Future support for recurring schedules (explicitly deferred)
+Booking requirements (Client)
+Clear labeling that booking is for a group session
+Booking behaves the same as a standard session from a payment and cancellation perspective
+Telehealth session behavior
+Group session room creation and access
+Participant cap aligned with configured capacity
+Dependencies (critical and likely)
+Platform capabilities
+Availability model that supports “multi-seat bookable blocks” instead of “single booking consumes slot.”
+Booking engine updates to:
+Track remaining capacity
+Prevent race-condition overbooking
+Handle multiple paid bookings for same time block
+Payments
+Checkout that can price per attendee booking
+Refund/cancellation mechanics compatible with group seats
+Reporting / reconciliation for multiple payments tied to one event
+Communications
+Notification system capable of addressing “all attendees” for event changes
+Email/SMS templates with group-specific context
+Search and navigation
+Indexing group events as discoverable inventory
+Dedicated query/filters for Therapy Groups vs Support Groups
+Provider portal
+UI for creating and managing group events
+Eligibility enforcement for Therapy Group creation
+Telehealth
+Twilio group session support aligned with participant cap (up to 50)
+Session room provisioning and secure join links
+Support and compliance
+Support tooling to view group booking roster and event state
+Policy language and disclosures for group privacy expectations

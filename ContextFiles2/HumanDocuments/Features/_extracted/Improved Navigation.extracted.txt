@@ -1,0 +1,48 @@
+BRD - Improved Navigation
+
+
+
+This will likely be the worst BRD ever. It’s too difficult to put into words. So I will explain it simply:
+
+
+
+Our Nav bar was modelled after Esty from 3 years ago. Please see the Wayback machine link below and see how their Nav Bar functions. We needed something like this that could handle tons of direct links from the Nav Bar.
+
+
+
+Wayback Machine - Etsy
+
+https://web.archive.org/web/20220331220752/https://www.etsy.com/c/clothing-and-shoes?ref=catnav-10923
+
+
+
+Current site: 
+
+When the team implemented what we have today, they did not hand code it. They used a plugin with limited functionality, which is why it looks the way it does. But I cannot live with it the way that it is. When you start to navigate, it simply looks bad with all of the random spacing and the significant redundancy when there is only a single link. Please see the loom video that I just created below for why and how we need to improve this.
+
+
+
+https://www.loom.com/share/3a2fba1af38f4b30a86d1d62ec05b751
+
+
+
+
+
+Thank you.
+
+
+
+More Context Below:This is a directory of old and current Nav Bar information:
+
+https://drive.google.com/drive/u/0/folders/1NLV4TJNwp0ampfhJqVNgN9gPS6Zg4hkU
+
+Use the version entitled:
+
+Navigation Bar 2.4 - Team.xlsx
+
+However, you need some context. Watch this loom I just quickly created to give you some background info:
+
+https://www.loom.com/share/909030b3353c42fb8e78b8e1ba4bb4d0
+
+
+
