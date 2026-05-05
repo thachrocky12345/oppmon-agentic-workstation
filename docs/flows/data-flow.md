@@ -256,6 +256,49 @@ flowchart TD
     K -->|Vector| N[pgvector]
 ```
 
+## Hybrid Search Flow (BM25 + Vector + RRF)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant API as Search Route
+    participant Svc as Search Service
+    participant BM25 as BM25 Engine
+    participant Vec as Vector Search
+    participant RRF as RRF Fusion
+    participant P as Prisma
+    participant PGV as pgvector
+
+    C->>API: POST /api/search
+    Note over C,API: {query, types?, limit?}
+
+    API->>Svc: hybridSearch(query)
+
+    par BM25 Keyword Search
+        Svc->>BM25: textSearch(query)
+        BM25->>P: Text pattern matching
+        P-->>BM25: Keyword results
+    and Vector Similarity Search
+        Svc->>Vec: vectorSearch(query)
+        Vec->>PGV: Cosine similarity
+        PGV-->>Vec: Vector results
+    end
+
+    BM25-->>Svc: Keyword ranked results
+    Vec-->>Svc: Similarity ranked results
+
+    Svc->>RRF: reciprocalRankFusion(keyword, vector)
+    Note over RRF: RRF(d) = Σ 1/(k + rank_i)
+
+    RRF-->>Svc: Fused rankings
+
+    Svc->>Svc: Apply confidence scoring
+
+    Svc-->>API: {results, confidence}
+    API-->>C: 200 OK
+```
+
 ## Data Read Patterns
 
 | Pattern | Table | Index Used | Typical Query |
@@ -267,8 +310,10 @@ flowchart TD
 | Active agents | agents | (status) | Agent list |
 | Tenant resources | * | (tenantId) | All queries |
 | Semantic search | embeddings | HNSW (embedding) | RAG context |
+| Hybrid search | embeddings + skills | BM25 + HNSW | Skill search |
 | Skill lookup | skills | (tenantId, name) | Skill registry |
 | LLM history | llm_messages | (sessionId, createdAt) | Chat history |
+| MCP servers | mcp_servers | (tenantId, name) | MCP registry |
 
 ## Caching Strategy
 

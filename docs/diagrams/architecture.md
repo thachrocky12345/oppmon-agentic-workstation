@@ -51,6 +51,7 @@ graph TD
             LLMRoutes["LLM"]
             RAGRoutes["RAG"]
             EmbeddingRoutes["Embedding"]
+            MCPRoutes["MCP"]
         end
 
         subgraph Services["Services"]
@@ -59,6 +60,8 @@ graph TD
             LLMSvc["LLM Service"]
             RAGSvc["RAG Service"]
             EmbeddingSvc["Embedding Service"]
+            SearchSvc["Search Service"]
+            MCPSvc["MCP Service"]
         end
 
         subgraph LLMProviders["LLM Providers"]
@@ -91,6 +94,7 @@ graph TD
         Shared["@arkon/shared<br/>(Types)"]
         TSConfig["@arkon/tsconfig"]
         EngineCore["engine-core<br/>(Rust)"]
+        CLIPkg["@arkon/cli<br/>(CLI Tool)"]
     end
 
     Browser --> NextApp

@@ -15,9 +15,9 @@ This directory contains Mermaid architecture diagrams for the Arkon project.
 
 ## Quick Links
 
-- **System Architecture**: How components connect (frontend, API, database, LLM providers)
-- **Dependencies**: What packages each app uses (pnpm + Turborepo monorepo)
-- **Data Model**: Database schema with multi-tenancy, skills, LLM sessions, embeddings
+- **System Architecture**: How components connect (frontend, API, database, LLM providers, CLI)
+- **Dependencies**: What packages each app uses (pnpm + Turborepo monorepo, including CLI)
+- **Data Model**: Database schema with multi-tenancy, skills, LLM sessions, embeddings, MCP servers
 - **Deployment**: Docker services, ports, volumes, and profiles
 
 ## Usage

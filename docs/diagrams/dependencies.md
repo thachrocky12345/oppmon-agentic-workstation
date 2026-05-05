@@ -19,6 +19,7 @@ graph TB
             Shared["@arkon/shared<br/>(Types)"]
             TSConfig["@arkon/tsconfig"]
             EngineCore["engine-core<br/>(Rust)"]
+            CLI["@arkon/cli<br/>(CLI Tool)"]
         end
     end
 
@@ -99,6 +100,15 @@ graph TB
         turbo["turbo 2.0"]
     end
 
+    subgraph CLIDeps["CLI Dependencies"]
+        commander["commander 12.1"]
+        chalk["chalk 5.3"]
+        ora["ora 8.0"]
+        keytar["keytar 7.9"]
+        open["open 10.1"]
+        conf["conf 13.0"]
+    end
+
     subgraph Rust["Rust Crates"]
         sha2["sha2"]
         serde["serde"]
@@ -159,6 +169,16 @@ graph TB
     EngineCore --> serde
     EngineCore --> napi_rs
 
+    %% CLI dependencies
+    CLI --> commander
+    CLI --> chalk
+    CLI --> ora
+    CLI --> keytar
+    CLI --> open
+    CLI --> conf
+    CLI --> Shared
+    CLI --> typescript
+
     %% Monorepo tools
     Monorepo --> turbo
 ```
@@ -200,7 +220,8 @@ graph TB
 
 | Package | Dependencies | Consumers |
 |---------|-------------|-----------|
+| @arkon/cli | commander, chalk, ora, keytar, open, conf | CLI users |
 | @arkon/database | Prisma, bcryptjs | @arkon/api |
-| @arkon/shared | (none) | @arkon/api, @arkon/web |
+| @arkon/shared | (none) | @arkon/api, @arkon/web, @arkon/cli |
 | @arkon/tsconfig | (none) | All packages |
 | engine-core | Rust crates | @arkon/api (planned) |

@@ -20,6 +20,7 @@ An Architecture Decision Record captures an important architectural decision mad
 | [0002](ADR-0002-multi-llm-providers.md) | [AUTO] Multi-Provider LLM Architecture | Accepted | 2026-05-05 |
 | [0003](ADR-0003-oauth-arctic.md) | [AUTO] OAuth Implementation with Arctic | Accepted | 2026-05-05 |
 | [0004](ADR-0004-pgvector-embeddings.md) | [AUTO] Vector Embeddings with pgvector | Accepted | 2026-05-05 |
+| [0005](ADR-0005-hybrid-search.md) | [AUTO] Hybrid Search with BM25 + Vector + RRF | Accepted | 2026-05-05 |
 
 ## Status Definitions
 

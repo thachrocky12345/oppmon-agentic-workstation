@@ -15,10 +15,12 @@ erDiagram
     TENANT ||--o{ AUDIT_LOG : tracks
     TENANT ||--o{ LLM_SESSION : owns
     TENANT ||--o{ EMBEDDING : stores
+    TENANT ||--o{ MCP_SERVER : registers
 
     TEAM ||--o{ TEAM_MEMBER : has
     TEAM ||--o{ AGENT : "optionally owns"
     TEAM ||--o{ SKILL : "optionally owns"
+    TEAM ||--o{ MCP_SERVER : "optionally owns"
 
     USER ||--o{ USER_SESSION : has
     USER ||--o{ TEAM_MEMBER : belongs_to
@@ -248,6 +250,24 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
+
+    MCP_SERVER {
+        string id PK
+        string tenantId FK
+        string teamId FK
+        string name UK
+        string description
+        string command
+        array args
+        json env
+        string version
+        string sha256
+        enum scope "TENANT|TEAM"
+        boolean enabled
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt
+    }
 ```
 
 ## Multi-Tenancy Model
@@ -267,7 +287,8 @@ Tenant
   ├── Skills → SkillVersions
   ├── AuditLogs
   ├── LlmSessions → LlmMessages
-  └── Embeddings (pgvector)
+  ├── Embeddings (pgvector)
+  └── McpServers
 ```
 
 ## PostgreSQL Extensions
@@ -340,3 +361,5 @@ LIMIT 10;
 | skills | idx_skills_scope | (scope) |
 | audit_logs | idx_audit_tenant_type | (tenantId, resourceType, createdAt DESC) |
 | embeddings | idx_embeddings_source | (tenantId, sourceType, sourceId) |
+| mcp_servers | idx_mcp_servers_tenant | (tenantId) |
+| mcp_servers | idx_mcp_servers_scope | (scope) |

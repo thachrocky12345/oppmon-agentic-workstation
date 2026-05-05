@@ -226,4 +226,20 @@ pnpm docker:up:prod       # Start db + api + web
 
 # Full stack with Redis
 pnpm docker:up:full       # Start all including Redis
+
+# CLI tool (runs locally, not containerized)
+cd packages/cli && pnpm dev -- <command>
 ```
+
+## CLI Tool (@arkon/cli)
+
+The CLI tool (`tag` command) is designed to run locally on developer machines, not in containers. It connects to the API server for operations.
+
+| Setting | Value |
+|---------|-------|
+| Package | `@arkon/cli` |
+| Binary | `tag` |
+| Runtime | Node.js 20+ |
+| Config | `~/.config/tag/config.json` (via conf) |
+| Credentials | System keychain (via keytar) |
+| API URL | Configured via `tag config set api-url` |

@@ -14,6 +14,7 @@ This is a **pnpm + Turborepo monorepo** with the following structure:
 | `packages/shared/` | **ACTIVE** | Shared TypeScript types (@arkon/shared) |
 | `packages/tsconfig/` | **ACTIVE** | Shared TypeScript configs (@arkon/tsconfig) |
 | `packages/engine-core/` | **ACTIVE** | Rust workspace for high-performance utilities |
+| `packages/cli/` | **ACTIVE** | CLI tool for AI Gateway management (@arkon/cli) |
 | `arkon-reference-only/` | **READ-ONLY** | Original monorepo — reference only, never modify |
 
 ## Overview
@@ -115,8 +116,11 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **LLM**: Multi-provider LLM proxy (Anthropic, Cerebras, Ollama)
 - **RAG**: Retrieval-augmented generation service
 - **Embeddings**: Vector embedding generation and storage
+- **Search**: Hybrid search (BM25 + vector + RRF)
+- **MCP**: Model Context Protocol server registry
 
 ### Shared Packages
+- **@arkon/cli**: CLI tool for AI Gateway management (tag command)
 - **@arkon/database**: Prisma schema with multi-tenancy, pgvector support
 - **@arkon/shared**: TypeScript types (JWTClaims, Role, TeamMembership)
 - **@arkon/tsconfig**: Base TypeScript configurations

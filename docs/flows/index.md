@@ -30,6 +30,7 @@ Illustrates how data enters the system through multiple channels:
 - REST API and WebSocket for events
 - LLM proxy for chat completions (Anthropic, Cerebras, Ollama)
 - Embedding generation (OpenAI) and RAG context retrieval
+- Hybrid search (BM25 + vector + RRF fusion)
 - Storage to PostgreSQL, TimescaleDB, and pgvector
 
 ### Error Flow

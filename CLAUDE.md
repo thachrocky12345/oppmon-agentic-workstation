@@ -13,6 +13,7 @@ This directory contains the original monorepo code and is **FOR REFERENCE ONLY**
 **All code changes must go to:**
 - `apps/api/` — Express API server (@arkon/api)
 - `apps/web/` — Next.js frontend (@arkon/web)
+- `packages/cli/` — CLI tool for AI Gateway management (@arkon/cli)
 - `packages/database/` — Prisma schema and client (@arkon/database)
 - `packages/shared/` — Shared TypeScript types (@arkon/shared)
 - `packages/engine-core/` — Rust high-performance utilities
@@ -161,6 +162,16 @@ Whenever `/init` is run:
 | prisma | ^5.22.0 | ORM |
 | bcryptjs | ^3.0.3 | Auth |
 
+### CLI (packages/cli — @arkon/cli)
+| Package | Version | Category |
+|---------|---------|----------|
+| commander | ^12.1.0 | CLI Framework |
+| chalk | ^5.3.0 | Terminal Styling |
+| ora | ^8.0.1 | Spinners |
+| keytar | ^7.9.0 | Credential Storage |
+| open | ^10.1.0 | Open URLs |
+| conf | ^13.0.0 | Config Storage |
+
 ### Monorepo (root)
 | Package | Version | Category |
 |---------|---------|----------|
@@ -242,6 +253,13 @@ arkon-workstation/
 │       └── package.json
 │
 ├── packages/
+│   ├── cli/                    # ✅ CLI tool (@arkon/cli)
+│   │   ├── src/
+│   │   │   ├── commands/       # CLI commands
+│   │   │   ├── lib/            # CLI utilities
+│   │   │   └── index.ts        # Entry point
+│   │   └── package.json
+│   │
 │   ├── database/               # ✅ Prisma schema (@arkon/database)
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma   # Database schema
@@ -302,6 +320,7 @@ arkon-workstation/
 | LLM | `llm.ts` | LLM provider proxy |
 | RAG | `rag.ts` | RAG context retrieval |
 | Embedding | `embedding.ts` | Vector embeddings API |
+| MCP | `mcp.ts` | MCP server registry |
 | Health | `health.ts` | Health checks |
 
 ### Backend Services (apps/api/src/services/)
@@ -313,6 +332,8 @@ arkon-workstation/
 | RAG | `rag.ts` | RAG pipeline service |
 | Embedding | `embedding.ts` | Embedding generation |
 | Embedding Hooks | `embedding-hooks.ts` | Auto-embed on model changes |
+| Search | `search.ts` | Hybrid search orchestration |
+| MCP | `mcp.ts` | MCP server management |
 
 ### Backend LLM Providers (apps/api/src/lib/llm/)
 | Module | Location | Purpose |
@@ -340,6 +361,19 @@ arkon-workstation/
 | Audit | `audit.ts` | Audit logging |
 | RAG | `rag/` | RAG context builder |
 | Embedding | `embedding/` | OpenAI embeddings |
+| Search | `search/` | Hybrid search (BM25 + vector + RRF) |
+| LLM | `llm/` | Multi-provider LLM clients |
+
+### Backend Search Lib (apps/api/src/lib/search/)
+| Module | Location | Purpose |
+|--------|----------|---------|
+| BM25 | `bm25.ts` | BM25 keyword search implementation |
+| Vector | `vector.ts` | Vector similarity search |
+| RRF | `rrf.ts` | Reciprocal Rank Fusion |
+| Taxonomy | `taxonomy.ts` | Query classification |
+| Confidence | `confidence.ts` | Result confidence scoring |
+| Config | `config.ts` | Search configuration |
+| Types | `types.ts` | Search types |
 
 ### Frontend Modules (apps/web/src/)
 | Module | Location | Purpose |
@@ -351,6 +385,7 @@ arkon-workstation/
 ### Shared Packages
 | Package | Location | Purpose |
 |---------|----------|---------|
+| @arkon/cli | `packages/cli/` | CLI tool for AI Gateway management |
 | @arkon/database | `packages/database/` | Prisma schema with multi-tenancy |
 | @arkon/shared | `packages/shared/` | JWTClaims, Role, TeamMembership types |
 | @arkon/tsconfig | `packages/tsconfig/` | Base TypeScript configs |
