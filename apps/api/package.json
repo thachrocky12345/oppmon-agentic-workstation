@@ -14,7 +14,10 @@
     "smoke:week1": "tsx scripts/smoke-week1.ts",
     "smoke:week2": "tsx scripts/smoke-week2.ts",
     "smoke:week3": "tsx scripts/smoke-week3.ts",
-    "smoke": "tsx scripts/smoke-week1.ts && tsx scripts/smoke-week2.ts && tsx scripts/smoke-week3.ts",
+    "smoke:week5": "tsx scripts/smoke-week5.ts",
+    "smoke": "tsx scripts/smoke-week1.ts && tsx scripts/smoke-week2.ts && tsx scripts/smoke-week3.ts && tsx scripts/smoke-week5.ts",
+    "test:auth": "tsx scripts/test-auth-integration.ts",
+    "test:ai": "tsx scripts/test-ai.ts",
     "onboarding-timer": "tsx scripts/onboarding-timer.ts",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
@@ -47,7 +50,10 @@
     "dotenv": "^16.4.5",
     "pino": "^9.2.0",
     "pino-pretty": "^11.2.0",
-    "arctic": "^2.1.0"
+    "arctic": "^2.1.0",
+    "tweetnacl": "^1.0.3",
+    "dockerode": "^4.0.0",
+    "mustache": "^4.2.0"
   },
   "devDependencies": {
     "@arkon/tsconfig": "workspace:*",
@@ -72,7 +78,9 @@
     "@types/supertest": "^6.0.2",
     "eslint": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0"
+    "@typescript-eslint/parser": "^8.0.0",
+    "@types/dockerode": "^3.3.0",
+    "@types/mustache": "^4.2.0"
   },
   "engines": {
     "node": ">=20.0.0"

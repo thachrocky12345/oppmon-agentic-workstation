@@ -1,6 +1,6 @@
 # Data Model
 
-**Last Updated:** 2026-05-05
+**Last Updated:** 2026-05-05 (synced)
 
 ## Overview
 
@@ -16,6 +16,8 @@ erDiagram
     TENANT ||--o{ LLM_SESSION : owns
     TENANT ||--o{ EMBEDDING : stores
     TENANT ||--o{ MCP_SERVER : registers
+    TENANT ||--|| TENANT_SETTINGS : has
+    TENANT ||--o{ USAGE_EVENT : tracks
 
     TEAM ||--o{ TEAM_MEMBER : has
     TEAM ||--o{ AGENT : "optionally owns"
@@ -268,6 +270,26 @@ erDiagram
         datetime updatedAt
         datetime deletedAt
     }
+
+    TENANT_SETTINGS {
+        string id PK
+        string tenantId UK
+        boolean eventsEnabled
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    USAGE_EVENT {
+        string id PK
+        string tenantId FK
+        string resourceType
+        string resourceId
+        string action
+        datetime bucketTimestamp
+        int count
+        json metadata
+        datetime createdAt
+    }
 ```
 
 ## Multi-Tenancy Model
@@ -288,7 +310,9 @@ Tenant
   ├── AuditLogs
   ├── LlmSessions → LlmMessages
   ├── Embeddings (pgvector)
-  └── McpServers
+  ├── McpServers
+  ├── TenantSettings (privacy controls)
+  └── UsageEvents (privacy-first analytics)
 ```
 
 ## PostgreSQL Extensions
@@ -363,3 +387,6 @@ LIMIT 10;
 | embeddings | idx_embeddings_source | (tenantId, sourceType, sourceId) |
 | mcp_servers | idx_mcp_servers_tenant | (tenantId) |
 | mcp_servers | idx_mcp_servers_scope | (scope) |
+| tenant_settings | idx_tenant_settings_tenant | (tenantId) |
+| usage_events | idx_usage_events_tenant_bucket | (tenantId, bucketTimestamp) |
+| usage_events | idx_usage_events_resource | (tenantId, resourceType) |

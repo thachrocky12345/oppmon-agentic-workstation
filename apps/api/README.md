@@ -185,6 +185,46 @@ apps/api/
 - `POST /api/rag/query` - Execute RAG query
 - `GET /api/rag/status` - Get RAG pipeline status
 
+## Database Migrations
+
+SQL migrations are stored in `scripts/migrations/` and tracked in a `_migrations` table.
+
+### Running Migrations
+
+```bash
+# Run all pending migrations
+pnpm --filter @arkon/api migrate
+
+# Preview without applying
+pnpm --filter @arkon/api migrate --dry-run
+```
+
+### Creating a New Migration
+
+1. Create a timestamped SQL file:
+   ```bash
+   # Format: YYYYMMDDHHMMSS_description.sql
+   touch scripts/migrations/20250505143000_add_new_column.sql
+   ```
+
+2. Write your SQL with safety checks:
+   ```sql
+   -- Migration: 20250505143000_add_new_column
+   -- Description: Add new column to table
+   -- Author: Your Name
+
+   ALTER TABLE "tableName" ADD COLUMN IF NOT EXISTS "newColumn" TEXT;
+   ```
+
+3. Run:
+   ```bash
+   pnpm --filter @arkon/api migrate
+   ```
+
+See `scripts/migrations/README.md` for full documentation.
+
+---
+
 ## Troubleshooting
 
 ### "column tenant_id does not exist"

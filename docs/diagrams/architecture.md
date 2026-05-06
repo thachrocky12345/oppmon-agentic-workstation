@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2026-05-05
+**Last Updated:** 2026-05-05 (synced)
 
 ## Overview
 
@@ -52,6 +52,8 @@ graph TD
             RAGRoutes["RAG"]
             EmbeddingRoutes["Embedding"]
             MCPRoutes["MCP"]
+            TeamsRoutes["Teams"]
+            UsageRoutes["Usage"]
         end
 
         subgraph Services["Services"]

@@ -1,6 +1,6 @@
 # Arkon Architecture
 
-**Last Updated:** 2026-05-05
+**Last Updated:** 2026-05-05 (synced)
 
 ## Important: Repository Structure
 
@@ -109,6 +109,7 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **Auth**: JWT + OAuth 2.0 (GitHub) authentication
 - **Agents**: Agent CRUD and lifecycle management
 - **Events**: Event ingestion and streaming
+- **Teams**: Team management and membership
 - **Workflows**: Workflow execution engine
 - **Analytics**: Aggregation and reporting
 - **Admin**: Administrative operations
@@ -118,6 +119,7 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **Embeddings**: Vector embedding generation and storage
 - **Search**: Hybrid search (BM25 + vector + RRF)
 - **MCP**: Model Context Protocol server registry
+- **Usage**: Privacy-first usage analytics (tenant-level aggregation)
 
 ### Shared Packages
 - **@arkon/cli**: CLI tool for AI Gateway management (tag command)

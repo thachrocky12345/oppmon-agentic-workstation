@@ -79,7 +79,7 @@ Whenever `/init` is run:
 ## Known Dependencies
 <!-- Claude auto-updates this section on every /init — do not edit manually -->
 
-**Last synced:** 2026-05-05
+**Last synced:** 2026-05-05 (init sync)
 
 ### Reference Only (arkon-reference-only/) — DO NOT MODIFY
 | Package | Version | Category |
@@ -321,6 +321,8 @@ arkon-workstation/
 | RAG | `rag.ts` | RAG context retrieval |
 | Embedding | `embedding.ts` | Vector embeddings API |
 | MCP | `mcp.ts` | MCP server registry |
+| Usage | `usage.ts` | Privacy-first usage analytics |
+| Teams | `teams.ts` | Team management |
 | Health | `health.ts` | Health checks |
 
 ### Backend Services (apps/api/src/services/)

@@ -13,6 +13,8 @@ import { usePathname, useRouter } from 'next/navigation'
 
 const navItems = [
   { href: '/admin/teams', label: 'Teams' },
+  { href: '/admin/models', label: 'AI Models' },
+  { href: '/admin/llm-usage', label: 'LLM Usage' },
   { href: '/admin/skills', label: 'Skills' },
   { href: '/admin/mcp', label: 'MCP Servers' },
   { href: '/admin/usage', label: 'Usage' },

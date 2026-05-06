@@ -5,6 +5,7 @@
  * - Chat completion across providers
  * - Session management
  * - Usage tracking and audit logging
+ * - Model Registry integration
  */
 
 import { prisma } from '@arkon/database';
@@ -17,7 +18,9 @@ import {
   LLMProvider,
   LLMResponse,
   LLMError,
+  ModelRegistryConfig,
 } from '../lib/llm/index.js';
+import { getEnabledModelsForTenant } from './models.js';
 
 // ============================================================================
 // Types
@@ -53,6 +56,7 @@ export interface SessionInfo {
 /**
  * Send a chat completion request
  * Creates or updates a session and logs messages
+ * Uses Model Registry if available, falls back to environment variables
  */
 export async function chat(
   tenantId: string,
@@ -65,7 +69,31 @@ export async function chat(
     throw new Error(`Invalid LLM provider: ${provider}`);
   }
 
-  const client = createLLMClient(provider);
+  // Try to get model config from Model Registry
+  let registryConfig: ModelRegistryConfig | undefined;
+
+  try {
+    const enabledModels = await getEnabledModelsForTenant(tenantId);
+
+    // Find a model matching the requested provider
+    const matchingModel = enabledModels.find(
+      (m) => m.model.providerTemplateId === provider
+    );
+
+    if (matchingModel && matchingModel.secrets.api_key) {
+      registryConfig = {
+        apiKey: matchingModel.secrets.api_key,
+        model: input.model || matchingModel.model.modelIdentifier,
+        baseUrl: matchingModel.model.publicConfig?.base_url as string | undefined,
+        timeout: matchingModel.model.publicConfig?.timeout as number | undefined,
+      };
+    }
+  } catch (error) {
+    // If Model Registry fails, fall back to environment variables
+    console.warn('Failed to load model from registry, falling back to env vars:', error);
+  }
+
+  const client = createLLMClient(provider, registryConfig);
 
   // Call the LLM
   const response = await client.chat({
@@ -193,6 +221,7 @@ export async function listModels(provider?: LLMProvider): Promise<string[]> {
 
 /**
  * List all available providers with their status
+ * Checks both environment variables and Model Registry
  */
 export function listProviders(): Array<{
   id: LLMProvider;
@@ -220,6 +249,55 @@ export function listProviders(): Array<{
       name: 'Anthropic (Claude)',
       available: !!process.env.ANTHROPIC_API_KEY,
       isDefault: defaultProvider === 'anthropic',
+    },
+  ];
+}
+
+/**
+ * List providers with Model Registry check (async version)
+ */
+export async function listProvidersWithRegistry(tenantId: string): Promise<Array<{
+  id: LLMProvider;
+  name: string;
+  available: boolean;
+  isDefault: boolean;
+  source: 'registry' | 'env' | 'none';
+}>> {
+  const defaultProvider = getDefaultProvider();
+
+  // Get models from registry
+  let registryModels: Array<{ providerTemplateId: string | null }> = [];
+  try {
+    const enabledModels = await getEnabledModelsForTenant(tenantId);
+    registryModels = enabledModels.map(m => ({ providerTemplateId: m.model.providerTemplateId }));
+  } catch (error) {
+    console.warn('Failed to check Model Registry:', error);
+  }
+
+  const hasRegistryProvider = (provider: string) =>
+    registryModels.some(m => m.providerTemplateId === provider);
+
+  return [
+    {
+      id: 'ollama' as LLMProvider,
+      name: 'Ollama (Local)',
+      available: true,
+      isDefault: defaultProvider === 'ollama',
+      source: hasRegistryProvider('ollama') ? 'registry' : 'env',
+    },
+    {
+      id: 'cerebras' as LLMProvider,
+      name: 'Cerebras',
+      available: hasRegistryProvider('cerebras') || !!process.env.CEREBRAS_API_KEY,
+      isDefault: defaultProvider === 'cerebras',
+      source: hasRegistryProvider('cerebras') ? 'registry' : (process.env.CEREBRAS_API_KEY ? 'env' : 'none'),
+    },
+    {
+      id: 'anthropic' as LLMProvider,
+      name: 'Anthropic (Claude)',
+      available: hasRegistryProvider('anthropic') || !!process.env.ANTHROPIC_API_KEY,
+      isDefault: defaultProvider === 'anthropic',
+      source: hasRegistryProvider('anthropic') ? 'registry' : (process.env.ANTHROPIC_API_KEY ? 'env' : 'none'),
     },
   ];
 }

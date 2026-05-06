@@ -2,7 +2,7 @@
  * LLM Provider Factory
  *
  * Central factory for creating LLM provider clients.
- * Reads configuration from environment variables.
+ * Reads configuration from Model Registry first, falls back to environment variables.
  */
 
 import { OllamaClient } from './ollama.js';
@@ -15,6 +15,14 @@ export * from './types.js';
 export { OllamaClient } from './ollama.js';
 export { CerebrasClient } from './cerebras.js';
 export { AnthropicClient } from './anthropic.js';
+
+// Model Registry config type
+export interface ModelRegistryConfig {
+  apiKey: string;
+  model: string;
+  baseUrl?: string;
+  timeout?: number;
+}
 
 // ============================================================================
 // Environment Configuration
@@ -69,16 +77,38 @@ function getAnthropicConfig() {
 
 /**
  * Create an LLM client for the specified provider
+ * If registryConfig is provided, use it instead of environment variables
  */
-export function createLLMClient(provider: LLMProvider): LLMClient {
+export function createLLMClient(provider: LLMProvider, registryConfig?: ModelRegistryConfig): LLMClient {
   switch (provider) {
     case 'ollama':
+      if (registryConfig) {
+        return new OllamaClient({
+          baseUrl: registryConfig.baseUrl || 'http://localhost:11434',
+          defaultModel: registryConfig.model,
+          timeout: registryConfig.timeout || 120000,
+        });
+      }
       return new OllamaClient(getOllamaConfig());
 
     case 'cerebras':
+      if (registryConfig) {
+        return new CerebrasClient({
+          apiKey: registryConfig.apiKey,
+          defaultModel: registryConfig.model,
+          timeout: registryConfig.timeout || 60000,
+        });
+      }
       return new CerebrasClient(getCerebrasConfig());
 
     case 'anthropic':
+      if (registryConfig) {
+        return new AnthropicClient({
+          apiKey: registryConfig.apiKey,
+          defaultModel: registryConfig.model,
+          timeout: registryConfig.timeout || 60000,
+        });
+      }
       return new AnthropicClient(getAnthropicConfig());
 
     default:

@@ -1,103 +1,155 @@
 /**
- * Database Migration Runner
+ * Migration Runner
  *
- * Runs SQL migrations in order from the migrations folder.
- * Tracks applied migrations in a schema_migrations table.
+ * Runs all pending SQL migrations in order.
+ * Tracks applied migrations in a `_migrations` table.
  *
- * Cross-platform: Works on Windows, Mac, and Linux.
+ * Usage:
+ *   pnpm --filter @arkon/api migrate
+ *
+ * Options:
+ *   --dry-run    Show what would be run without executing
+ *   --force      Re-run all migrations (dangerous!)
  */
 
 import { readdir, readFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { Pool } from 'pg';
-import { config } from 'dotenv';
+import pg from 'pg';
 
-// ESM-compatible __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = join(__dirname, 'migrations');
 
-// Load .env from apps/api directory
-config({ path: join(__dirname, '..', '.env') });
+// Parse command line arguments
+const args = process.argv.slice(2);
+const DRY_RUN = args.includes('--dry-run');
+const FORCE = args.includes('--force');
 
-// Default to Docker Compose database URL
+// Database connection
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://arkon:arkon_dev_password@localhost:5433/arkon';
 
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-});
+interface Migration {
+  name: string;
+  sql: string;
+}
 
-async function ensureMigrationTable(): Promise<void> {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version VARCHAR(255) PRIMARY KEY,
-      applied_at TIMESTAMPTZ DEFAULT NOW()
+interface AppliedMigration {
+  name: string;
+  applied_at: Date;
+}
+
+async function getClient(): Promise<pg.Client> {
+  const client = new pg.Client({ connectionString: DATABASE_URL });
+  await client.connect();
+  return client;
+}
+
+async function ensureMigrationsTable(client: pg.Client): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )
   `);
 }
 
-async function getAppliedMigrations(): Promise<Set<string>> {
-  const result = await pool.query('SELECT version FROM schema_migrations ORDER BY version');
-  return new Set(result.rows.map((row) => row.version));
+async function getAppliedMigrations(client: pg.Client): Promise<Set<string>> {
+  const result = await client.query<AppliedMigration>('SELECT name FROM _migrations ORDER BY name');
+  return new Set(result.rows.map(r => r.name));
 }
 
-async function applyMigration(version: string, sql: string): Promise<void> {
-  const client = await pool.connect();
+async function loadMigrations(): Promise<Migration[]> {
+  const files = await readdir(MIGRATIONS_DIR);
+  const sqlFiles = files
+    .filter(f => f.endsWith('.sql'))
+    .sort(); // Sort by filename (timestamp prefix ensures order)
+
+  const migrations: Migration[] = [];
+
+  for (const file of sqlFiles) {
+    const sql = await readFile(join(MIGRATIONS_DIR, file), 'utf-8');
+    migrations.push({
+      name: file.replace('.sql', ''),
+      sql,
+    });
+  }
+
+  return migrations;
+}
+
+async function applyMigration(client: pg.Client, migration: Migration): Promise<void> {
+  console.log(`  Applying: ${migration.name}`);
+
+  if (DRY_RUN) {
+    console.log('    [DRY RUN] Would execute:');
+    console.log(migration.sql.split('\n').map(l => `      ${l}`).join('\n'));
+    return;
+  }
+
+  await client.query('BEGIN');
   try {
-    await client.query('BEGIN');
-    await client.query(sql);
-    await client.query('INSERT INTO schema_migrations (version) VALUES ($1)', [version]);
+    await client.query(migration.sql);
+    await client.query('INSERT INTO _migrations (name) VALUES ($1)', [migration.name]);
     await client.query('COMMIT');
-    console.log(`✓ Applied migration: ${version}`);
-  } catch (err) {
+    console.log(`    Applied successfully`);
+  } catch (error) {
     await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
+    throw error;
   }
 }
 
 async function main(): Promise<void> {
-  const migrationsDir = join(__dirname, 'migrations');
-
-  console.log('Running database migrations...');
-  console.log(`Migrations directory: ${migrationsDir}`);
+  console.log('='.repeat(60));
+  console.log('Arkon Migration Runner');
+  console.log('='.repeat(60));
   console.log(`Database: ${DATABASE_URL.replace(/:[^:@]+@/, ':****@')}`);
+  if (DRY_RUN) console.log('Mode: DRY RUN (no changes will be made)');
+  if (FORCE) console.log('Mode: FORCE (re-running all migrations)');
+  console.log();
 
-  await ensureMigrationTable();
-  const applied = await getAppliedMigrations();
+  const client = await getClient();
 
-  // Read all migration files
-  const files = await readdir(migrationsDir);
-  const migrations = files
-    .filter((f) => f.endsWith('.sql') && !f.startsWith('_'))
-    .sort();
+  try {
+    // Ensure migrations table exists
+    await ensureMigrationsTable(client);
 
-  let appliedCount = 0;
+    // Get applied migrations
+    const applied = FORCE ? new Set<string>() : await getAppliedMigrations(client);
+    console.log(`Applied migrations: ${applied.size}`);
 
-  for (const file of migrations) {
-    const version = file.replace('.sql', '');
+    // Load all migrations
+    const migrations = await loadMigrations();
+    console.log(`Total migrations: ${migrations.length}`);
+    console.log();
 
-    if (applied.has(version)) {
-      console.log(`  Skipping (already applied): ${version}`);
-      continue;
+    // Find pending migrations
+    const pending = migrations.filter(m => !applied.has(m.name));
+
+    if (pending.length === 0) {
+      console.log('No pending migrations.');
+      return;
     }
 
-    const sql = await readFile(join(migrationsDir, file), 'utf-8');
-    await applyMigration(version, sql);
-    appliedCount++;
-  }
+    console.log(`Pending migrations: ${pending.length}`);
+    console.log();
 
-  if (appliedCount === 0) {
-    console.log('No new migrations to apply.');
-  } else {
-    console.log(`\nApplied ${appliedCount} migration(s).`);
-  }
+    // Apply pending migrations
+    for (const migration of pending) {
+      await applyMigration(client, migration);
+    }
 
-  await pool.end();
+    console.log();
+    console.log('='.repeat(60));
+    console.log(DRY_RUN ? 'Dry run complete.' : 'All migrations applied successfully!');
+    console.log('='.repeat(60));
+
+  } finally {
+    await client.end();
+  }
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error('Migration failed:', err);
   process.exit(1);
 });

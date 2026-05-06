@@ -642,10 +642,177 @@ export function createSyncCommand(): Command {
 
   sync.addCommand(mcp)
 
+  // Routing subcommand
+  const routing = new Command('routing').description('Sync AI Gateway routing configuration')
+
+  routing
+    .command('fetch')
+    .description('Fetch routing config and write .envrc for AI Gateway')
+    .option('--output <file>', 'Output file path', '.envrc')
+    .option('--json', 'Output as JSON instead of .envrc')
+    .action(routingFetchCommand)
+
+  sync.addCommand(routing)
+
   // Default action: show help
   sync.action(() => {
     sync.outputHelp()
   })
 
   return sync
+}
+
+// ============================================================================
+// Routing Sync
+// ============================================================================
+
+interface RoutingConfig {
+  gatewayUrl: string
+  tenantId: string
+  teamId?: string
+  teamName?: string
+  defaultModel?: {
+    displayName: string
+    modelIdentifier: string
+    providerTemplateId: string | null
+  }
+  availableModels: Array<{
+    displayName: string
+    modelIdentifier: string
+    providerTemplateId: string | null
+  }>
+  virtualKey?: {
+    id: string
+    keyPrefix: string
+    label: string | null
+  }
+}
+
+async function routingFetchCommand(options: { output?: string; json?: boolean }): Promise<void> {
+  requireAuth()
+  const api = createApiClient()
+  const spinner = ora('Fetching routing configuration...').start()
+
+  try {
+    const response = await api.getRoutingConfig()
+    const config: RoutingConfig = response.data
+
+    spinner.stop()
+
+    if (options.json) {
+      console.log(JSON.stringify(config, null, 2))
+      return
+    }
+
+    // Generate .envrc content
+    const envrcContent = generateEnvrc(config)
+
+    if (options.output) {
+      const fs = await import('fs/promises')
+      const outputPath = options.output
+
+      // Check if file exists and ask for confirmation
+      try {
+        await fs.access(outputPath)
+        console.log(chalk.yellow(`\nWarning: ${outputPath} already exists.`))
+        console.log(chalk.dim('The tag-managed section will be updated.\n'))
+      } catch {
+        // File doesn't exist, that's fine
+      }
+
+      // Read existing content if any
+      let existingContent = ''
+      try {
+        existingContent = await fs.readFile(outputPath, 'utf-8')
+      } catch {
+        // File doesn't exist
+      }
+
+      // Merge with existing content
+      const mergedContent = mergeEnvrc(existingContent, envrcContent)
+      await fs.writeFile(outputPath, mergedContent)
+
+      console.log(chalk.green(`\n✓ Routing config written to ${outputPath}`))
+      console.log(chalk.dim('\nTo activate: source ' + outputPath))
+    } else {
+      // Print to stdout
+      console.log(envrcContent)
+    }
+
+    // Print summary
+    console.log(chalk.bold('\nRouting Configuration:'))
+    console.log(chalk.dim('  Gateway URL: ') + config.gatewayUrl)
+    console.log(chalk.dim('  Tenant: ') + config.tenantId)
+    if (config.teamName) {
+      console.log(chalk.dim('  Team: ') + config.teamName)
+    }
+    if (config.defaultModel) {
+      console.log(chalk.dim('  Default Model: ') + config.defaultModel.displayName)
+    }
+    console.log(chalk.dim('  Available Models: ') + config.availableModels.length)
+    if (config.virtualKey) {
+      console.log(chalk.dim('  API Key: ') + `sk-tag-${config.virtualKey.keyPrefix}-...`)
+    } else {
+      console.log(chalk.yellow('  API Key: ') + chalk.dim('None found. Run "tag virtual-key create"'))
+    }
+
+  } catch (error) {
+    spinner.fail('Failed to fetch routing configuration')
+    console.error(chalk.red(`Error: ${(error as Error).message}`))
+    process.exit(EXIT_CODES.ERROR)
+  }
+}
+
+function generateEnvrc(config: RoutingConfig): string {
+  const lines: string[] = [
+    '# --- tag managed (do not edit manually) ---',
+    `# Last synced: ${new Date().toISOString()}`,
+    '',
+  ]
+
+  // Gateway URL for ANTHROPIC_BASE_URL
+  lines.push(`export ANTHROPIC_BASE_URL="${config.gatewayUrl}"`)
+
+  // Auth token (if available)
+  if (config.virtualKey) {
+    lines.push(`export ANTHROPIC_AUTH_TOKEN="sk-tag-${config.virtualKey.keyPrefix}-<YOUR_SECRET>"`)
+    lines.push(`# Note: Replace <YOUR_SECRET> with your actual key secret`)
+  }
+
+  // Routing info as comments
+  lines.push('')
+  if (config.defaultModel) {
+    lines.push(`# Routing: ${config.defaultModel.displayName} (${config.defaultModel.providerTemplateId || 'custom'})`)
+  }
+  if (config.teamName) {
+    lines.push(`# Team: ${config.teamName}`)
+  }
+
+  lines.push('')
+  lines.push('# --- end tag managed ---')
+
+  return lines.join('\n')
+}
+
+function mergeEnvrc(existing: string, newContent: string): string {
+  const startMarker = '# --- tag managed'
+  const endMarker = '# --- end tag managed ---'
+
+  // Find existing tag-managed section
+  const startIdx = existing.indexOf(startMarker)
+  const endIdx = existing.indexOf(endMarker)
+
+  if (startIdx >= 0 && endIdx > startIdx) {
+    // Replace existing section
+    const before = existing.substring(0, startIdx)
+    const after = existing.substring(endIdx + endMarker.length)
+    return before + newContent + after
+  }
+
+  // No existing section, append
+  if (existing.trim()) {
+    return existing.trimEnd() + '\n\n' + newContent
+  }
+
+  return newContent
 }

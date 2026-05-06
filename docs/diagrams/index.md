@@ -1,6 +1,6 @@
 # Architecture Diagrams
 
-**Last Updated:** 2026-05-05
+**Last Updated:** 2026-05-05 (synced)
 
 This directory contains Mermaid architecture diagrams for the Arkon project.
 
@@ -8,16 +8,16 @@ This directory contains Mermaid architecture diagrams for the Arkon project.
 
 | File | Description | Last Updated |
 |------|-------------|--------------|
-| [architecture.md](architecture.md) | System component overview with LLM/RAG services | 2026-05-05 |
-| [dependencies.md](dependencies.md) | Package dependency graph (monorepo structure) | 2026-05-05 |
-| [data-model.md](data-model.md) | Entity relationship diagram (Prisma schema) | 2026-05-05 |
-| [deployment.md](deployment.md) | Docker Compose deployment architecture | 2026-05-05 |
+| [architecture.md](architecture.md) | System component overview with LLM/RAG services | 2026-05-05 (synced) |
+| [dependencies.md](dependencies.md) | Package dependency graph (monorepo structure) | 2026-05-05 (synced) |
+| [data-model.md](data-model.md) | Entity relationship diagram (Prisma schema) | 2026-05-05 (synced) |
+| [deployment.md](deployment.md) | Docker Compose deployment architecture | 2026-05-05 (synced) |
 
 ## Quick Links
 
 - **System Architecture**: How components connect (frontend, API, database, LLM providers, CLI)
 - **Dependencies**: What packages each app uses (pnpm + Turborepo monorepo, including CLI)
-- **Data Model**: Database schema with multi-tenancy, skills, LLM sessions, embeddings, MCP servers
+- **Data Model**: Database schema with multi-tenancy, skills, LLM sessions, embeddings, MCP servers, usage analytics
 - **Deployment**: Docker services, ports, volumes, and profiles
 
 ## Usage

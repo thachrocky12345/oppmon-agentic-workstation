@@ -10,13 +10,23 @@ async function login(page: any) {
   // Go to login page
   await page.goto('/login')
 
-  // Fill in credentials (test user from seed)
-  await page.fill('input[type="email"]', 'admin@arkon.dev')
-  await page.fill('input[type="password"]', 'admin123')
+  // Fill in credentials (test user from seed: admin@arkon.dev / admin123)
+  await page.fill('input#email', 'admin@arkon.dev')
+  await page.fill('input#password', 'admin123')
   await page.click('button[type="submit"]')
 
-  // Wait for navigation away from login page
-  await page.waitForURL((url: URL) => !url.pathname.includes('/login'), { timeout: 10000 })
+  // Wait for navigation away from login page or for an error
+  try {
+    await page.waitForURL((url: URL) => !url.pathname.includes('/login'), { timeout: 15000 })
+  } catch (e) {
+    // Check if there's an error message
+    const errorVisible = await page.locator('.bg-red-50').isVisible()
+    if (errorVisible) {
+      const errorText = await page.locator('.bg-red-50').textContent()
+      throw new Error(`Login failed: ${errorText}`)
+    }
+    throw e
+  }
 
   // Wait a bit for cookies to be fully set
   await page.waitForTimeout(500)
@@ -25,9 +35,9 @@ async function login(page: any) {
 test.describe('Landing Page', () => {
   test('displays hero section', async ({ page }) => {
     await page.goto('/')
-    await expect(page.locator('h2')).toContainText('AI Agent Gateway Platform')
-    await expect(page.locator('text=Login')).toBeVisible()
-    await expect(page.locator('text=Get Started')).toBeVisible()
+    await expect(page.locator('h2').first()).toContainText('AI Agent Gateway Platform')
+    await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Get Started' })).toBeVisible()
   })
 })
 

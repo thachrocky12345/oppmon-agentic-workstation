@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:e2e": "playwright test",
-    "test:a11y": "playwright test --project=a11y"
+    "test:e2e:auth": "playwright test auth-flows.spec.ts",
+    "test:e2e:dashboard": "playwright test dashboard-pages.spec.ts",
+    "test:a11y": "playwright test --project=a11y",
+    "smoke:ui": "playwright test --reporter=list"
   },
   "dependencies": {
     "@arkon/shared": "workspace:*",

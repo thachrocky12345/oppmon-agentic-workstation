@@ -1,0 +1,40 @@
+{
+  "name": "@arkon/router",
+  "version": "1.0.0",
+  "description": "Arkon AI Gateway Router - Routes requests to tenant LiteLLM instances",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@arkon/database": "workspace:*",
+    "@arkon/shared": "workspace:*",
+    "express": "^4.21.0",
+    "http-proxy-middleware": "^3.0.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "pino": "^9.2.0",
+    "pino-pretty": "^11.2.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@arkon/tsconfig": "workspace:*",
+    "@types/express": "^4.17.21",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

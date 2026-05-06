@@ -1,6 +1,6 @@
 # Data Flow
 
-**Last Updated:** 2026-05-05
+**Last Updated:** 2026-05-05 (synced)
 
 ## Overview
 
@@ -314,6 +314,8 @@ sequenceDiagram
 | Skill lookup | skills | (tenantId, name) | Skill registry |
 | LLM history | llm_messages | (sessionId, createdAt) | Chat history |
 | MCP servers | mcp_servers | (tenantId, name) | MCP registry |
+| Usage analytics | usage_events | (tenantId, bucketTimestamp) | Privacy-first metrics |
+| Tenant settings | tenant_settings | (tenantId) | Privacy controls |
 
 ## Caching Strategy
 

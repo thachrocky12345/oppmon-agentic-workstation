@@ -20,18 +20,40 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
 
   /* Reporter to use */
-  reporter: 'html',
+  reporter: process.env.CI ? 'github' : 'html',
+
+  /* Global timeout for each test */
+  timeout: 60000,
+
+  /* Expect timeout for assertions */
+  expect: {
+    timeout: 15000,
+  },
 
   /* Shared settings for all the projects below */
   use: {
     /* Base URL to use in actions like `await page.goto('/')` */
-    baseURL: 'http://localhost:3002',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3002',
+
+    /* API URL for backend requests */
+    extraHTTPHeaders: {
+      'X-Test-Mode': 'true',
+    },
 
     /* Collect trace when retrying the failed test */
     trace: 'on-first-retry',
 
     /* Screenshot on failure */
     screenshot: 'only-on-failure',
+
+    /* Video on failure for debugging */
+    video: 'retain-on-failure',
+
+    /* Action timeout */
+    actionTimeout: 15000,
+
+    /* Navigation timeout */
+    navigationTimeout: 30000,
   },
 
   /* Configure projects for major browsers */
@@ -40,13 +62,35 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+
+    /* Test on Firefox */
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+
+    /* Accessibility testing project */
+    {
+      name: 'a11y',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /a11y.*\.spec\.ts/,
+    },
   ],
 
   /* Run your local dev server before starting the tests */
   // Uncomment if you want Playwright to start the dev server automatically
-  // webServer: {
-  //   command: 'pnpm dev',
-  //   url: 'http://localhost:3002',
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  // webServer: [
+  //   {
+  //     command: 'pnpm --filter @arkon/api dev',
+  //     url: 'http://localhost:3001/api/health',
+  //     reuseExistingServer: !process.env.CI,
+  //     timeout: 120000,
+  //   },
+  //   {
+  //     command: 'pnpm --filter @arkon/web dev',
+  //     url: 'http://localhost:3002',
+  //     reuseExistingServer: !process.env.CI,
+  //     timeout: 120000,
+  //   },
+  // ],
 })

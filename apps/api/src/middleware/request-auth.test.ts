@@ -35,7 +35,7 @@ describe('Request Auth Middleware', () => {
       await requestAuth(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
-      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Missing or invalid authorization header' });
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Missing or invalid authorization' });
       expect(mockNext).not.toHaveBeenCalled();
     });
 
@@ -45,7 +45,7 @@ describe('Request Auth Middleware', () => {
       await requestAuth(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
-      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Missing or invalid authorization header' });
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Missing or invalid authorization' });
     });
 
     it('returns 401 when token is invalid', async () => {

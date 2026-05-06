@@ -583,6 +583,36 @@ export class ApiClient {
   async updateUsageSettings(eventsEnabled: boolean): Promise<ApiResponse<{ eventsEnabled: boolean }>> {
     return this.request('PUT', '/api/usage/settings', { eventsEnabled })
   }
+
+  // Routing Config API
+
+  async getRoutingConfig(): Promise<ApiResponse<RoutingConfig>> {
+    return this.request('GET', '/api/cli/routing-config')
+  }
+}
+
+// Routing Config types
+
+export interface RoutingConfig {
+  gatewayUrl: string
+  tenantId: string
+  teamId?: string
+  teamName?: string
+  defaultModel?: {
+    displayName: string
+    modelIdentifier: string
+    providerTemplateId: string | null
+  }
+  availableModels: Array<{
+    displayName: string
+    modelIdentifier: string
+    providerTemplateId: string | null
+  }>
+  virtualKey?: {
+    id: string
+    keyPrefix: string
+    label: string | null
+  }
 }
 
 // User info type

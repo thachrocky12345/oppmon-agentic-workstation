@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
+import { createId } from '@paralleldrive/cuid2';
 import { query } from '../lib/db.js';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { requestAuth, AuthenticatedRequest } from '../middleware/request-auth.js';
@@ -132,23 +133,23 @@ authRouter.post('/register', asyncHandler(async (req: Request, res: Response) =>
   // Hash password
   const passwordHash = await bcrypt.hash(password, 12);
 
+  // Generate IDs (Prisma's cuid() is client-side, so we need to generate for raw SQL)
+  const tenantId = createId();
+  const userId = createId();
+
   // Create default tenant for new user (Prisma uses camelCase column names)
-  const tenantResult = await query<{ id: string }>(
-    `INSERT INTO tenants (name, slug, "isActive", "createdAt", "updatedAt") VALUES ($1, $2, true, NOW(), NOW()) RETURNING id`,
-    [name || email.split('@')[0], `tenant-${Date.now()}`],
+  await query(
+    `INSERT INTO tenants (id, name, slug, "isActive", "createdAt", "updatedAt") VALUES ($1, $2, $3, true, NOW(), NOW())`,
+    [tenantId, name || email.split('@')[0], `tenant-${Date.now()}`],
   );
 
-  const tenantId = tenantResult.rows[0].id;
-
-  // Create user
-  const userResult = await query<{ id: string }>(
-    `INSERT INTO users (email, "passwordHash", name, role, "tenantId", "isActive", "createdAt", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
-     RETURNING id`,
-    [email.toLowerCase(), passwordHash, name || null, 'TENANT_ADMIN', tenantId],
+  // Create user - name defaults to email prefix if not provided
+  const userName = name || email.split('@')[0];
+  await query(
+    `INSERT INTO users (id, email, "passwordHash", name, role, "tenantId", "isActive", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())`,
+    [userId, email.toLowerCase(), passwordHash, userName, 'TENANT_ADMIN', tenantId],
   );
-
-  const userId = userResult.rows[0].id;
 
   // Generate JWT
   const token = jwt.sign(
@@ -167,7 +168,7 @@ authRouter.post('/register', asyncHandler(async (req: Request, res: Response) =>
     user: {
       id: userId,
       email: email.toLowerCase(),
-      name: name || null,
+      name: userName,
       role: 'TENANT_ADMIN',
       tenantId,
     },

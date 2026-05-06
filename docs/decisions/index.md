@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-**Last Updated:** 2026-05-05
+**Last Updated:** 2026-05-05 (synced)
 
 This directory contains Architecture Decision Records (ADRs) for the Arkon project.
 
@@ -21,6 +21,7 @@ An Architecture Decision Record captures an important architectural decision mad
 | [0003](ADR-0003-oauth-arctic.md) | [AUTO] OAuth Implementation with Arctic | Accepted | 2026-05-05 |
 | [0004](ADR-0004-pgvector-embeddings.md) | [AUTO] Vector Embeddings with pgvector | Accepted | 2026-05-05 |
 | [0005](ADR-0005-hybrid-search.md) | [AUTO] Hybrid Search with BM25 + Vector + RRF | Accepted | 2026-05-05 |
+| [0006](ADR-0006-privacy-first-usage-analytics.md) | [AUTO] Privacy-First Usage Analytics | Accepted | 2026-05-05 |
 
 ## Status Definitions
 

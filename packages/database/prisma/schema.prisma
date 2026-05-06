@@ -58,6 +58,19 @@ enum SkillScope {
   TEAM
 }
 
+enum ModelScope {
+  TENANT
+  TEAM
+}
+
+enum RoutingStatus {
+  PROVISIONING
+  RUNNING
+  DEGRADED
+  FAILED
+  STOPPED
+}
+
 enum AuditAction {
   CREATE
   READ
@@ -71,37 +84,44 @@ enum AuditAction {
 // ============================================================================
 
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  name                   String
+  slug                   String   @unique
+  isActive               Boolean  @default(true)
+  fallbackDefaultModelId String?  // Default model when team has none set
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   // Relations
-  users       User[]
-  teams       Team[]
-  agents      Agent[]
-  skills      Skill[]
-  auditLogs   AuditLog[]
-  llmSessions LlmSession[]
-  embeddings  Embedding[]
+  users         User[]
+  teams         Team[]
+  agents        Agent[]
+  skills        Skill[]
+  auditLogs     AuditLog[]
+  llmSessions   LlmSession[]
+  embeddings    Embedding[]
+  models        Model[]
+  modelSecrets  ModelSecret[]
+  virtualKeys   VirtualKey[]
+  routingState  TenantRoutingState?
 
   @@map("tenants")
 }
 
 model Team {
-  id        String   @id @default(cuid())
-  name      String
-  tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String
+  tenantId       String
+  defaultModelId String?  // Default model for this team
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
   tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   members TeamMember[]
   agents  Agent[]
   skills  Skill[]
+  models  Model[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -134,6 +154,8 @@ model User {
   skillVersionsCreated SkillVersion[]   @relation("SkillVersionCreatedBy")
   auditLogs            AuditLog[]
   llmSessions          LlmSession[]
+  modelsCreated        Model[]          @relation("ModelCreatedBy")
+  virtualKeys          VirtualKey[]
 
   @@index([tenantId])
   @@index([email])
@@ -346,6 +368,7 @@ model Skill {
   content     String     // skill definition/content
   sha256      String     // hash of content for integrity
   scope       SkillScope @default(TEAM)
+  enabled     Boolean    @default(true)
   createdById String
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -550,4 +573,95 @@ model UsageEvent {
   @@index([tenantId, bucketTimestamp])
   @@index([tenantId, resourceType])
   @@map("usage_events")
+}
+
+// ============================================================================
+// Multi-Provider Model Routing
+// ============================================================================
+
+model Model {
+  id                 String     @id @default(cuid())
+  tenantId           String
+  scope              ModelScope @default(TENANT)
+  teamId             String?    // null for tenant-wide models
+  displayName        String     // User-friendly name
+  providerTemplateId String?    // null = YAML mode
+  modelIdentifier    String     // e.g., "claude-3-sonnet-20240229"
+  publicConfig       Json       @default("{}") // Non-secret config
+  secretRef          String?    // FK to ModelSecret (null if no secrets)
+  yamlOverride       String?    // Raw LiteLLM YAML for advanced users
+  enabled            Boolean    @default(true)
+  createdById        String
+  lastSyncedAt       DateTime?  // Last time synced to LiteLLM
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?  // Soft delete
+
+  // Relations
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  team      Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdBy User         @relation("ModelCreatedBy", fields: [createdById], references: [id])
+  secret    ModelSecret? @relation(fields: [secretRef], references: [id])
+
+  @@unique([tenantId, displayName])
+  @@index([tenantId, enabled, deletedAt])
+  @@index([teamId])
+  @@index([providerTemplateId])
+  @@map("models")
+}
+
+model ModelSecret {
+  id               String   @id @default(cuid())
+  tenantId         String
+  encryptedPayload Bytes    // XChaCha20-Poly1305 encrypted JSON
+  nonce            Bytes    // 24-byte nonce for XChaCha20-Poly1305
+  version          Int      @default(1) // Key version for rotation
+  createdAt        DateTime @default(now())
+
+  // Relations
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  models Model[]
+
+  @@index([tenantId])
+  @@map("model_secrets")
+}
+
+model VirtualKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  userId     String
+  keyPrefix  String    @unique @db.VarChar(8) // 8-char prefix for lookup
+  keyHash    String    // bcrypt hash of full key
+  label      String?   // User-friendly label
+  enabled    Boolean   @default(true)
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyPrefix])
+  @@index([userId, enabled])
+  @@index([tenantId])
+  @@map("virtual_keys")
+}
+
+model TenantRoutingState {
+  tenantId             String        @id
+  litellmContainerName String?       // Docker container name
+  masterKeySecretRef   String?       // Reference to LiteLLM master key
+  status               RoutingStatus @default(STOPPED)
+  lastHealthCheckAt    DateTime?
+  lastError            String?
+  restartCount         Int           @default(0)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_routing_states")
 }

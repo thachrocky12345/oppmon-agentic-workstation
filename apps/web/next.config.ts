@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  // Standalone disabled on Windows due to symlink issues
+  // output: 'standalone',
 
   // API rewrites to backend
   async rewrites() {

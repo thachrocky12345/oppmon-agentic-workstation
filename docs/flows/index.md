@@ -1,6 +1,6 @@
 # Flow Diagrams
 
-**Last Updated:** 2026-05-05
+**Last Updated:** 2026-05-05 (synced)
 
 This directory contains Mermaid flow diagrams showing how data and processes move through the Arkon system.
 
@@ -8,10 +8,10 @@ This directory contains Mermaid flow diagrams showing how data and processes mov
 
 | File | Description | Last Updated |
 |------|-------------|--------------|
-| [request-flow.md](request-flow.md) | API request lifecycle with middleware chain | 2026-05-05 |
-| [auth-flow.md](auth-flow.md) | JWT + GitHub OAuth authentication | 2026-05-05 |
-| [data-flow.md](data-flow.md) | Data pipeline with LLM/RAG/embeddings | 2026-05-05 |
-| [error-flow.md](error-flow.md) | Error propagation and handling | 2026-05-05 |
+| [request-flow.md](request-flow.md) | API request lifecycle with middleware chain | 2026-05-05 (synced) |
+| [auth-flow.md](auth-flow.md) | JWT + GitHub OAuth authentication | 2026-05-05 (synced) |
+| [data-flow.md](data-flow.md) | Data pipeline with LLM/RAG/embeddings | 2026-05-05 (synced) |
+| [error-flow.md](error-flow.md) | Error propagation and handling | 2026-05-05 (synced) |
 
 ## Flow Types
 

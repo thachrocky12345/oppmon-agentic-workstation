@@ -15,6 +15,7 @@ import { createRagCommand } from './commands/rag.js'
 import { createInitCommand } from './commands/init.js'
 import { createHooksCommand } from './commands/hooks.js'
 import { createEventsCommand } from './commands/events.js'
+import { createDoctorCommand } from './commands/doctor.js'
 import { loadTokensCache } from './lib/credentials.js'
 
 const program = new Command()
@@ -43,6 +44,7 @@ program.addCommand(createRagCommand())
 program.addCommand(createInitCommand())
 program.addCommand(createHooksCommand())
 program.addCommand(createEventsCommand())
+program.addCommand(createDoctorCommand())
 
 // Add examples to help output
 program.addHelpText('after', `
@@ -86,6 +88,14 @@ ${chalk.bold('Event Collection:')}
   $ tag events disable           # Disable event collection
   $ tag events status            # Show event collection status
   $ tag events flush             # Manually flush buffered events
+
+${chalk.bold('Diagnostics:')}
+  $ tag doctor                   # Run all diagnostic checks
+  $ tag doctor auth              # Check authentication only
+  $ tag doctor network           # Check API connectivity only
+  $ tag doctor claude            # Check Claude Code integration
+  $ tag doctor sync              # Check sync state
+  $ tag doctor --fix             # Attempt to auto-fix issues
 
 ${chalk.bold('Environment Variables:')}
   TAG_API_URL    API endpoint (default: http://localhost:3001)

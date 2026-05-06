@@ -17,7 +17,8 @@
     "smoke:week2": "tsx scripts/smoke-week2.ts",
     "smoke:week3": "tsx scripts/smoke-week3.ts",
     "smoke:week4": "tsx scripts/smoke-week4.ts",
-    "smoke": "tsx scripts/smoke-week2.ts && tsx scripts/smoke-week3.ts && tsx scripts/smoke-week4.ts",
+    "smoke:week5": "tsx scripts/smoke-week5.ts",
+    "smoke": "tsx scripts/smoke-week2.ts && tsx scripts/smoke-week3.ts && tsx scripts/smoke-week4.ts && tsx scripts/smoke-week5.ts",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },

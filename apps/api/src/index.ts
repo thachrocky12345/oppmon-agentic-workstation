@@ -36,6 +36,9 @@ import { ragRouter } from './routes/rag.js';
 import { mcpRouter } from './routes/mcp.js';
 import { usageRouter } from './routes/usage.js';
 import { teamsRouter } from './routes/teams.js';
+import { modelsRouter } from './routes/models.js';
+import { virtualKeysRouter } from './routes/virtual-keys.js';
+import { cliRoutingRouter } from './routes/cli-routing.js';
 
 // Import middleware
 import { errorHandler } from './middleware/error-handler.js';
@@ -107,6 +110,9 @@ app.use('/api/llm', requestAuth, llmRouter);
 app.use('/api/embedding', requestAuth, embeddingRouter);
 app.use('/api/rag', requestAuth, ragRouter);
 app.use('/api/mcp', requestAuth, mcpRouter);
+app.use('/api/models', requestAuth, modelsRouter);
+app.use('/api/virtual-keys', requestAuth, virtualKeysRouter);
+app.use('/api/cli', requestAuth, cliRoutingRouter);
 
 // Usage API - Uses optionalAuth for privacy-first design
 // POST /events returns 204 even without auth (graceful degradation)

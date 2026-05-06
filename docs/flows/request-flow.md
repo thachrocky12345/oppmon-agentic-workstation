@@ -1,6 +1,6 @@
 # Request Flow
 
-**Last Updated:** 2026-05-05
+**Last Updated:** 2026-05-05 (synced)
 
 ## Overview
 
@@ -159,3 +159,5 @@ flowchart TD
 | POST | /api/llm/chat | `llm.ts` | LLM chat completion |
 | POST | /api/rag/query | `rag.ts` | RAG context retrieval |
 | POST | /api/embedding | `embedding.ts` | Generate embeddings |
+| GET/POST | /api/teams | `teams.ts` | Team management |
+| GET | /api/usage | `usage.ts` | Usage analytics (privacy-first) |
