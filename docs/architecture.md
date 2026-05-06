@@ -156,6 +156,11 @@ See [Architecture Decision Records](decisions/index.md) for detailed decisions.
 - [Data Flow](flows/data-flow.md)
 - [Error Flow](flows/error-flow.md)
 
+## CLI Documentation
+
+- [CLI Setup Guide](cli-setup-guide.md) - 9-step setup for Arkon CLI
+- [CLI Coding Workflows](cli-coding-workflows.md) - Practical workflows for coding and bug fixing
+
 ## Open Questions
 
 - [x] Multi-tenancy isolation approach — **Resolved: Tenant/Team/User model with Prisma**

@@ -149,3 +149,10 @@ node dist/index.js --help
 # Run tests
 pnpm test
 ```
+
+## Detailed Documentation
+
+For comprehensive setup and workflow guides, see:
+
+- [CLI Setup Guide](../../docs/cli-setup-guide.md) - Complete 9-step setup
+- [CLI Coding Workflows](../../docs/cli-coding-workflows.md) - Practical workflows for coding and bug fixing

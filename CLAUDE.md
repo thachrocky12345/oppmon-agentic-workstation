@@ -535,6 +535,8 @@ pnpm lint              # Lint all
 - [Deployment Guide](docs/DEPLOYMENT.md)
 - [Local Development](docs/LOCAL_DEVELOPMENT.md)
 - [API README](apps/api/README.md) - API setup, endpoints, and troubleshooting
+- [CLI Setup Guide](docs/cli-setup-guide.md) - 9-step Arkon CLI setup
+- [CLI Coding Workflows](docs/cli-coding-workflows.md) - Practical workflows for coding and bug fixing
 
 ---
 
