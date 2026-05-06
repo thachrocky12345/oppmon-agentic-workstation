@@ -3,7 +3,7 @@
  * Tests Azure OpenAI deployment credentials
  */
 
-import type { ConnectionTestResult } from '@arkon/shared';
+import type { ConnectionTestResult } from '@oppmon/shared';
 import {
   type ValidationContext,
   registerValidator,

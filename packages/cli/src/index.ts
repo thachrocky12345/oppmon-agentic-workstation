@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Arkon CLI - tag command
+ * OppMon CLI - tag command
  *
  * AI Gateway management CLI for skills, MCP servers, and RAG.
  */
@@ -25,7 +25,7 @@ const VERSION = '0.1.0'
 
 program
   .name('tag')
-  .description('Arkon CLI - AI Gateway management tool')
+  .description('OppMon CLI - AI Gateway management tool')
   .version(VERSION, '-v, --version', 'Output the current version')
   .helpOption('-h, --help', 'Display help for command')
   .configureOutput({

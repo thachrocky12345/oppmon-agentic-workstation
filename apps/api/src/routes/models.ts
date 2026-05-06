@@ -13,8 +13,8 @@
 
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { prisma, ModelScope } from '@arkon/database';
-import { providerRegistry, type ProviderTemplateId } from '@arkon/shared';
+import { prisma, ModelScope } from '@oppmon/database';
+import { providerRegistry, type ProviderTemplateId } from '@oppmon/shared';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { AuthenticatedRequest } from '../middleware/request-auth.js';
 import { rbac, buildRBACContext, RBACContext } from '../middleware/rbac.js';

@@ -41,13 +41,13 @@ function getBucketTimestamp(timestamp: Date): Date {
 /**
  * Check if events are enabled for tenant
  */
-async function isEventsEnabled(tenantId: string): Promise<boolean> {
+async function isEventsEnabled(tenant_id: string): Promise<boolean> {
   const result = await query(
-    'SELECT "eventsEnabled" FROM tenant_settings WHERE "tenantId" = $1',
-    [tenantId]
+    'SELECT "events_enabled" FROM tenant_settings WHERE "tenant_id" = $1',
+    [tenant_id]
   )
   // Default to false if no settings exist (privacy by default)
-  return result.rows[0]?.eventsEnabled ?? false
+  return result.rows[0]?.events_enabled ?? false
 }
 
 /**
@@ -59,10 +59,10 @@ async function isEventsEnabled(tenantId: string): Promise<boolean> {
  */
 usageRouter.post('/events', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId
+    const tenant_id = req.tenantId
 
     // Graceful degradation: if not authenticated, just return 204
-    if (!tenantId) {
+    if (!tenant_id) {
       return res.status(204).send()
     }
 
@@ -77,7 +77,7 @@ usageRouter.post('/events', asyncHandler(async (req: AuthenticatedRequest, res: 
     const event = parseResult.data
 
     // Check if events are enabled for this tenant
-    const enabled = await isEventsEnabled(tenantId)
+    const enabled = await isEventsEnabled(tenant_id)
     if (!enabled) {
       // Discard event silently - return 204 to hide state
       return res.status(204).send()
@@ -85,20 +85,20 @@ usageRouter.post('/events', asyncHandler(async (req: AuthenticatedRequest, res: 
 
     // Calculate bucket timestamp
     const eventTime = event.timestamp ? new Date(event.timestamp) : new Date()
-    const bucketTimestamp = getBucketTimestamp(eventTime)
+    const bucket_timestamp = getBucketTimestamp(eventTime)
 
     // Upsert into bucket (increment count if exists)
     await query(
-      `INSERT INTO usage_events ("id", "tenantId", "resourceType", "resourceId", "action", "bucketTimestamp", "count", "metadata", "createdAt")
+      `INSERT INTO usage_events ("id", "tenant_id", "resource_type", "resource_id", "action", "bucket_timestamp", "count", "metadata", "created_at")
        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 1, $6, NOW())
-       ON CONFLICT ("tenantId", "resourceType", "resourceId", "action", "bucketTimestamp")
+       ON CONFLICT ("tenant_id", "resource_type", "resource_id", "action", "bucket_timestamp")
        DO UPDATE SET "count" = usage_events."count" + 1`,
       [
-        tenantId,
+        tenant_id,
         event.resource_type,
         event.resource_id,
         event.action,
-        bucketTimestamp,
+        bucket_timestamp,
         event.metadata ? JSON.stringify(event.metadata) : null,
       ]
     )
@@ -120,10 +120,10 @@ usageRouter.post('/events', asyncHandler(async (req: AuthenticatedRequest, res: 
  */
 usageRouter.post('/events/batch', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId
+    const tenant_id = req.tenantId
 
     // Graceful degradation: if not authenticated, just return 204
-    if (!tenantId) {
+    if (!tenant_id) {
       return res.status(204).send()
     }
 
@@ -132,7 +132,7 @@ usageRouter.post('/events/batch', asyncHandler(async (req: AuthenticatedRequest,
       return res.status(204).send()
     }
 
-    const enabled = await isEventsEnabled(tenantId)
+    const enabled = await isEventsEnabled(tenant_id)
     if (!enabled) {
       return res.status(204).send()
     }
@@ -143,20 +143,20 @@ usageRouter.post('/events/batch', asyncHandler(async (req: AuthenticatedRequest,
     await Promise.all(
       events.map(async (event) => {
         const eventTime = event.timestamp ? new Date(event.timestamp) : new Date()
-        const bucketTimestamp = getBucketTimestamp(eventTime)
+        const bucket_timestamp = getBucketTimestamp(eventTime)
 
         try {
           await query(
-            `INSERT INTO usage_events ("id", "tenantId", "resourceType", "resourceId", "action", "bucketTimestamp", "count", "metadata", "createdAt")
+            `INSERT INTO usage_events ("id", "tenant_id", "resource_type", "resource_id", "action", "bucket_timestamp", "count", "metadata", "created_at")
              VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 1, $6, NOW())
-             ON CONFLICT ("tenantId", "resourceType", "resourceId", "action", "bucketTimestamp")
+             ON CONFLICT ("tenant_id", "resource_type", "resource_id", "action", "bucket_timestamp")
              DO UPDATE SET "count" = usage_events."count" + 1`,
             [
-              tenantId,
+              tenant_id,
               event.resource_type,
               event.resource_id,
               event.action,
-              bucketTimestamp,
+              bucket_timestamp,
               event.metadata ? JSON.stringify(event.metadata) : null,
             ]
           )
@@ -180,7 +180,7 @@ usageRouter.post('/events/batch', asyncHandler(async (req: AuthenticatedRequest,
  * CRITICAL: Returns counts only, no user data.
  */
 usageRouter.get('/', requireRole('TENANT_ADMIN', 'TEAM_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const tenantId = req.tenantId!
+  const tenant_id = req.tenantId!
   const { period = '7d' } = req.query
 
   // Calculate start date based on period
@@ -201,35 +201,35 @@ usageRouter.get('/', requireRole('TENANT_ADMIN', 'TEAM_ADMIN'), asyncHandler(asy
 
   // Get time series data
   const timeSeriesResult = await query(
-    `SELECT "bucketTimestamp", SUM("count") as total
+    `SELECT "bucket_timestamp", SUM("count") as total
      FROM usage_events
-     WHERE "tenantId" = $1 AND "bucketTimestamp" >= $2
-     GROUP BY "bucketTimestamp"
-     ORDER BY "bucketTimestamp" ASC`,
-    [tenantId, startDate]
+     WHERE "tenant_id" = $1 AND "bucket_timestamp" >= $2
+     GROUP BY "bucket_timestamp"
+     ORDER BY "bucket_timestamp" ASC`,
+    [tenant_id, startDate]
   )
 
   // Get breakdown by resource type
   const byResourceTypeResult = await query(
-    `SELECT "resourceType", SUM("count") as total
+    `SELECT "resource_type", SUM("count") as total
      FROM usage_events
-     WHERE "tenantId" = $1 AND "bucketTimestamp" >= $2
-     GROUP BY "resourceType"`,
-    [tenantId, startDate]
+     WHERE "tenant_id" = $1 AND "bucket_timestamp" >= $2
+     GROUP BY "resource_type"`,
+    [tenant_id, startDate]
   )
 
   // Get breakdown by action
   const byActionResult = await query(
     `SELECT "action", SUM("count") as total
      FROM usage_events
-     WHERE "tenantId" = $1 AND "bucketTimestamp" >= $2
+     WHERE "tenant_id" = $1 AND "bucket_timestamp" >= $2
      GROUP BY "action"`,
-    [tenantId, startDate]
+    [tenant_id, startDate]
   )
 
   // Calculate totals
-  const timeSeriesRows = timeSeriesResult.rows as Array<{ bucketTimestamp: Date; total: string }>
-  const byResourceTypeRows = byResourceTypeResult.rows as Array<{ resourceType: string; total: string }>
+  const timeSeriesRows = timeSeriesResult.rows as Array<{ bucket_timestamp: Date; total: string }>
+  const byResourceTypeRows = byResourceTypeResult.rows as Array<{ resource_type: string; total: string }>
   const byActionRows = byActionResult.rows as Array<{ action: string; total: string }>
 
   const totalEvents = timeSeriesRows.reduce(
@@ -243,11 +243,11 @@ usageRouter.get('/', requireRole('TENANT_ADMIN', 'TEAM_ADMIN'), asyncHandler(asy
       period,
       totalEvents,
       timeSeries: timeSeriesRows.map((bucket) => ({
-        timestamp: bucket.bucketTimestamp,
+        timestamp: bucket.bucket_timestamp,
         count: parseInt(bucket.total, 10),
       })),
       byResourceType: byResourceTypeRows.map((rt) => ({
-        resourceType: rt.resourceType,
+        resource_type: rt.resource_type,
         count: parseInt(rt.total, 10),
       })),
       byAction: byActionRows.map((a) => ({
@@ -265,8 +265,8 @@ usageRouter.get('/', requireRole('TENANT_ADMIN', 'TEAM_ADMIN'), asyncHandler(asy
  * CRITICAL: Returns counts only, no user breakdown.
  */
 usageRouter.get('/top-resources', requireRole('TENANT_ADMIN', 'TEAM_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const tenantId = req.tenantId!
-  const { period = '7d', limit = '10', resourceType } = req.query
+  const tenant_id = req.tenantId!
+  const { period = '7d', limit = '10', resource_type } = req.query
 
   const startDate = new Date()
   switch (period) {
@@ -281,30 +281,30 @@ usageRouter.get('/top-resources', requireRole('TENANT_ADMIN', 'TEAM_ADMIN'), asy
       break
   }
 
-  const params: (string | Date | number)[] = [tenantId, startDate, parseInt(limit as string, 10)]
-  let whereClause = '"tenantId" = $1 AND "bucketTimestamp" >= $2'
+  const params: (string | Date | number)[] = [tenant_id, startDate, parseInt(limit as string, 10)]
+  let whereClause = '"tenant_id" = $1 AND "bucket_timestamp" >= $2'
 
-  if (resourceType) {
-    whereClause += ' AND "resourceType" = $4'
-    params.push(resourceType as string)
+  if (resource_type) {
+    whereClause += ' AND "resource_type" = $4'
+    params.push(resource_type as string)
   }
 
   const result = await query(
-    `SELECT "resourceType", "resourceId", SUM("count") as total
+    `SELECT "resource_type", "resource_id", SUM("count") as total
      FROM usage_events
      WHERE ${whereClause}
-     GROUP BY "resourceType", "resourceId"
+     GROUP BY "resource_type", "resource_id"
      ORDER BY total DESC
      LIMIT $3`,
     params
   )
 
   // CRITICAL: Response contains count only, no users field
-  const topResourceRows = result.rows as Array<{ resourceType: string; resourceId: string; total: string }>
+  const topResourceRows = result.rows as Array<{ resource_type: string; resource_id: string; total: string }>
   res.json({
     data: topResourceRows.map((r) => ({
-      resourceType: r.resourceType,
-      resourceId: r.resourceId,
+      resource_type: r.resource_type,
+      resource_id: r.resource_id,
       count: parseInt(r.total, 10),
       // NO users field - this is intentional
     })),
@@ -317,16 +317,16 @@ usageRouter.get('/top-resources', requireRole('TENANT_ADMIN', 'TEAM_ADMIN'), asy
  * Get tenant usage settings including events_enabled state.
  */
 usageRouter.get('/settings', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const tenantId = req.tenantId!
+  const tenant_id = req.tenantId!
 
   const result = await query(
-    'SELECT "eventsEnabled" FROM tenant_settings WHERE "tenantId" = $1',
-    [tenantId]
+    'SELECT "events_enabled" FROM tenant_settings WHERE "tenant_id" = $1',
+    [tenant_id]
   )
 
   res.json({
     data: {
-      eventsEnabled: result.rows[0]?.eventsEnabled ?? false,
+      events_enabled: result.rows[0]?.events_enabled ?? false,
     },
   })
 }))
@@ -337,24 +337,24 @@ usageRouter.get('/settings', requireRole('TENANT_ADMIN'), asyncHandler(async (re
  * Update tenant usage settings.
  */
 usageRouter.put('/settings', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const tenantId = req.tenantId!
-  const { eventsEnabled } = req.body
+  const tenant_id = req.tenantId!
+  const { events_enabled } = req.body
 
-  if (typeof eventsEnabled !== 'boolean') {
-    throw ApiError.badRequest('eventsEnabled must be a boolean')
+  if (typeof events_enabled !== 'boolean') {
+    throw ApiError.badRequest('events_enabled must be a boolean')
   }
 
   await query(
-    `INSERT INTO tenant_settings ("id", "tenantId", "eventsEnabled", "createdAt", "updatedAt")
+    `INSERT INTO tenant_settings ("id", "tenant_id", "events_enabled", "created_at", "updated_at")
      VALUES (gen_random_uuid(), $1, $2, NOW(), NOW())
-     ON CONFLICT ("tenantId")
-     DO UPDATE SET "eventsEnabled" = $2, "updatedAt" = NOW()`,
-    [tenantId, eventsEnabled]
+     ON CONFLICT ("tenant_id")
+     DO UPDATE SET "events_enabled" = $2, "updated_at" = NOW()`,
+    [tenant_id, events_enabled]
   )
 
   res.json({
     data: {
-      eventsEnabled,
+      events_enabled,
     },
   })
 }))

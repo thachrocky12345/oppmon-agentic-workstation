@@ -5,14 +5,17 @@ export default function Home() {
     <main className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
       {/* Header */}
       <header className="container mx-auto px-4 py-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Arkon</h1>
-        <nav className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold">OppMon</h1>
+        <nav className="flex items-center gap-6">
+          <Link href="/docs" className="text-gray-300 hover:text-white">
+            Tutorial
+          </Link>
           <Link href="/login" className="text-gray-300 hover:text-white">
             Sign in
           </Link>
           <Link
             href="/register"
-            className="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-green-600 rounded-lg hover:bg-green-700"
           >
             Get Started
           </Link>
@@ -21,65 +24,71 @@ export default function Home() {
 
       {/* Hero */}
       <section className="container mx-auto px-4 py-20 text-center">
-        <div className="inline-block px-4 py-1 bg-blue-600/20 rounded-full text-blue-400 text-sm font-medium mb-6">
-          Now in Private Beta
+        <div className="inline-block px-4 py-1 bg-green-600/20 rounded-full text-green-400 text-sm font-medium mb-6">
+          Give every team a secure AI toolbox
         </div>
         <h2 className="text-5xl font-bold mb-6">
-          AI Agent Gateway Platform
+          AI Gateway for Claude Code Teams
         </h2>
-        <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-8">
-          Monitor, secure, and manage your AI agents with comprehensive observability,
-          cost tracking, and workflow automation. Privacy-first by design.
+        <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-4">
+          Skills. RAG. MCP. Distributed by team. Owned by you.
+        </p>
+        <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-8">
+          One CLI command. Five minutes from install to working with team RAG inside Claude Code.
+          Privacy-first — see what resources are used, not what users ask.
         </p>
         <div className="flex justify-center gap-4">
           <Link
             href="/register"
-            className="px-6 py-3 bg-blue-600 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            className="px-6 py-3 bg-green-600 rounded-lg font-semibold hover:bg-green-700 transition-colors"
           >
             Start Free Trial
           </Link>
           <Link
-            href="#features"
+            href="/docs"
             className="px-6 py-3 border border-gray-600 rounded-lg font-semibold hover:bg-gray-800 transition-colors"
           >
-            Learn More
+            View Tutorial
           </Link>
         </div>
         <p className="text-gray-500 text-sm mt-4">
-          No credit card required. Get started in minutes.
+          No credit card required. Get started in 5 minutes.
         </p>
       </section>
 
       {/* Features */}
       <section id="features" className="container mx-auto px-4 py-20">
-        <h3 className="text-3xl font-bold text-center mb-12">Key Features</h3>
+        <h3 className="text-3xl font-bold text-center mb-4">The Complete AI Toolbox</h3>
+        <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
+          Everything your engineering team needs to share AI tools safely, without becoming surveillance.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-gray-800 rounded-lg p-6">
-            <span className="text-4xl mb-4 block">📊</span>
-            <h4 className="text-xl font-semibold mb-2">Dashboard</h4>
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-green-500/50 transition-colors">
+            <span className="text-4xl mb-4 block">📦</span>
+            <h4 className="text-xl font-semibold mb-2">Skill Registry</h4>
             <p className="text-gray-400">
-              Real-time overview of all your AI agents with key metrics and trends.
+              Versioned skill bundles, scoped to team. One <code className="text-green-400">tag sync</code> to install.
             </p>
           </div>
-          <div className="bg-gray-800 rounded-lg p-6">
-            <span className="text-4xl mb-4 block">🛡️</span>
-            <h4 className="text-xl font-semibold mb-2">Security</h4>
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-purple-500/50 transition-colors">
+            <span className="text-4xl mb-4 block">🔌</span>
+            <h4 className="text-xl font-semibold mb-2">MCP Catalog</h4>
             <p className="text-gray-400">
-              ThreatGuard detects and alerts you to security threats and anomalies.
+              Register internal API/Jira/RAG servers once. Every developer&apos;s Claude Code picks them up.
             </p>
           </div>
-          <div className="bg-gray-800 rounded-lg p-6">
-            <span className="text-4xl mb-4 block">💰</span>
-            <h4 className="text-xl font-semibold mb-2">Cost Tracking</h4>
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-blue-500/50 transition-colors">
+            <span className="text-4xl mb-4 block">🔒</span>
+            <h4 className="text-xl font-semibold mb-2">Tenant-aware RAG</h4>
             <p className="text-gray-400">
-              Track spending by agent and model with budget alerts.
+              Vector search with tenant_id at SQL layer. Cross-tenant leak is impossible by construction.
             </p>
           </div>
-          <div className="bg-gray-800 rounded-lg p-6">
-            <span className="text-4xl mb-4 block">⚡</span>
-            <h4 className="text-xl font-semibold mb-2">Workflows</h4>
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-yellow-500/50 transition-colors">
+            <span className="text-4xl mb-4 block">👁️</span>
+            <h4 className="text-xl font-semibold mb-2">Privacy Analytics</h4>
             <p className="text-gray-400">
-              Automate tasks and responses with event-driven workflows.
+              See which resources are getting value — not what users ask. No prompts stored. By design.
             </p>
           </div>
         </div>
@@ -89,7 +98,7 @@ export default function Home() {
       <section className="container mx-auto px-4 py-16 text-center">
         <h3 className="text-3xl font-bold mb-4">Ready to get started?</h3>
         <p className="text-gray-400 mb-8 max-w-xl mx-auto">
-          Join teams using Arkon to manage their AI infrastructure with confidence.
+          Join teams using OppMon to manage their AI infrastructure with confidence.
         </p>
         <Link
           href="/register"
@@ -102,7 +111,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="container mx-auto px-4 py-8 border-t border-gray-700">
         <div className="flex justify-between items-center">
-          <p className="text-gray-400">Arkon - AI Agent Gateway Platform</p>
+          <p className="text-gray-400">OppMon - AI Agent Gateway Platform</p>
           <div className="flex gap-4">
             <Link href="/login" className="text-gray-400 hover:text-white text-sm">
               Sign In

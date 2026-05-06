@@ -8,8 +8,8 @@
  * - Scope-based filtering respecting team memberships
  */
 
-import { prisma } from "@arkon/database";
-import { Skill, SkillScope, Prisma } from "@arkon/database";
+import { prisma } from "@oppmon/database";
+import { Skill, SkillScope, Prisma } from "@oppmon/database";
 import { createHash } from "crypto";
 import {
   embedSkill,

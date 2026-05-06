@@ -4,7 +4,7 @@
  * PostgreSQL full-text search using tsvector and ts_rank_cd
  */
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { BM25Result, BM25SearchOptions } from './types.js';
 import { BM25_NORMALIZATION, BM25_MIN_SCORE } from './config.js';
 import { expandQuery } from './taxonomy.js';

@@ -9,7 +9,7 @@ import { modelsRouter } from './models.js';
 import { errorHandler } from '../middleware/error-handler.js';
 
 // Mock dependencies
-vi.mock('@arkon/database', () => ({
+vi.mock('@oppmon/database', () => ({
   prisma: {
     model: {
       findUnique: vi.fn(),
@@ -78,7 +78,7 @@ vi.mock('../services/audit.js', () => ({
   getAuditContext: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('@arkon/shared', () => ({
+vi.mock('@oppmon/shared', () => ({
   providerRegistry: {
     has: vi.fn().mockReturnValue(true),
     getAll: vi.fn().mockReturnValue([
@@ -102,7 +102,7 @@ vi.mock('@arkon/shared', () => ({
 import { listModels, getModel, createModel, updateModel, deleteModel } from '../services/models.js';
 import { validateConnection, validateYamlConfig } from '../validators/index.js';
 import { buildRBACContext } from '../middleware/rbac.js';
-import { providerRegistry } from '@arkon/shared';
+import { providerRegistry } from '@oppmon/shared';
 
 // Create app for testing
 const app = express();

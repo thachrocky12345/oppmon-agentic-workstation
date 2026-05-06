@@ -4,7 +4,7 @@ import { pino } from 'pino';
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
 // Default to Docker Compose database URL (port 5433)
-const DATABASE_URL = process.env.DATABASE_URL || 'postgres://arkon:arkon_dev_password@localhost:5433/arkon';
+const DATABASE_URL = process.env.DATABASE_URL || 'postgres://oppmon:oppmon_dev_password@localhost:5433/oppmon';
 
 // Connection pool configuration
 const pool = new Pool({

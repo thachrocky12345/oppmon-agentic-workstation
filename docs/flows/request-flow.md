@@ -1,6 +1,6 @@
 # Request Flow
 
-**Last Updated:** 2026-05-05 (synced)
+**Last Updated:** 2026-05-06 (init sync)
 
 ## Overview
 
@@ -158,6 +158,11 @@ flowchart TD
 | GET/POST | /api/skills | `skills.ts` | Skills registry |
 | POST | /api/llm/chat | `llm.ts` | LLM chat completion |
 | POST | /api/rag/query | `rag.ts` | RAG context retrieval |
+| POST | /api/rag/chat | `rag-chat.ts` | RAG-augmented chat completion |
+| GET/POST | /api/rag/admin | `rag-admin.ts` | RAG document management |
 | POST | /api/embedding | `embedding.ts` | Generate embeddings |
 | GET/POST | /api/teams | `teams.ts` | Team management |
 | GET | /api/usage | `usage.ts` | Usage analytics (privacy-first) |
+| GET/POST | /api/models | `models.ts` | Model configuration |
+| GET/POST | /api/virtual-keys | `virtual-keys.ts` | Virtual key management |
+| POST | /api/cli/routing | `cli-routing.ts` | CLI model routing |

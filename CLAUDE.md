@@ -20,37 +20,41 @@ This directory contains the original monorepo code and is **FOR REFERENCE ONLY**
 
 ---
 
-## CRITICAL: Database Column Naming (Prisma uses camelCase)
+## CRITICAL: Database Column Naming (snake_case with @map)
 
-**Prisma generates database columns in camelCase, NOT snake_case.**
+**Database columns use snake_case for Go/Rust compatibility.**
 
-When writing raw SQL queries, you **MUST** use double-quoted camelCase column names:
+The Prisma schema uses camelCase in TypeScript but maps to snake_case columns via `@map()` directives.
+
+When writing raw SQL queries, use **snake_case** column names (no quotes needed):
 
 ```sql
--- CORRECT (camelCase with double quotes)
-SELECT id, "tenantId", "createdAt" FROM users WHERE "isActive" = true
-
--- WRONG (snake_case will fail with "column does not exist")
+-- CORRECT (snake_case in raw SQL)
 SELECT id, tenant_id, created_at FROM users WHERE is_active = true
+
+-- In TypeScript/Prisma (camelCase)
+prisma.user.findMany({ where: { isActive: true } })
 ```
 
-### Common Column Mappings
+### Column Naming Convention
 
-| Wrong (snake_case) | Correct (camelCase) |
-|--------------------|---------------------|
-| `tenant_id` | `"tenantId"` |
-| `created_at` | `"createdAt"` |
-| `updated_at` | `"updatedAt"` |
-| `source_type` | `"sourceType"` |
-| `source_id` | `"sourceId"` |
-| `is_active` | `"isActive"` |
-| `password_hash` | `"passwordHash"` |
-| `team_id` | `"teamId"` |
-| `user_id` | `"userId"` |
+| Prisma (camelCase) | Database (snake_case) |
+|--------------------|----------------------|
+| `tenantId` | `tenant_id` |
+| `createdAt` | `created_at` |
+| `updatedAt` | `updated_at` |
+| `sourceType` | `source_type` |
+| `sourceId` | `source_id` |
+| `isActive` | `is_active` |
+| `passwordHash` | `password_hash` |
+| `teamId` | `team_id` |
+| `userId` | `user_id` |
 
-### Why?
+### Why snake_case?
 
-PostgreSQL lowercases unquoted identifiers. Since Prisma creates camelCase columns, you must quote them to preserve case. Without quotes, `tenantId` becomes `tenantid` which doesn't exist.
+- **Go/Rust compatibility**: Standard convention for these languages
+- **SQL ergonomics**: No quoting needed in raw queries
+- **Industry standard**: Most ORMs and databases use snake_case
 
 **Full documentation:** [docs/database-conventions.md](docs/database-conventions.md)
 
@@ -79,7 +83,7 @@ Whenever `/init` is run:
 ## Known Dependencies
 <!-- Claude auto-updates this section on every /init — do not edit manually -->
 
-**Last synced:** 2026-05-05 (init sync)
+**Last synced:** 2026-05-06 (init sync)
 
 ### Reference Only (arkon-reference-only/) — DO NOT MODIFY
 | Package | Version | Category |
@@ -319,11 +323,16 @@ arkon-workstation/
 | Skills | `skills.ts` | Skills registry CRUD |
 | LLM | `llm.ts` | LLM provider proxy |
 | RAG | `rag.ts` | RAG context retrieval |
+| RAG Chat | `rag-chat.ts` | RAG-augmented chat completion |
+| RAG Admin | `rag-admin.ts` | RAG document management |
 | Embedding | `embedding.ts` | Vector embeddings API |
 | MCP | `mcp.ts` | MCP server registry |
 | Usage | `usage.ts` | Privacy-first usage analytics |
 | Teams | `teams.ts` | Team management |
 | Health | `health.ts` | Health checks |
+| Models | `models.ts` | Model configuration CRUD |
+| Virtual Keys | `virtual-keys.ts` | Virtual key management |
+| CLI Routing | `cli-routing.ts` | CLI model routing endpoint |
 
 ### Backend Services (apps/api/src/services/)
 | Module | Location | Purpose |
@@ -332,10 +341,17 @@ arkon-workstation/
 | Skills | `skills.ts` | Skills business logic |
 | LLM | `llm.ts` | Multi-provider LLM orchestration |
 | RAG | `rag.ts` | RAG pipeline service |
+| RAG Chat | `rag-chat.ts` | RAG chat completion service |
+| RAG Retriever | `rag-retriever.ts` | Advanced document retrieval |
+| Advanced RAG | `advanced-rag.ts` | Complex RAG workflows |
+| Toolbox | `toolbox.ts` | Comprehensive toolbox service |
 | Embedding | `embedding.ts` | Embedding generation |
 | Embedding Hooks | `embedding-hooks.ts` | Auto-embed on model changes |
 | Search | `search.ts` | Hybrid search orchestration |
 | MCP | `mcp.ts` | MCP server management |
+| Models | `models.ts` | Model configuration service |
+| LiteLLM Config | `litellm-config-generator.ts` | LiteLLM YAML generation |
+| LiteLLM Orchestrator | `litellm-orchestrator.ts` | LiteLLM container management |
 
 ### Backend LLM Providers (apps/api/src/lib/llm/)
 | Module | Location | Purpose |
@@ -361,10 +377,23 @@ arkon-workstation/
 | OAuth | `oauth.ts` | Arctic OAuth helpers |
 | RBAC | `rbac.ts` | RBAC utilities |
 | Audit | `audit.ts` | Audit logging |
+| Secret Vault | `crypto/secret-vault.ts` | XChaCha20-Poly1305 encryption |
 | RAG | `rag/` | RAG context builder |
 | Embedding | `embedding/` | OpenAI embeddings |
 | Search | `search/` | Hybrid search (BM25 + vector + RRF) |
 | LLM | `llm/` | Multi-provider LLM clients |
+
+### Backend Validators (apps/api/src/validators/)
+| Module | Location | Purpose |
+|--------|----------|---------|
+| Connection Validator | `connection-validator.ts` | Provider connection validation |
+| Anthropic | `providers/anthropic.ts` | Anthropic provider validation |
+| OpenAI | `providers/openai.ts` | OpenAI provider validation |
+| Azure | `providers/azure.ts` | Azure OpenAI validation |
+| Bedrock | `providers/bedrock.ts` | AWS Bedrock validation |
+| Ollama | `providers/ollama.ts` | Ollama provider validation |
+| Cerebras | `providers/cerebras.ts` | Cerebras provider validation |
+| OpenAI Compatible | `providers/openai-compatible.ts` | Generic OpenAI-compatible validation |
 
 ### Backend Search Lib (apps/api/src/lib/search/)
 | Module | Location | Purpose |
@@ -382,6 +411,18 @@ arkon-workstation/
 |--------|----------|---------|
 | App Shell | `app/layout.tsx` | Root layout |
 | Home | `app/page.tsx` | Landing page |
+| Dashboard | `app/(dashboard)/dashboard/page.tsx` | Main dashboard |
+| Agents | `app/(dashboard)/agents/page.tsx` | Agent management |
+| Events | `app/(dashboard)/events/page.tsx` | Event stream |
+| Analytics | `app/(dashboard)/analytics/page.tsx` | Usage analytics |
+| Costs | `app/(dashboard)/costs/page.tsx` | Cost tracking |
+| Workflows | `app/(dashboard)/workflows/page.tsx` | Workflow automation |
+| Incidents | `app/(dashboard)/incidents/page.tsx` | Incident management |
+| Security | `app/(dashboard)/security/page.tsx` | ThreatGuard |
+| Infrastructure | `app/(dashboard)/infrastructure/page.tsx` | Infrastructure nodes |
+| Journal | `app/(dashboard)/journal/page.tsx` | Agent journals |
+| Chat | `app/(dashboard)/chat/page.tsx` | RAG Chat interface |
+| Notifications | `app/(dashboard)/notifications/page.tsx` | Notifications |
 | API Client | `lib/api.ts` | Backend API calls |
 
 ### Shared Packages
@@ -389,7 +430,7 @@ arkon-workstation/
 |---------|----------|---------|
 | @arkon/cli | `packages/cli/` | CLI tool for AI Gateway management |
 | @arkon/database | `packages/database/` | Prisma schema with multi-tenancy |
-| @arkon/shared | `packages/shared/` | JWTClaims, Role, TeamMembership types |
+| @arkon/shared | `packages/shared/` | JWTClaims, Role, TeamMembership types, Provider templates |
 | @arkon/tsconfig | `packages/tsconfig/` | Base TypeScript configs |
 | engine-core | `packages/engine-core/` | Rust: Envelope<T>, Error, SHA-256 |
 
@@ -477,6 +518,24 @@ arkon-workstation/
 | GET | /api/dashboard | Dashboard data |
 | GET | /api/analytics | Usage analytics |
 | GET | /api/costs | Cost tracking |
+
+### AI/LLM
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/llm/chat | LLM chat completion |
+| POST | /api/rag/query | RAG context retrieval |
+| POST | /api/rag/chat | RAG-augmented chat completion |
+| GET/POST | /api/rag/admin | RAG document management |
+| POST | /api/embedding | Generate embeddings |
+| GET/POST | /api/skills | Skills registry |
+| GET/POST | /api/mcp | MCP server registry |
+
+### Model Routing
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | /api/models | Model configuration |
+| GET/POST | /api/virtual-keys | Virtual key management |
+| POST | /api/cli/routing | CLI model routing |
 
 ---
 

@@ -3,7 +3,7 @@
  * Tests provider credentials and returns helpful error messages
  */
 
-import type { ConnectionTestResult, ProviderTemplateId } from '@arkon/shared';
+import type { ConnectionTestResult, ProviderTemplateId } from '@oppmon/shared';
 
 // ============================================================================
 // Types

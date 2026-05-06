@@ -20,6 +20,11 @@ WORKDIR /app
 RUN addgroup -g 1001 -S arkon && \
     adduser -S arkon -u 1001 -G arkon
 
+# Create documents directory (will be mounted as volume)
+RUN mkdir -p /app/data/documents && \
+    chown -R arkon:arkon /app/data && \
+    chmod 750 /app/data/documents
+
 # Install production dependencies only
 COPY package*.json ./
 RUN npm install --omit=dev && npm cache clean --force

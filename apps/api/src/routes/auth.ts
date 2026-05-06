@@ -56,17 +56,17 @@ const registerSchema = z.object({
 authRouter.post('/login', asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = loginSchema.parse(req.body);
 
-  // Find user by email (Prisma uses camelCase column names)
+  // Find user by email (using snake_case column names)
   const result = await query<{
     id: string;
     email: string;
-    passwordHash: string;
+    password_hash: string;
     role: string;
-    tenantId: string;
+    tenant_id: string;
     name: string | null;
-    isActive: boolean;
+    is_active: boolean;
   }>(
-    'SELECT id, email, "passwordHash", role, "tenantId", name, "isActive" FROM users WHERE email = $1',
+    'SELECT id, email, password_hash, role, tenant_id, name, is_active FROM users WHERE email = $1',
     [email.toLowerCase()],
   );
 
@@ -76,12 +76,12 @@ authRouter.post('/login', asyncHandler(async (req: Request, res: Response) => {
 
   const user = result.rows[0];
 
-  if (!user.isActive) {
+  if (!user.is_active) {
     throw ApiError.unauthorized('Account is deactivated');
   }
 
   // Verify password
-  const validPassword = await bcrypt.compare(password, user.passwordHash);
+  const validPassword = await bcrypt.compare(password, user.password_hash);
   if (!validPassword) {
     throw ApiError.unauthorized('Invalid email or password');
   }
@@ -92,14 +92,14 @@ authRouter.post('/login', asyncHandler(async (req: Request, res: Response) => {
       sub: user.id,
       email: user.email,
       role: user.role,
-      tenantId: user.tenantId,
+      tenantId: user.tenant_id,
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN },
   );
 
-  // Update updatedAt timestamp
-  await query('UPDATE users SET "updatedAt" = NOW() WHERE id = $1', [user.id]);
+  // Update updated_at timestamp
+  await query('UPDATE users SET updated_at = NOW() WHERE id = $1', [user.id]);
 
   res.json({
     token,
@@ -108,7 +108,7 @@ authRouter.post('/login', asyncHandler(async (req: Request, res: Response) => {
       email: user.email,
       name: user.name,
       role: user.role,
-      tenantId: user.tenantId,
+      tenantId: user.tenant_id,
     },
   });
 }));
@@ -137,16 +137,16 @@ authRouter.post('/register', asyncHandler(async (req: Request, res: Response) =>
   const tenantId = createId();
   const userId = createId();
 
-  // Create default tenant for new user (Prisma uses camelCase column names)
+  // Create default tenant for new user (using snake_case column names)
   await query(
-    `INSERT INTO tenants (id, name, slug, "isActive", "createdAt", "updatedAt") VALUES ($1, $2, $3, true, NOW(), NOW())`,
+    `INSERT INTO tenants (id, name, slug, is_active, created_at, updated_at) VALUES ($1, $2, $3, true, NOW(), NOW())`,
     [tenantId, name || email.split('@')[0], `tenant-${Date.now()}`],
   );
 
   // Create user - name defaults to email prefix if not provided
   const userName = name || email.split('@')[0];
   await query(
-    `INSERT INTO users (id, email, "passwordHash", name, role, "tenantId", "isActive", "createdAt", "updatedAt")
+    `INSERT INTO users (id, email, password_hash, name, role, tenant_id, is_active, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())`,
     [userId, email.toLowerCase(), passwordHash, userName, 'TENANT_ADMIN', tenantId],
   );
@@ -201,16 +201,16 @@ authRouter.post('/logout', asyncHandler(async (req: Request, res: Response) => {
  * Get current user info with tenant and team memberships
  */
 authRouter.get('/me', requestAuth, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  // Get user info (Prisma uses camelCase column names)
+  // Get user info (using snake_case column names)
   const userResult = await query<{
     id: string;
     email: string;
     name: string | null;
     role: string;
-    tenantId: string;
-    createdAt: Date;
+    tenant_id: string;
+    created_at: Date;
   }>(
-    'SELECT id, email, name, role, "tenantId", "createdAt" FROM users WHERE id = $1',
+    'SELECT id, email, name, role, tenant_id, created_at FROM users WHERE id = $1',
     [req.user!.id],
   );
 
@@ -227,27 +227,27 @@ authRouter.get('/me', requestAuth, asyncHandler(async (req: AuthenticatedRequest
     slug: string;
   }>(
     'SELECT id, name, slug FROM tenants WHERE id = $1',
-    [user.tenantId],
+    [user.tenant_id],
   );
 
   const tenant = tenantResult.rows[0];
 
   // Get team memberships
   const teamsResult = await query<{
-    teamId: string;
-    teamName: string;
+    team_id: string;
+    team_name: string;
     role: string;
   }>(
-    `SELECT tm."teamId", t.name as "teamName", tm.role
+    `SELECT tm.team_id, t.name as team_name, tm.role
      FROM team_members tm
-     JOIN teams t ON t.id = tm."teamId"
-     WHERE tm."userId" = $1`,
+     JOIN teams t ON t.id = tm.team_id
+     WHERE tm.user_id = $1`,
     [user.id],
   );
 
   const teams = teamsResult.rows.map(row => ({
-    teamId: row.teamId,
-    teamName: row.teamName,
+    teamId: row.team_id,
+    teamName: row.team_name,
     role: row.role,
   }));
 
@@ -257,7 +257,7 @@ authRouter.get('/me', requestAuth, asyncHandler(async (req: AuthenticatedRequest
       email: user.email,
       name: user.name,
       role: user.role,
-      tenantId: user.tenantId,
+      tenantId: user.tenant_id,
     },
     tenant: tenant ? {
       id: tenant.id,
@@ -265,7 +265,7 @@ authRouter.get('/me', requestAuth, asyncHandler(async (req: AuthenticatedRequest
       slug: tenant.slug,
     } : null,
     teams,
-    createdAt: user.createdAt,
+    createdAt: user.created_at,
   });
 }));
 
@@ -275,10 +275,10 @@ authRouter.get('/me', requestAuth, asyncHandler(async (req: AuthenticatedRequest
  */
 authRouter.get('/sessions', requestAuth, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(
-    `SELECT id, "createdAt", "userAgent", "ipAddress"
+    `SELECT id, created_at, user_agent, ip_address
      FROM user_sessions
-     WHERE "userId" = $1 AND "expiresAt" > NOW()
-     ORDER BY "createdAt" DESC`,
+     WHERE user_id = $1 AND expires_at > NOW()
+     ORDER BY created_at DESC`,
     [req.user!.id],
   );
 
@@ -381,10 +381,10 @@ authRouter.post('/device/token', asyncHandler(async (req: Request, res: Response
     id: string;
     email: string;
     role: string;
-    tenantId: string;
+    tenant_id: string;
     name: string | null;
   }>(
-    'SELECT id, email, role, "tenantId", name FROM users WHERE id = $1',
+    'SELECT id, email, role, tenant_id, name FROM users WHERE id = $1',
     [entry.userId],
   );
 
@@ -401,7 +401,7 @@ authRouter.post('/device/token', asyncHandler(async (req: Request, res: Response
       sub: user.id,
       email: user.email,
       role: user.role,
-      tenantId: user.tenantId,
+      tenantId: user.tenant_id,
     },
     JWT_SECRET,
     { expiresIn },

@@ -1,5 +1,5 @@
 {
-  "extends": "@arkon/tsconfig/node.json",
+  "extends": "@oppmon/tsconfig/node.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src"

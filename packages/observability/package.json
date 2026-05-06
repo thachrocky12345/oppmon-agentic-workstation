@@ -1,0 +1,38 @@
+{
+  "name": "@arkon/observability",
+  "version": "1.0.0",
+  "description": "Observability and tracing for Arkon AI Gateway",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  },
+  "peerDependencies": {
+    "langfuse": "^3.0.0",
+    "prom-client": "^15.0.0"
+  },
+  "peerDependenciesMeta": {
+    "langfuse": {
+      "optional": true
+    },
+    "prom-client": {
+      "optional": true
+    }
+  }
+}

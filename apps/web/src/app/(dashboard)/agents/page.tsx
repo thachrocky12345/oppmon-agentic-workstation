@@ -13,23 +13,18 @@ interface Agent {
   id: string
   name: string
   description?: string
-  status: 'active' | 'inactive' | 'error'
-  type: string
-  model?: string
-  lastSeen?: string
-  totalEvents: number
-  totalCost: number
-  createdAt: string
-  updatedAt: string
+  status: 'ACTIVE' | 'INACTIVE' | 'ERROR' | 'PENDING'
+  framework: 'OPENAI' | 'ANTHROPIC' | 'LANGCHAIN' | 'CUSTOM'
+  config?: Record<string, unknown>
+  created_at: string
+  updated_at: string
 }
 
 interface AgentsResponse {
   data: Agent[]
-  meta: {
-    total: number
-    limit: number
-    offset: number
-  }
+  total: number
+  limit: number
+  offset: number
 }
 
 export default function AgentsPage() {
@@ -60,7 +55,7 @@ export default function AgentsPage() {
 
       const data: AgentsResponse = await response.json()
       setAgents(data.data || [])
-      setTotal(data.meta?.total || 0)
+      setTotal(data.total || 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -89,19 +84,12 @@ export default function AgentsPage() {
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'inactive': return 'bg-gray-100 text-gray-600'
-      case 'error': return 'bg-red-100 text-red-800'
+      case 'ACTIVE': return 'bg-green-100 text-green-800'
+      case 'INACTIVE': return 'bg-gray-100 text-gray-600'
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800'
+      case 'ERROR': return 'bg-red-100 text-red-800'
       default: return 'bg-gray-100 text-gray-600'
     }
-  }
-
-  const formatCurrency = (n: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(n)
   }
 
   const totalPages = Math.ceil(total / limit)
@@ -136,9 +124,10 @@ export default function AgentsPage() {
           className="px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white"
         >
           <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="error">Error</option>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+          <option value="PENDING">Pending</option>
+          <option value="ERROR">Error</option>
         </select>
       </div>
 
@@ -155,23 +144,20 @@ export default function AgentsPage() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Events</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Seen</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Framework</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">Loading...</td>
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading...</td>
               </tr>
             ) : agents.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                   <div className="flex flex-col items-center">
-                    <span className="text-4xl mb-2">🤖</span>
                     <p className="font-medium">No agents yet</p>
                     <p className="text-sm">Register your first AI agent to get started</p>
                   </div>
@@ -190,14 +176,12 @@ export default function AgentsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(agent.status)}`}>
-                      {agent.status}
+                      {agent.status.toLowerCase()}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{agent.type}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{agent.totalEvents.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{formatCurrency(agent.totalCost)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{agent.framework.toLowerCase()}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">
-                    {agent.lastSeen ? new Date(agent.lastSeen).toLocaleString() : 'Never'}
+                    {new Date(agent.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Link href={`/agents/${agent.id}`} className="text-blue-600 hover:text-blue-800 mr-4 text-sm">
@@ -253,26 +237,22 @@ export default function AgentsPage() {
                   )}
                 </div>
                 <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(agent.status)}`}>
-                  {agent.status}
+                  {agent.status.toLowerCase()}
                 </span>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+              <div className="mt-3 flex items-center gap-4 text-sm">
                 <div>
-                  <span className="text-gray-500">Type:</span>
-                  <span className="ml-1">{agent.type}</span>
+                  <span className="text-gray-500">Framework:</span>
+                  <span className="ml-1">{agent.framework.toLowerCase()}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Events:</span>
-                  <span className="ml-1">{agent.totalEvents}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Cost:</span>
-                  <span className="ml-1">{formatCurrency(agent.totalCost)}</span>
+                  <span className="text-gray-500">Created:</span>
+                  <span className="ml-1">{new Date(agent.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between mt-3 pt-3 border-t">
                 <span className="text-xs text-gray-500">
-                  Last seen: {agent.lastSeen ? new Date(agent.lastSeen).toLocaleString() : 'Never'}
+                  ID: {agent.id.slice(0, 8)}...
                 </span>
                 <div className="flex gap-4">
                   <Link href={`/agents/${agent.id}`} className="text-blue-600 text-sm">View</Link>
@@ -303,7 +283,7 @@ function CreateAgentModal({
 }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [type, setType] = useState('claude-code')
+  const [framework, setFramework] = useState<'openai' | 'anthropic' | 'langchain' | 'custom'>('anthropic')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -320,7 +300,7 @@ function CreateAgentModal({
         body: JSON.stringify({
           name,
           description: description || undefined,
-          type,
+          framework,
         }),
       })
 
@@ -376,16 +356,16 @@ function CreateAgentModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Framework</label>
             <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
+              value={framework}
+              onChange={(e) => setFramework(e.target.value as 'openai' | 'anthropic' | 'langchain' | 'custom')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white"
             >
-              <option value="claude-code">Claude Code</option>
-              <option value="custom">Custom</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI</option>
               <option value="langchain">LangChain</option>
-              <option value="autogpt">AutoGPT</option>
+              <option value="custom">Custom</option>
             </select>
           </div>
 

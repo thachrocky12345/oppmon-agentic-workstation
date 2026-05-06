@@ -8,30 +8,30 @@ import { logAudit, getClientIp } from '../lib/audit.js';
 export const infraRouter = Router();
 
 /**
+ * Infrastructure Routes
+ *
+ * NOTE: infra_nodes, infra_metrics, infra_connections, infra_alerts tables
+ * don't exist in the Prisma schema. Returns mock/empty data.
+ */
+
+/**
  * GET /api/infra/nodes
  * List infrastructure nodes
  */
 infraRouter.get('/nodes', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { type, status } = req.query;
-
-  let whereClause = 'WHERE tenant_id = $1';
-  const params: unknown[] = [req.tenantId];
-
-  if (type) {
-    params.push(type);
-    whereClause += ` AND node_type = $${params.length}`;
-  }
-
-  if (status) {
-    params.push(status);
-    whereClause += ` AND status = $${params.length}`;
-  }
-
+  // infra_nodes table doesn't exist - return agents as nodes
   const result = await query(`
-    SELECT * FROM infra_nodes
-    ${whereClause}
-    ORDER BY node_type, name
-  `, params);
+    SELECT
+      a.id,
+      a.name,
+      'agent' as node_type,
+      a.status,
+      a."lastSeen" as last_seen,
+      a.config as metadata
+    FROM agents a
+    WHERE a."tenantId" = $1
+    ORDER BY a.name
+  `, [req.tenantId]);
 
   res.json({ data: result.rows });
 }));
@@ -42,24 +42,25 @@ infraRouter.get('/nodes', asyncHandler(async (req: AuthenticatedRequest, res: Re
  */
 infraRouter.get('/nodes/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
-    SELECT * FROM infra_nodes WHERE id = $1 AND tenant_id = $2
+    SELECT
+      a.id,
+      a.name,
+      'agent' as node_type,
+      a.status,
+      a."lastSeen" as last_seen,
+      a.config as metadata,
+      a.description
+    FROM agents a
+    WHERE a.id = $1 AND a."tenantId" = $2
   `, [req.params.id, req.tenantId]);
 
   if (result.rows.length === 0) {
     throw ApiError.notFound('Node not found');
   }
 
-  // Get recent metrics
-  const metrics = await query(`
-    SELECT * FROM infra_metrics
-    WHERE node_id = $1 AND collected_at > NOW() - INTERVAL '24 hours'
-    ORDER BY collected_at DESC
-    LIMIT 100
-  `, [req.params.id]);
-
   res.json({
     ...result.rows[0],
-    metrics: metrics.rows,
+    metrics: [], // No metrics table
   });
 }));
 
@@ -70,42 +71,37 @@ const nodeActionSchema = z.object({
 
 /**
  * POST /api/infra/nodes/:id/action
- * Execute action on node
+ * Execute action on node (updates agent status)
  */
 infraRouter.post('/nodes/:id/action', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const data = nodeActionSchema.parse(req.body);
 
-  const nodeResult = await query(`
-    SELECT * FROM infra_nodes WHERE id = $1 AND tenant_id = $2
-  `, [req.params.id, req.tenantId]);
-
-  if (nodeResult.rows.length === 0) {
-    throw ApiError.notFound('Node not found');
-  }
-
-  // Map action to new status
   const statusMap: Record<string, string> = {
-    start: 'running',
-    stop: 'stopped',
-    restart: 'restarting',
-    drain: 'draining',
-    cordon: 'cordoned',
+    start: 'ACTIVE',
+    stop: 'INACTIVE',
+    restart: 'PENDING',
+    drain: 'INACTIVE',
+    cordon: 'INACTIVE',
   };
 
   const newStatus = statusMap[data.action];
 
   const result = await query(`
-    UPDATE infra_nodes
-    SET status = $3, updated_at = NOW()
-    WHERE id = $1 AND tenant_id = $2
+    UPDATE agents
+    SET status = $3, "updatedAt" = NOW()
+    WHERE id = $1 AND "tenantId" = $2
     RETURNING *
   `, [req.params.id, req.tenantId, newStatus]);
+
+  if (result.rows.length === 0) {
+    throw ApiError.notFound('Node not found');
+  }
 
   logAudit({
     actorType: 'user',
     actorId: req.userId,
     action: `infra.node.${data.action}`,
-    targetType: 'infra_node',
+    targetType: 'agent',
     targetId: req.params.id,
     metadata: { action: data.action, force: data.force },
     tenantId: req.tenantId,
@@ -117,24 +113,24 @@ infraRouter.post('/nodes/:id/action', requireRole('TENANT_ADMIN'), asyncHandler(
 
 /**
  * GET /api/infra/topology
- * Get infrastructure topology
+ * Get infrastructure topology (agents as nodes)
  */
 infraRouter.get('/topology', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const nodes = await query(`
-    SELECT id, name, node_type, status, parent_id, metadata
-    FROM infra_nodes
-    WHERE tenant_id = $1
-    ORDER BY node_type, name
-  `, [req.tenantId]);
-
-  const connections = await query(`
-    SELECT * FROM infra_connections
-    WHERE tenant_id = $1
+    SELECT
+      a.id,
+      a.name,
+      'agent' as node_type,
+      a.status,
+      a.config as metadata
+    FROM agents a
+    WHERE a."tenantId" = $1
+    ORDER BY a.name
   `, [req.tenantId]);
 
   res.json({
     nodes: nodes.rows,
-    connections: connections.rows,
+    connections: [], // No connections table
   });
 }));
 
@@ -145,77 +141,37 @@ infraRouter.get('/topology', asyncHandler(async (req: AuthenticatedRequest, res:
 infraRouter.get('/report', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const summary = await query(`
     SELECT
-      node_type,
+      'agent' as node_type,
       COUNT(*) as total,
-      COUNT(*) FILTER (WHERE status = 'running') as running,
-      COUNT(*) FILTER (WHERE status = 'stopped') as stopped,
-      COUNT(*) FILTER (WHERE status = 'error') as error
-    FROM infra_nodes
-    WHERE tenant_id = $1
-    GROUP BY node_type
-  `, [req.tenantId]);
-
-  const recentAlerts = await query(`
-    SELECT * FROM infra_alerts
-    WHERE tenant_id = $1 AND created_at > NOW() - INTERVAL '24 hours'
-    ORDER BY severity DESC, created_at DESC
-    LIMIT 20
-  `, [req.tenantId]);
-
-  const resourceUsage = await query(`
-    SELECT
-      node_type,
-      AVG(cpu_percent) as avg_cpu,
-      AVG(memory_percent) as avg_memory,
-      AVG(disk_percent) as avg_disk
-    FROM infra_metrics m
-    JOIN infra_nodes n ON n.id = m.node_id
-    WHERE n.tenant_id = $1 AND m.collected_at > NOW() - INTERVAL '1 hour'
-    GROUP BY node_type
+      COUNT(*) FILTER (WHERE status = 'ACTIVE') as running,
+      COUNT(*) FILTER (WHERE status = 'INACTIVE') as stopped,
+      COUNT(*) FILTER (WHERE status = 'ERROR') as error
+    FROM agents
+    WHERE "tenantId" = $1
+    GROUP BY 'agent'
   `, [req.tenantId]);
 
   res.json({
     summary: summary.rows,
-    recentAlerts: recentAlerts.rows,
-    resourceUsage: resourceUsage.rows,
+    recentAlerts: [], // No alerts table
+    resourceUsage: [], // No metrics table
     generatedAt: new Date().toISOString(),
   });
 }));
 
-const collectMetricsSchema = z.object({
-  nodeId: z.string().uuid(),
-  cpuPercent: z.number().min(0).max(100),
-  memoryPercent: z.number().min(0).max(100),
-  diskPercent: z.number().min(0).max(100),
-  networkInBytes: z.number().min(0),
-  networkOutBytes: z.number().min(0),
-});
-
 /**
  * POST /api/infra/collect
- * Collect metrics from nodes (agent endpoint)
+ * Collect metrics from nodes
  */
 infraRouter.post('/collect', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const data = collectMetricsSchema.parse(req.body);
+  // No metrics table - just update agent lastSeen
+  const { nodeId } = req.body;
 
-  // Verify node belongs to tenant
-  const nodeResult = await query(`
-    SELECT id FROM infra_nodes WHERE id = $1 AND tenant_id = $2
-  `, [data.nodeId, req.tenantId]);
-
-  if (nodeResult.rows.length === 0) {
-    throw ApiError.notFound('Node not found');
+  if (nodeId) {
+    await query(`
+      UPDATE agents SET "lastSeen" = NOW() WHERE id = $1 AND "tenantId" = $2
+    `, [nodeId, req.tenantId]);
   }
-
-  await query(`
-    INSERT INTO infra_metrics (node_id, cpu_percent, memory_percent, disk_percent, network_in_bytes, network_out_bytes)
-    VALUES ($1, $2, $3, $4, $5, $6)
-  `, [data.nodeId, data.cpuPercent, data.memoryPercent, data.diskPercent, data.networkInBytes, data.networkOutBytes]);
-
-  // Update node last_seen
-  await query(`
-    UPDATE infra_nodes SET last_seen = NOW() WHERE id = $1
-  `, [data.nodeId]);
 
   res.status(204).send();
 }));

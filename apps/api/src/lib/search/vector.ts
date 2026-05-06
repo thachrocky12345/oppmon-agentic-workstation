@@ -4,7 +4,7 @@
  * pgvector-based semantic search wrapper
  */
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { VectorResult, VectorSearchOptions } from './types.js';
 import { createEmbeddingClient, getDefaultEmbeddingProvider, toPgVector, EmbeddingProvider } from '../embedding/index.js';
 

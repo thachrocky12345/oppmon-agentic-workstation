@@ -5,7 +5,7 @@
 
 import Docker from 'dockerode';
 import { createHash, randomBytes } from 'crypto';
-import { prisma, RoutingStatus } from '@arkon/database';
+import { prisma, RoutingStatus } from '@oppmon/database';
 import { generateLiteLLMConfig } from './litellm-config-generator.js';
 import { storeSecret, retrieveSecret } from '../crypto/secret-vault.js';
 
@@ -37,7 +37,7 @@ export interface ContainerInfo {
 const LITELLM_IMAGE = process.env.LITELLM_IMAGE || 'ghcr.io/berriai/litellm:main-latest';
 const LITELLM_INTERNAL_PORT = 4000;
 const CONTAINER_PREFIX = 'litellm-tag';
-const CONTAINER_NETWORK = process.env.DOCKER_NETWORK || 'arkon-internal';
+const CONTAINER_NETWORK = process.env.DOCKER_NETWORK || 'oppmon-internal';
 const MAX_RESTARTS = 3;
 const HEALTH_CHECK_TIMEOUT_MS = 5000;
 
@@ -203,8 +203,8 @@ async function createContainer(tenantId: string, containerName: string): Promise
       NetworkMode: CONTAINER_NETWORK,
     },
     Labels: {
-      'arkon.tenant': tenantId,
-      'arkon.type': 'litellm',
+      'oppmon.tenant': tenantId,
+      'oppmon.type': 'litellm',
     },
   });
 
@@ -313,7 +313,7 @@ export async function reloadConfig(tenantId: string): Promise<void> {
     const container = docker.getContainer(containers[0].Id);
     const info = await container.inspect();
 
-    // Get IP from the arkon network
+    // Get IP from the oppmon network
     const networkSettings = info.NetworkSettings.Networks[CONTAINER_NETWORK];
     if (!networkSettings) {
       throw new Error(`Container not connected to ${CONTAINER_NETWORK} network`);

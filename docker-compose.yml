@@ -1,5 +1,5 @@
 # =============================================================================
-# Arkon Workstation - Docker Compose
+# OppMon Workstation - Docker Compose
 # =============================================================================
 #
 # Usage:
@@ -21,31 +21,31 @@ services:
   # ===========================================================================
   db:
     image: timescale/timescaledb:latest-pg15
-    container_name: arkon-db
+    container_name: oppmon-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-arkon}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arkon_dev_password}
-      POSTGRES_DB: ${POSTGRES_DB:-arkon}
+      POSTGRES_USER: ${POSTGRES_USER:-oppmon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oppmon_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-oppmon}
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arkon} -d ${POSTGRES_DB:-arkon}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oppmon} -d ${POSTGRES_DB:-oppmon}"]
       interval: 5s
       timeout: 5s
       retries: 10
     networks:
-      - arkon-network
+      - oppmon-network
 
   # ===========================================================================
   # Redis - Caching and Session Store (optional)
   # ===========================================================================
   redis:
     image: redis:7-alpine
-    container_name: arkon-redis
+    container_name: oppmon-redis
     restart: unless-stopped
     profiles:
       - full
@@ -59,7 +59,7 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - arkon-network
+      - oppmon-network
 
   # ===========================================================================
   # Backend API - Express.js (Development)
@@ -68,14 +68,14 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile.dev
-    container_name: arkon-api-dev
+    container_name: oppmon-api-dev
     restart: unless-stopped
     profiles:
       - dev
     environment:
       NODE_ENV: development
       PORT: 3001
-      DATABASE_URL: postgres://${POSTGRES_USER:-arkon}:${POSTGRES_PASSWORD:-arkon_dev_password}@db:5432/${POSTGRES_DB:-arkon}
+      DATABASE_URL: postgres://${POSTGRES_USER:-oppmon}:${POSTGRES_PASSWORD:-oppmon_dev_password}@db:5432/${POSTGRES_DB:-oppmon}
       JWT_SECRET: ${JWT_SECRET:-development-secret-change-in-production}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3002}
@@ -94,6 +94,7 @@ services:
       - ./packages:/app/packages:ro
       - /app/node_modules
       - /app/apps/api/node_modules
+      - oppmon-documents:/app/data/documents
     depends_on:
       db:
         condition: service_healthy
@@ -104,7 +105,7 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - arkon-network
+      - oppmon-network
 
   # ===========================================================================
   # Backend API - Express.js (Production)
@@ -115,7 +116,7 @@ services:
       dockerfile: apps/api/Dockerfile
       args:
         NODE_ENV: production
-    container_name: arkon-api
+    container_name: oppmon-api
     restart: unless-stopped
     profiles:
       - prod
@@ -134,6 +135,8 @@ services:
       REDIS_URL: ${REDIS_URL:-}
     ports:
       - "3001:3001"
+    volumes:
+      - oppmon-documents:/app/data/documents
     depends_on:
       db:
         condition: service_healthy
@@ -143,7 +146,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - arkon-network
+      - oppmon-network
 
   # ===========================================================================
   # Frontend - Next.js (Development)
@@ -152,7 +155,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile.dev
-    container_name: arkon-web-dev
+    container_name: oppmon-web-dev
     restart: unless-stopped
     profiles:
       - dev
@@ -178,7 +181,7 @@ services:
       retries: 3
       start_period: 60s
     networks:
-      - arkon-network
+      - oppmon-network
 
   # ===========================================================================
   # Frontend - Next.js (Production)
@@ -190,7 +193,7 @@ services:
       args:
         NODE_ENV: production
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-    container_name: arkon-web
+    container_name: oppmon-web
     restart: unless-stopped
     profiles:
       - prod
@@ -207,7 +210,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - arkon-network
+      - oppmon-network
 
   # ===========================================================================
   # Prisma Studio - Database GUI (Development only)
@@ -216,19 +219,19 @@ services:
     build:
       context: .
       dockerfile: packages/database/Dockerfile.studio
-    container_name: arkon-prisma-studio
+    container_name: oppmon-prisma-studio
     restart: unless-stopped
     profiles:
       - dev
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-arkon}:${POSTGRES_PASSWORD:-arkon_dev_password}@db:5432/${POSTGRES_DB:-arkon}
+      DATABASE_URL: postgres://${POSTGRES_USER:-oppmon}:${POSTGRES_PASSWORD:-oppmon_dev_password}@db:5432/${POSTGRES_DB:-oppmon}
     ports:
       - "5555:5555"
     depends_on:
       db:
         condition: service_healthy
     networks:
-      - arkon-network
+      - oppmon-network
 
 # =============================================================================
 # Volumes
@@ -238,11 +241,13 @@ volumes:
     driver: local
   redisdata:
     driver: local
+  oppmon-documents:
+    driver: local
 
 # =============================================================================
 # Networks
 # =============================================================================
 networks:
-  arkon-network:
-    name: arkon-network
+  oppmon-network:
+    name: oppmon-network
     driver: bridge

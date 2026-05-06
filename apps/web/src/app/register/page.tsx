@@ -13,7 +13,7 @@ import Link from 'next/link'
 function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/admin'
+  const redirect = searchParams.get('redirect') || '/dashboard'
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -197,7 +197,7 @@ export default function RegisterPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h1 className="text-center text-3xl font-bold text-gray-900">
-            Arkon
+            OppMon
           </h1>
           <h2 className="mt-6 text-center text-xl text-gray-600">
             Create your account

@@ -23,7 +23,7 @@ import {
 import { Role, TeamRole } from '@prisma/client';
 
 // Mock prisma
-vi.mock('@arkon/database', () => ({
+vi.mock('@oppmon/database', () => ({
   prisma: {
     teamMember: {
       findMany: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock('../services/audit.js', () => ({
   }),
 }));
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 
 describe('RBAC Middleware', () => {
   describe('isRoleAtLeast', () => {

@@ -3,7 +3,7 @@
  * Tests OpenAI API credentials
  */
 
-import type { ConnectionTestResult } from '@arkon/shared';
+import type { ConnectionTestResult } from '@oppmon/shared';
 import {
   type ValidationContext,
   registerValidator,

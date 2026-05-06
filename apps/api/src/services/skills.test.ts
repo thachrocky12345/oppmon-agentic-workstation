@@ -24,7 +24,7 @@ import {
 import { SkillScope } from '@prisma/client';
 
 // Mock prisma
-vi.mock('@arkon/database', () => ({
+vi.mock('@oppmon/database', () => ({
   prisma: {
     skill: {
       findMany: vi.fn(),
@@ -55,7 +55,7 @@ vi.mock('@arkon/database', () => ({
   },
 }));
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 
 describe('Skills Service', () => {
   beforeEach(() => {

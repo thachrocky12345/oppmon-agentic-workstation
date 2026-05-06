@@ -1,6 +1,6 @@
 # Data Model
 
-**Last Updated:** 2026-05-05 (synced)
+**Last Updated:** 2026-05-06 (init sync)
 
 ## Overview
 
@@ -18,11 +18,16 @@ erDiagram
     TENANT ||--o{ MCP_SERVER : registers
     TENANT ||--|| TENANT_SETTINGS : has
     TENANT ||--o{ USAGE_EVENT : tracks
+    TENANT ||--o{ MODEL : configures
+    TENANT ||--o{ MODEL_SECRET : stores
+    TENANT ||--o{ VIRTUAL_KEY : issues
+    TENANT ||--|| TENANT_ROUTING_STATE : has
 
     TEAM ||--o{ TEAM_MEMBER : has
     TEAM ||--o{ AGENT : "optionally owns"
     TEAM ||--o{ SKILL : "optionally owns"
     TEAM ||--o{ MCP_SERVER : "optionally owns"
+    TEAM ||--o{ MODEL : "optionally owns"
 
     USER ||--o{ USER_SESSION : has
     USER ||--o{ TEAM_MEMBER : belongs_to
@@ -33,6 +38,10 @@ erDiagram
     USER ||--o{ SKILL_VERSION : creates
     USER ||--o{ AUDIT_LOG : "actor in"
     USER ||--o{ LLM_SESSION : owns
+    USER ||--o{ MODEL : creates
+    USER ||--o{ VIRTUAL_KEY : owns
+
+    MODEL ||--o| MODEL_SECRET : "uses"
 
     AGENT ||--o{ EVENT : generates
     AGENT ||--o{ INCIDENT : triggers
@@ -290,6 +299,60 @@ erDiagram
         json metadata
         datetime createdAt
     }
+
+    MODEL {
+        string id PK
+        string tenantId FK
+        enum scope "TENANT|TEAM"
+        string teamId FK
+        string displayName UK
+        string providerTemplateId
+        string modelIdentifier
+        json publicConfig
+        string secretRef FK
+        string yamlOverride
+        boolean enabled
+        string createdById FK
+        datetime lastSyncedAt
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt
+    }
+
+    MODEL_SECRET {
+        string id PK
+        string tenantId FK
+        bytes encryptedPayload
+        bytes nonce
+        int version
+        datetime createdAt
+    }
+
+    VIRTUAL_KEY {
+        string id PK
+        string tenantId FK
+        string userId FK
+        string keyPrefix UK
+        string keyHash
+        string label
+        boolean enabled
+        datetime expiresAt
+        datetime lastUsedAt
+        datetime createdAt
+        datetime revokedAt
+    }
+
+    TENANT_ROUTING_STATE {
+        string tenantId PK
+        string litellmContainerName
+        string masterKeySecretRef
+        enum status "PROVISIONING|RUNNING|DEGRADED|FAILED|STOPPED"
+        datetime lastHealthCheckAt
+        string lastError
+        int restartCount
+        datetime createdAt
+        datetime updatedAt
+    }
 ```
 
 ## Multi-Tenancy Model
@@ -312,7 +375,10 @@ Tenant
   ├── Embeddings (pgvector)
   ├── McpServers
   ├── TenantSettings (privacy controls)
-  └── UsageEvents (privacy-first analytics)
+  ├── UsageEvents (privacy-first analytics)
+  ├── Models → ModelSecrets (encrypted provider credentials)
+  ├── VirtualKeys (CLI/SDK API key management)
+  └── TenantRoutingState (LiteLLM orchestration status)
 ```
 
 ## PostgreSQL Extensions
@@ -390,3 +456,8 @@ LIMIT 10;
 | tenant_settings | idx_tenant_settings_tenant | (tenantId) |
 | usage_events | idx_usage_events_tenant_bucket | (tenantId, bucketTimestamp) |
 | usage_events | idx_usage_events_resource | (tenantId, resourceType) |
+| models | idx_models_tenant_enabled | (tenantId, enabled, deletedAt) |
+| models | idx_models_team | (teamId) |
+| model_secrets | idx_model_secrets_tenant | (tenantId) |
+| virtual_keys | idx_virtual_keys_prefix | (keyPrefix) |
+| virtual_keys | idx_virtual_keys_user | (userId, enabled) |

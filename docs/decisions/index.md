@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-**Last Updated:** 2026-05-05 (synced)
+**Last Updated:** 2026-05-06 (init sync)
 
 This directory contains Architecture Decision Records (ADRs) for the Arkon project.
 

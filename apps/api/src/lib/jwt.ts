@@ -6,12 +6,12 @@
  */
 
 import jwt from "jsonwebtoken";
-import type { JWTClaims, TeamMembership, Role, TeamRole } from "@arkon/shared";
+import type { JWTClaims, TeamMembership, Role, TeamRole } from "@oppmon/shared";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "development-secret-change-in-production";
 const JWT_EXPIRES_IN: jwt.SignOptions["expiresIn"] = (process.env.JWT_EXPIRES_IN || "7d") as jwt.SignOptions["expiresIn"];
-const JWT_ISSUER = "arkon";
+const JWT_ISSUER = "oppmon";
 
 /**
  * Sign a JWT with user and team context

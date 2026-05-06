@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2026-05-05 (synced)
+**Last Updated:** 2026-05-06 (init sync)
 
 ## Overview
 
@@ -50,10 +50,15 @@ graph TD
             SkillsRoutes["Skills"]
             LLMRoutes["LLM"]
             RAGRoutes["RAG"]
+            RAGChatRoutes["RAG Chat"]
+            RAGAdminRoutes["RAG Admin"]
             EmbeddingRoutes["Embedding"]
             MCPRoutes["MCP"]
             TeamsRoutes["Teams"]
             UsageRoutes["Usage"]
+            ModelsRoutes["Models"]
+            VirtualKeysRoutes["Virtual Keys"]
+            RoutingRoutes["CLI Routing"]
         end
 
         subgraph Services["Services"]
@@ -61,9 +66,16 @@ graph TD
             SkillsSvc["Skills Service"]
             LLMSvc["LLM Service"]
             RAGSvc["RAG Service"]
+            RAGChatSvc["RAG Chat Service"]
+            RAGRetrieverSvc["RAG Retriever"]
+            AdvRAGSvc["Advanced RAG"]
             EmbeddingSvc["Embedding Service"]
             SearchSvc["Search Service"]
             MCPSvc["MCP Service"]
+            ModelsSvc["Models Service"]
+            LiteLLMSvc["LiteLLM Orchestrator"]
+            ToolboxSvc["Toolbox Service"]
+            SecretVault["Secret Vault"]
         end
 
         subgraph LLMProviders["LLM Providers"]

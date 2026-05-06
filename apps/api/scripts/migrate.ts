@@ -5,7 +5,7 @@
  * Tracks applied migrations in a `_migrations` table.
  *
  * Usage:
- *   pnpm --filter @arkon/api migrate
+ *   pnpm --filter @oppmon/api migrate
  *
  * Options:
  *   --dry-run    Show what would be run without executing
@@ -26,7 +26,7 @@ const DRY_RUN = args.includes('--dry-run');
 const FORCE = args.includes('--force');
 
 // Database connection
-const DATABASE_URL = process.env.DATABASE_URL || 'postgres://arkon:arkon_dev_password@localhost:5433/arkon';
+const DATABASE_URL = process.env.DATABASE_URL || 'postgres://oppmon:oppmon_dev_password@localhost:5433/oppmon';
 
 interface Migration {
   name: string;

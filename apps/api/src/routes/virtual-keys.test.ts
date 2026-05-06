@@ -9,7 +9,7 @@ import { virtualKeysRouter } from './virtual-keys.js';
 import { errorHandler } from '../middleware/error-handler.js';
 
 // Mock dependencies
-vi.mock('@arkon/database', () => ({
+vi.mock('@oppmon/database', () => ({
   prisma: {
     virtualKey: {
       findMany: vi.fn(),
@@ -43,7 +43,7 @@ vi.mock('@paralleldrive/cuid2', () => ({
   createId: vi.fn().mockReturnValue('new-key-id'),
 }));
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { buildRBACContext } from '../middleware/rbac.js';
 
 // Create app for testing

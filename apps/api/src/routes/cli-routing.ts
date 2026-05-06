@@ -8,7 +8,7 @@
  */
 
 import { Router, Response } from 'express';
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { AuthenticatedRequest } from '../middleware/request-auth.js';
 import { buildRBACContext } from '../middleware/rbac.js';
@@ -141,7 +141,7 @@ cliRoutingRouter.get(
 
     // Build response
     const config: RoutingConfig = {
-      gatewayUrl: process.env.GATEWAY_URL || 'https://gateway.arkon.example',
+      gatewayUrl: process.env.GATEWAY_URL || 'https://gateway.oppmon.example',
       tenantId: tenant.id,
       teamId: primaryTeam?.id,
       teamName: primaryTeam?.name,

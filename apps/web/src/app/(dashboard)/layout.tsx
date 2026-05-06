@@ -10,9 +10,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { ChatWidget } from '@/components/chat'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { href: '/chat', label: 'Chat', icon: '💬' },
   { href: '/agents', label: 'Agents', icon: '🤖' },
   { href: '/events', label: 'Events', icon: '📡' },
   { href: '/security', label: 'Security', icon: '🛡️' },
@@ -102,7 +104,7 @@ export default function DashboardLayout({
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-800">
           <Link href="/" className="text-xl font-bold">
-            Arkon
+            OppMon
           </Link>
           <button
             className="lg:hidden text-gray-400 hover:text-white"
@@ -189,11 +191,36 @@ export default function DashboardLayout({
           </div>
         </header>
 
+        {/* Help Banner */}
+        <div className="bg-gradient-to-r from-green-600/10 to-blue-600/10 border-b border-green-500/20">
+          <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-green-400">💡</span>
+              <p className="text-sm text-gray-300">
+                <span className="font-medium text-white">New here?</span>{' '}
+                Check out the tutorial to get started with OppMon in 5 minutes.
+              </p>
+            </div>
+            <Link
+              href="/docs"
+              className="px-3 py-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-sm font-medium rounded-lg transition-colors flex items-center gap-1"
+            >
+              View Tutorial
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+
         {/* Page content */}
         <main className="p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>
+
+      {/* Chat Widget */}
+      <ChatWidget />
     </div>
   )
 }

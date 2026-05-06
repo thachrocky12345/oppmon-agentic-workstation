@@ -1,5 +1,5 @@
 /**
- * Shared types for the Arkon platform
+ * Shared types for the OppMon platform
  */
 
 // ============================================================================

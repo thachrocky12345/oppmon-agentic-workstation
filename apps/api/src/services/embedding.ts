@@ -7,8 +7,8 @@
  * - Embedding management and deduplication
  */
 
-import { prisma } from '@arkon/database';
-import { Prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
+import { Prisma } from '@oppmon/database';
 import {
   createEmbeddingClient,
   getDefaultEmbeddingProvider,

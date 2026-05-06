@@ -8,37 +8,36 @@ export const dashboardRouter = Router();
 /**
  * GET /api/dashboard/overview
  * Get dashboard overview data
+ *
+ * NOTE: Column names use camelCase with quotes per Prisma convention.
+ * See CLAUDE.md "Database Column Naming" section.
  */
 dashboardRouter.get('/overview', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const agents = await query(`
-    SELECT a.id, a.name, a.metadata, a.created_at, a.tenant_id,
-      (SELECT MAX(e.created_at) FROM events e WHERE e.agent_id = a.id) as last_active,
-      (SELECT COUNT(*) FROM events e WHERE e.agent_id = a.id AND e.created_at > NOW() - INTERVAL '24 hours') as events_24h,
-      (SELECT COUNT(*) FROM events e WHERE e.agent_id = a.id AND e.created_at > NOW() - INTERVAL '7 days') as events_7d,
-      (SELECT COUNT(*) FROM events e WHERE e.agent_id = a.id) as events_total,
-      (SELECT COALESCE(SUM(e.token_estimate), 0) FROM events e WHERE e.agent_id = a.id AND e.created_at > NOW() - INTERVAL '24 hours') as tokens_24h,
-      (SELECT COUNT(*) FROM events e WHERE e.agent_id = a.id AND e.threat_level IS NOT NULL AND e.threat_level != 'none' AND e.created_at > NOW() - INTERVAL '30 days') as threats_30d,
-      (SELECT COALESCE(SUM(ds.estimated_cost_usd), 0) FROM daily_stats ds WHERE ds.agent_id = a.id AND ds.day > CURRENT_DATE - INTERVAL '30 days') as cost_30d
+    SELECT a.id, a.name, a.config, a."createdAt", a."tenantId", a.status, a."lastSeen",
+      (SELECT MAX(e.timestamp) FROM events e WHERE e."agentId" = a.id) as last_active,
+      (SELECT COUNT(*) FROM events e WHERE e."agentId" = a.id AND e.timestamp > NOW() - INTERVAL '24 hours') as events_24h,
+      (SELECT COUNT(*) FROM events e WHERE e."agentId" = a.id AND e.timestamp > NOW() - INTERVAL '7 days') as events_7d,
+      (SELECT COUNT(*) FROM events e WHERE e."agentId" = a.id) as events_total
     FROM agents a
-    WHERE a.tenant_id = $1
+    WHERE a."tenantId" = $1
     ORDER BY last_active DESC NULLS LAST
   `, [req.tenantId]);
 
-  const todayStats = await query(`
-    SELECT agent_id, tenant_id,
-      COALESCE(SUM(messages_received), 0) as received,
-      COALESCE(SUM(messages_sent), 0) as sent,
-      COALESCE(SUM(tool_calls), 0) as tools,
-      COALESCE(SUM(errors), 0) as errors,
-      COALESCE(SUM(estimated_tokens), 0) as tokens
-    FROM daily_stats
-    WHERE day = CURRENT_DATE AND tenant_id = $1
-    GROUP BY agent_id, tenant_id
-  `, [req.tenantId]);
+  // Return overview stats aggregated from agents
+  const totalAgents = agents.rows.length;
+  const activeAgents = agents.rows.filter((a: any) => a.status === 'ACTIVE').length;
+  const totalEvents = agents.rows.reduce((sum: number, a: any) => sum + parseInt(a.events_total || '0'), 0);
+  const eventsToday = agents.rows.reduce((sum: number, a: any) => sum + parseInt(a.events_24h || '0'), 0);
 
   res.json({
     agents: agents.rows,
-    todayStats: todayStats.rows,
+    summary: {
+      totalAgents,
+      activeAgents,
+      totalEvents,
+      eventsToday,
+    },
     timestamp: new Date().toISOString(),
   });
 }));
@@ -46,17 +45,19 @@ dashboardRouter.get('/overview', requireRole('TENANT_ADMIN'), asyncHandler(async
 /**
  * GET /api/dashboard/activity
  * Get recent activity for dashboard
+ *
+ * NOTE: Events table doesn't have tenantId directly - filter through agents relation.
  */
 dashboardRouter.get('/activity', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { limit = 50, offset = 0 } = req.query;
 
   const result = await query(`
-    SELECT e.id, e.event_type, e.agent_id, a.name as agent_name,
-           e.metadata, e.created_at, e.threat_level
+    SELECT e.id, e."eventType", e."agentId", a.name as agent_name,
+           e.payload, e.timestamp, e.severity
     FROM events e
-    LEFT JOIN agents a ON a.id = e.agent_id
-    WHERE e.tenant_id = $1
-    ORDER BY e.created_at DESC
+    LEFT JOIN agents a ON a.id = e."agentId"
+    WHERE a."tenantId" = $1
+    ORDER BY e.timestamp DESC
     LIMIT $2 OFFSET $3
   `, [req.tenantId, limit, offset]);
 
@@ -70,21 +71,21 @@ dashboardRouter.get('/activity', asyncHandler(async (req: AuthenticatedRequest, 
 /**
  * GET /api/dashboard/trends
  * Get usage trends for charts
+ *
+ * NOTE: Computes trends directly from events table since daily_stats doesn't exist.
  */
 dashboardRouter.get('/trends', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { days = 30 } = req.query;
 
   const result = await query(`
-    SELECT day,
-      SUM(messages_received) as messages_received,
-      SUM(messages_sent) as messages_sent,
-      SUM(tool_calls) as tool_calls,
-      SUM(errors) as errors,
-      SUM(estimated_tokens) as tokens,
-      SUM(estimated_cost_usd) as cost
-    FROM daily_stats
-    WHERE tenant_id = $1 AND day > CURRENT_DATE - $2::int
-    GROUP BY day
+    SELECT DATE(e.timestamp) as day,
+      COUNT(*) as total_events,
+      COUNT(DISTINCT e."agentId") as active_agents,
+      COUNT(CASE WHEN e.severity = 'error' THEN 1 END) as errors
+    FROM events e
+    JOIN agents a ON a.id = e."agentId"
+    WHERE a."tenantId" = $1 AND e.timestamp > NOW() - ($2::int || ' days')::interval
+    GROUP BY DATE(e.timestamp)
     ORDER BY day ASC
   `, [req.tenantId, days]);
 
@@ -94,16 +95,20 @@ dashboardRouter.get('/trends', asyncHandler(async (req: AuthenticatedRequest, re
 /**
  * GET /api/dashboard/anomalies
  * Get detected anomalies
+ *
+ * NOTE: Returns high-severity events as anomalies since dedicated anomalies table doesn't exist.
  */
 dashboardRouter.get('/anomalies', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { limit = 20 } = req.query;
 
+  // Return error-level events as "anomalies"
   const result = await query(`
-    SELECT id, agent_id, anomaly_type, severity, description,
-           detected_at, resolved_at, metadata
-    FROM anomalies
-    WHERE tenant_id = $1
-    ORDER BY detected_at DESC
+    SELECT e.id, e."agentId", e."eventType" as anomaly_type, e.severity,
+           e.payload->>'message' as description, e.timestamp as detected_at
+    FROM events e
+    JOIN agents a ON a.id = e."agentId"
+    WHERE a."tenantId" = $1 AND e.severity = 'error'
+    ORDER BY e.timestamp DESC
     LIMIT $2
   `, [req.tenantId, limit]);
 
@@ -117,21 +122,24 @@ dashboardRouter.get('/anomalies', asyncHandler(async (req: AuthenticatedRequest,
 dashboardRouter.get('/agent/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const agentResult = await query(`
     SELECT a.*,
-      (SELECT COUNT(*) FROM events e WHERE e.agent_id = a.id) as total_events,
-      (SELECT MAX(e.created_at) FROM events e WHERE e.agent_id = a.id) as last_active
+      (SELECT COUNT(*) FROM events e WHERE e."agentId" = a.id) as total_events,
+      (SELECT MAX(e.timestamp) FROM events e WHERE e."agentId" = a.id) as last_active
     FROM agents a
-    WHERE a.id = $1 AND a.tenant_id = $2
+    WHERE a.id = $1 AND a."tenantId" = $2
   `, [req.params.id, req.tenantId]);
 
   if (agentResult.rows.length === 0) {
     throw ApiError.notFound('Agent not found');
   }
 
+  // Compute daily stats from events
   const statsResult = await query(`
-    SELECT day, messages_received, messages_sent, tool_calls,
-           errors, estimated_tokens, estimated_cost_usd
-    FROM daily_stats
-    WHERE agent_id = $1 AND day > CURRENT_DATE - 30
+    SELECT DATE(e.timestamp) as day,
+      COUNT(*) as total_events,
+      COUNT(CASE WHEN e.severity = 'error' THEN 1 END) as errors
+    FROM events e
+    WHERE e."agentId" = $1 AND e.timestamp > NOW() - INTERVAL '30 days'
+    GROUP BY DATE(e.timestamp)
     ORDER BY day ASC
   `, [req.params.id]);
 

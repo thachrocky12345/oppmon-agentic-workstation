@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { query, transaction } from '../lib/db.js';
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { AuthenticatedRequest, requireRole } from '../middleware/request-auth.js';
 import { logAudit, getClientIp } from '../lib/audit.js';

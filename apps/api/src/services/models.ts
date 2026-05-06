@@ -3,13 +3,13 @@
  * Business logic for model registry CRUD operations
  */
 
-import { prisma, ModelScope } from '@arkon/database';
+import { prisma, ModelScope } from '@oppmon/database';
 import { createId } from '@paralleldrive/cuid2';
 import {
   providerRegistry,
   validateRequiredFields,
   extractSecretFields,
-} from '@arkon/shared';
+} from '@oppmon/shared';
 import { storeSecret, retrieveSecret, updateSecret, deleteSecret } from '../crypto/secret-vault.js';
 
 // ============================================================================

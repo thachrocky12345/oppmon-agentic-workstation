@@ -1,5 +1,5 @@
 /**
- * API Client for Arkon Backend
+ * API Client for OppMon Backend
  *
  * Provides typed methods for all API endpoints with error handling.
  */

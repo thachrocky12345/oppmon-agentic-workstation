@@ -30,6 +30,31 @@ export interface LLMMessage {
 }
 
 /**
+ * Tool function schema (OpenAI-compatible)
+ */
+export interface ToolFunction {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: 'object';
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+  };
+}
+
+/**
+ * Tool call from LLM response
+ */
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+/**
  * Request to the LLM
  */
 export interface LLMRequest {
@@ -37,6 +62,7 @@ export interface LLMRequest {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  tools?: ToolFunction[];
 }
 
 /**
@@ -57,6 +83,16 @@ export interface LLMResponse {
   provider: LLMProvider;
   usage: TokenUsage;
   finishReason: string;
+  toolCalls?: ToolCall[];
+}
+
+/**
+ * Stream chunk from LLM
+ */
+export interface LLMStreamChunk {
+  type: 'content' | 'done';
+  text?: string;
+  usage?: TokenUsage;
 }
 
 // ============================================================================
@@ -71,6 +107,11 @@ export interface LLMClient {
    * Send a chat completion request
    */
   chat(request: LLMRequest): Promise<LLMResponse>;
+
+  /**
+   * Send a streaming chat completion request
+   */
+  streamChat?(request: LLMRequest): AsyncGenerator<LLMStreamChunk>;
 
   /**
    * List available models for this provider

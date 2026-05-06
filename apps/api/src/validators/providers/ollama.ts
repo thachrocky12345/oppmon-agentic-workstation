@@ -3,7 +3,7 @@
  * Tests connection to local Ollama server
  */
 
-import type { ConnectionTestResult } from '@arkon/shared';
+import type { ConnectionTestResult } from '@oppmon/shared';
 import {
   type ValidationContext,
   registerValidator,

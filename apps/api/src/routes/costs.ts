@@ -6,69 +6,100 @@ import { AuthenticatedRequest } from '../middleware/request-auth.js';
 
 export const costsRouter = Router();
 
+// Estimated cost per token (very rough estimate)
+const COST_PER_TOKEN = 0.000001; // $0.001 per 1K tokens
+
 /**
  * GET /api/costs/overview
  * Get cost overview with totals
+ *
+ * NOTE: Computes costs from llm_messages since daily_stats doesn't exist.
  */
 costsRouter.get('/overview', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { period = '30d' } = req.query;
 
   const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
 
+  // Get token usage from llm_messages
   const result = await query(`
     SELECT
-      COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
-      COALESCE(SUM(estimated_tokens), 0) as total_tokens,
-      COALESCE(AVG(estimated_cost_usd), 0) as avg_daily_cost,
-      COUNT(DISTINCT agent_id) as active_agents
-    FROM daily_stats
-    WHERE tenant_id = $1 AND day > CURRENT_DATE - $2::int
+      COALESCE(SUM(m."inputTokens" + m."outputTokens"), 0) as total_tokens,
+      COUNT(DISTINCT DATE(m."createdAt")) as active_days,
+      COUNT(DISTINCT s."userId") as active_users
+    FROM llm_messages m
+    JOIN llm_sessions s ON s.id = m."sessionId"
+    WHERE s."tenantId" = $1 AND m."createdAt" > NOW() - ($2 || ' days')::interval
   `, [req.tenantId, days]);
 
+  // Get daily trend
   const trend = await query(`
-    SELECT day, SUM(estimated_cost_usd) as cost
-    FROM daily_stats
-    WHERE tenant_id = $1 AND day > CURRENT_DATE - $2::int
-    GROUP BY day
+    SELECT DATE(m."createdAt") as day,
+      SUM(m."inputTokens" + m."outputTokens") as tokens
+    FROM llm_messages m
+    JOIN llm_sessions s ON s.id = m."sessionId"
+    WHERE s."tenantId" = $1 AND m."createdAt" > NOW() - ($2 || ' days')::interval
+    GROUP BY DATE(m."createdAt")
     ORDER BY day ASC
   `, [req.tenantId, days]);
 
+  const totalTokens = parseInt(result.rows[0]?.total_tokens || '0');
+  const totalCost = totalTokens * COST_PER_TOKEN;
+
   res.json({
-    summary: result.rows[0],
-    trend: trend.rows,
+    summary: {
+      total_cost: totalCost,
+      total_tokens: totalTokens,
+      avg_daily_cost: trend.rows.length > 0 ? totalCost / trend.rows.length : 0,
+      active_users: parseInt(result.rows[0]?.active_users || '0'),
+    },
+    trend: trend.rows.map((r: any) => ({
+      day: r.day,
+      cost: parseInt(r.tokens || '0') * COST_PER_TOKEN,
+      tokens: parseInt(r.tokens || '0'),
+    })),
   });
 }));
 
 /**
  * GET /api/costs/by-agent
  * Get cost breakdown by agent
+ *
+ * NOTE: Agent costs not directly tracked. Returns agents with event counts.
  */
 costsRouter.get('/by-agent', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { period = '30d', limit = 10 } = req.query;
 
   const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
 
+  // Agents don't have direct cost tracking in current schema
+  // Return agents with their activity as a proxy for cost
   const result = await query(`
     SELECT
       a.id as agent_id,
       a.name as agent_name,
-      COALESCE(SUM(ds.estimated_cost_usd), 0) as total_cost,
-      COALESCE(SUM(ds.estimated_tokens), 0) as total_tokens,
-      COUNT(DISTINCT ds.day) as active_days
+      COUNT(e.id) as total_events,
+      COUNT(DISTINCT DATE(e.timestamp)) as active_days
     FROM agents a
-    LEFT JOIN daily_stats ds ON ds.agent_id = a.id AND ds.day > CURRENT_DATE - $2::int
-    WHERE a.tenant_id = $1
+    LEFT JOIN events e ON e."agentId" = a.id AND e.timestamp > NOW() - ($2 || ' days')::interval
+    WHERE a."tenantId" = $1
     GROUP BY a.id, a.name
-    ORDER BY total_cost DESC
+    ORDER BY total_events DESC
     LIMIT $3
   `, [req.tenantId, days, limit]);
 
-  res.json({ data: result.rows });
+  // Add estimated costs (events as proxy)
+  const data = result.rows.map((r: any) => ({
+    ...r,
+    total_cost: 0, // No cost tracking per agent
+    total_tokens: 0, // No token tracking per agent
+  }));
+
+  res.json({ data });
 }));
 
 /**
  * GET /api/costs/by-model
- * Get cost breakdown by model
+ * Get cost breakdown by model from llm_messages
  */
 costsRouter.get('/by-model', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { period = '30d' } = req.query;
@@ -77,73 +108,61 @@ costsRouter.get('/by-model', asyncHandler(async (req: AuthenticatedRequest, res:
 
   const result = await query(`
     SELECT
-      model_id,
-      COALESCE(SUM(input_tokens), 0) as input_tokens,
-      COALESCE(SUM(output_tokens), 0) as output_tokens,
-      COALESCE(SUM(cost_usd), 0) as total_cost,
+      m.model as model_id,
+      m.provider,
+      COALESCE(SUM(m."inputTokens"), 0) as input_tokens,
+      COALESCE(SUM(m."outputTokens"), 0) as output_tokens,
       COUNT(*) as request_count
-    FROM model_usage
-    WHERE tenant_id = $1 AND created_at > NOW() - $2::int * INTERVAL '1 day'
-    GROUP BY model_id
-    ORDER BY total_cost DESC
+    FROM llm_messages m
+    JOIN llm_sessions s ON s.id = m."sessionId"
+    WHERE s."tenantId" = $1 AND m."createdAt" > NOW() - ($2 || ' days')::interval
+    GROUP BY m.model, m.provider
+    ORDER BY SUM(m."inputTokens") + SUM(m."outputTokens") DESC
   `, [req.tenantId, days]);
 
-  res.json({ data: result.rows });
+  // Add calculated costs
+  const data = result.rows.map((r: any) => {
+    const totalTokens = parseInt(r.input_tokens || '0') + parseInt(r.output_tokens || '0');
+    return {
+      ...r,
+      total_tokens: totalTokens,
+      total_cost: totalTokens * COST_PER_TOKEN,
+    };
+  });
+
+  res.json({ data });
 }));
 
 /**
  * GET /api/costs/budgets
  * Get budget status and alerts
+ *
+ * NOTE: budgets table doesn't exist. Returns empty or default budgets.
  */
 costsRouter.get('/budgets', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const budgets = await query(`
-    SELECT b.*,
-      (SELECT COALESCE(SUM(ds.estimated_cost_usd), 0)
-       FROM daily_stats ds
-       WHERE ds.tenant_id = b.tenant_id
-         AND (b.agent_ids IS NULL OR ds.agent_id = ANY(b.agent_ids))
-         AND ds.day >= CASE
-           WHEN b.period = 'daily' THEN CURRENT_DATE
-           WHEN b.period = 'weekly' THEN DATE_TRUNC('week', CURRENT_DATE)
-           WHEN b.period = 'monthly' THEN DATE_TRUNC('month', CURRENT_DATE)
-         END
-      ) as current_spend
-    FROM budgets b
-    WHERE b.tenant_id = $1
-  `, [req.tenantId]);
-
-  const budgetsWithStatus = budgets.rows.map((b: any) => ({
-    ...b,
-    percentUsed: (b.current_spend / b.amount) * 100,
-    isOverThreshold: (b.current_spend / b.amount) * 100 >= b.alert_threshold,
-    isOverBudget: b.current_spend >= b.amount,
-  }));
-
-  res.json({ data: budgetsWithStatus });
+  // budgets table doesn't exist - return empty array or defaults
+  res.json({
+    data: [],
+    message: 'Budget management not yet implemented',
+  });
 }));
 
 const budgetAlertSchema = z.object({
-  budgetId: z.string().uuid(),
+  budgetId: z.string(),
   threshold: z.number().min(0).max(100),
 });
 
 /**
  * POST /api/costs/budgets/alert
  * Update budget alert threshold
+ *
+ * NOTE: budgets table doesn't exist. Returns 501.
  */
 costsRouter.post('/budgets/alert', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const data = budgetAlertSchema.parse(req.body);
+  budgetAlertSchema.parse(req.body);
 
-  const result = await query(`
-    UPDATE budgets
-    SET alert_threshold = $1, updated_at = NOW()
-    WHERE id = $2 AND tenant_id = $3
-    RETURNING *
-  `, [data.threshold, data.budgetId, req.tenantId]);
-
-  if (result.rows.length === 0) {
-    throw ApiError.notFound('Budget not found');
-  }
-
-  res.json(result.rows[0]);
+  res.status(501).json({
+    error: 'Budget management not yet implemented',
+    message: 'Budget alerts will be available in a future release',
+  });
 }));

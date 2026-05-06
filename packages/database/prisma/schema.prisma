@@ -1,5 +1,8 @@
 // Arkon Database Schema
 // PostgreSQL with TimescaleDB and pgvector extensions
+//
+// IMPORTANT: All columns use snake_case in the database for Go/Rust compatibility.
+// Prisma fields use camelCase with @map("snake_case") directives.
 
 generator client {
   provider        = "prisma-client-js"
@@ -32,6 +35,13 @@ enum AgentStatus {
   INACTIVE
   ERROR
   PENDING
+}
+
+enum AgentFramework {
+  OPENAI
+  ANTHROPIC
+  LANGCHAIN
+  CUSTOM
 }
 
 enum IncidentSeverity {
@@ -87,10 +97,10 @@ model Tenant {
   id                     String   @id @default(cuid())
   name                   String
   slug                   String   @unique
-  isActive               Boolean  @default(true)
-  fallbackDefaultModelId String?  // Default model when team has none set
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  isActive               Boolean  @default(true) @map("is_active")
+  fallbackDefaultModelId String?  @map("fallback_default_model_id") // Default model when team has none set
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
   // Relations
   users         User[]
@@ -111,10 +121,10 @@ model Tenant {
 model Team {
   id             String   @id @default(cuid())
   name           String
-  tenantId       String
-  defaultModelId String?  // Default model for this team
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  tenantId       String   @map("tenant_id")
+  defaultModelId String?  @map("default_model_id") // Default model for this team
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
   tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -135,13 +145,13 @@ model Team {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
-  passwordHash String?
+  passwordHash String?  @map("password_hash")
   name         String
   role         Role     @default(MEMBER)
-  tenantId     String
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  tenantId     String   @map("tenant_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
   tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -164,12 +174,12 @@ model User {
 
 model UserSession {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String   @map("user_id")
   token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  userAgent String?
-  ipAddress String?
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -181,14 +191,14 @@ model UserSession {
 
 model OAuthAccount {
   id                String        @id @default(cuid())
-  userId            String
+  userId            String        @map("user_id")
   provider          OAuthProvider
-  providerAccountId String
-  accessToken       String?
-  refreshToken      String?
-  expiresAt         DateTime?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  providerAccountId String        @map("provider_account_id")
+  accessToken       String?       @map("access_token")
+  refreshToken      String?       @map("refresh_token")
+  expiresAt         DateTime?     @map("expires_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -200,10 +210,10 @@ model OAuthAccount {
 
 model TeamMember {
   id        String   @id @default(cuid())
-  userId    String
-  teamId    String
+  userId    String   @map("user_id")
+  teamId    String   @map("team_id")
   role      TeamRole @default(MEMBER)
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -219,22 +229,24 @@ model TeamMember {
 // ============================================================================
 
 model Agent {
-  id          String      @id @default(cuid())
+  id          String         @id @default(cuid())
   name        String
   description String?
-  status      AgentStatus @default(PENDING)
-  tenantId    String
-  teamId      String?
-  config      Json        @default("{}")
-  lastSeen    DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  status      AgentStatus    @default(PENDING)
+  framework   AgentFramework @default(CUSTOM)
+  tenantId    String         @map("tenant_id")
+  teamId      String?        @map("team_id")
+  config      Json           @default("{}")
+  lastSeen    DateTime?      @map("last_seen")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
 
   // Relations
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   team      Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
   events    Event[]
   incidents Incident[]
+  toolCalls ToolCall[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -244,12 +256,21 @@ model Agent {
 }
 
 model Event {
-  id        String   @id @default(cuid())
-  agentId   String
-  eventType String
-  payload   Json     @default("{}")
-  severity  String   @default("info")
-  timestamp DateTime @default(now())
+  id           String   @id @default(cuid())
+  agentId      String   @map("agent_id")
+  eventType    String   @map("event_type")
+  direction    String?  // 'inbound' or 'outbound'
+  sessionKey   String?  @map("session_key")
+  channelId    String?  @map("channel_id")
+  sender       String?
+  content      String?
+  payload      Json     @default("{}")
+  severity     String   @default("info")
+  inputTokens  Int?     @map("input_tokens")
+  outputTokens Int?     @map("output_tokens")
+  threatLevel  String   @default("none") @map("threat_level")
+  timestamp    DateTime @default(now())
+  createdAt    DateTime @default(now()) @map("created_at")
 
   // Relations
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -265,13 +286,13 @@ model Event {
 
 model Incident {
   id          String           @id @default(cuid())
-  agentId     String
+  agentId     String           @map("agent_id")
   title       String
   description String
   severity    IncidentSeverity @default(MEDIUM)
   status      IncidentStatus   @default(OPEN)
-  createdAt   DateTime         @default(now())
-  resolvedAt  DateTime?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  resolvedAt  DateTime?        @map("resolved_at")
 
   // Relations
   agent   Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -284,10 +305,10 @@ model Incident {
 
 model IncidentUpdate {
   id         String   @id @default(cuid())
-  incidentId String
-  userId     String
+  incidentId String   @map("incident_id")
+  userId     String   @map("user_id")
   message    String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @map("created_at")
 
   // Relations
   incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
@@ -303,12 +324,12 @@ model IncidentUpdate {
 
 model Notification {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String   @map("user_id")
   type      String
   title     String
   message   String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -325,11 +346,11 @@ model Workflow {
   id          String   @id @default(cuid())
   name        String
   description String?
-  tenantId    String
+  tenantId    String   @map("tenant_id")
   definition  Json     @default("{}")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
   runs WorkflowRun[]
@@ -340,11 +361,11 @@ model Workflow {
 
 model WorkflowRun {
   id          String    @id @default(cuid())
-  workflowId  String
+  workflowId  String    @map("workflow_id")
   status      String    @default("pending")
   context     Json      @default("{}")
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
 
   // Relations
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
@@ -360,8 +381,8 @@ model WorkflowRun {
 
 model Skill {
   id          String     @id @default(cuid())
-  tenantId    String
-  teamId      String?    // null for tenant-wide skills
+  tenantId    String     @map("tenant_id")
+  teamId      String?    @map("team_id") // null for tenant-wide skills
   name        String
   description String?
   version     Int        @default(1)
@@ -369,10 +390,10 @@ model Skill {
   sha256      String     // hash of content for integrity
   scope       SkillScope @default(TEAM)
   enabled     Boolean    @default(true)
-  createdById String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  deletedAt   DateTime?  // soft delete
+  createdById String     @map("created_by_id")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at") // soft delete
 
   // Relations
   tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -390,12 +411,12 @@ model Skill {
 
 model SkillVersion {
   id          String   @id @default(cuid())
-  skillId     String
+  skillId     String   @map("skill_id")
   version     Int
   content     String
   sha256      String
-  createdById String
-  createdAt   DateTime @default(now())
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations
   skill     Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
@@ -412,17 +433,17 @@ model SkillVersion {
 
 model AuditLog {
   id           String      @id @default(cuid())
-  tenantId     String
-  resourceType String      // e.g., 'skill', 'agent', 'workflow'
-  resourceId   String
+  tenantId     String      @map("tenant_id")
+  resourceType String      @map("resource_type") // e.g., 'skill', 'agent', 'workflow'
+  resourceId   String      @map("resource_id")
   action       AuditAction
-  actorId      String
-  beforeState  Json?       // null for CREATE
-  afterState   Json?       // null for DELETE
-  ipAddress    String?
-  userAgent    String?
+  actorId      String      @map("actor_id")
+  beforeState  Json?       @map("before_state") // null for CREATE
+  afterState   Json?       @map("after_state") // null for DELETE
+  ipAddress    String?     @map("ip_address")
+  userAgent    String?     @map("user_agent")
   metadata     Json?       // additional context
-  createdAt    DateTime    @default(now())
+  createdAt    DateTime    @default(now()) @map("created_at")
 
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -441,12 +462,12 @@ model AuditLog {
 
 model LlmSession {
   id        String       @id @default(cuid())
-  tenantId  String
-  userId    String
+  tenantId  String       @map("tenant_id")
+  userId    String       @map("user_id")
   title     String?
   provider  String       // Last used provider ('ollama', 'cerebras', 'anthropic')
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
 
   // Relations
   tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -460,14 +481,14 @@ model LlmSession {
 
 model LlmMessage {
   id           String     @id @default(cuid())
-  sessionId    String
+  sessionId    String     @map("session_id")
   provider     String     // 'ollama', 'cerebras', 'anthropic'
   model        String
   role         String     // 'user', 'assistant', 'system'
   content      String
-  inputTokens  Int        @default(0)
-  outputTokens Int        @default(0)
-  createdAt    DateTime   @default(now())
+  inputTokens  Int        @default(0) @map("input_tokens")
+  outputTokens Int        @default(0) @map("output_tokens")
+  createdAt    DateTime   @default(now()) @map("created_at")
 
   // Relations
   session      LlmSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -482,19 +503,19 @@ model LlmMessage {
 
 model Embedding {
   id          String   @id @default(cuid())
-  tenantId    String
-  sourceType  String   // 'skill', 'agent', 'journal', 'document', etc.
-  sourceId    String   // Reference to source record
+  tenantId    String   @map("tenant_id")
+  sourceType  String   @map("source_type") // 'skill', 'agent', 'journal', 'document', etc.
+  sourceId    String   @map("source_id") // Reference to source record
   content     String   // Text that was embedded
-  contentHash String   // SHA-256 hash for deduplication
+  contentHash String   @map("content_hash") // SHA-256 hash for deduplication
   // Note: embedding vector stored via raw SQL, Prisma doesn't support pgvector
   // Use: embedding vector(1536) in migration
   provider    String   // 'openai', 'gemini', 'voyage', 'cohere'
   model       String   // e.g., 'text-embedding-3-small'
   dimensions  Int      // Vector dimensions
   metadata    Json?    // Additional context
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -512,8 +533,8 @@ model Embedding {
 
 model McpServer {
   id          String     @id @default(cuid())
-  tenantId    String
-  teamId      String?    // null for tenant-wide servers
+  tenantId    String     @map("tenant_id")
+  teamId      String?    @map("team_id") // null for tenant-wide servers
   name        String     // Unique name within scope
   description String?
   command     String     // Executable command (e.g., "npx", "node")
@@ -523,9 +544,9 @@ model McpServer {
   sha256      String     // Hash of configuration for sync
   scope       SkillScope @default(TEAM)
   enabled     Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  deletedAt   DateTime?  // Soft delete
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at") // Soft delete
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -541,10 +562,10 @@ model McpServer {
 
 model TenantSettings {
   id            String   @id @default(cuid())
-  tenantId      String   @unique
-  eventsEnabled Boolean  @default(false) // CRITICAL: Default false for privacy
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  tenantId      String   @unique @map("tenant_id")
+  eventsEnabled Boolean  @default(false) @map("events_enabled") // CRITICAL: Default false for privacy
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("tenant_settings")
 }
@@ -557,14 +578,14 @@ model TenantSettings {
 
 model UsageEvent {
   id              String   @id @default(cuid())
-  tenantId        String
-  resourceType    String   // 'skill', 'mcp_server', 'rag_query'
-  resourceId      String
+  tenantId        String   @map("tenant_id")
+  resourceType    String   @map("resource_type") // 'skill', 'mcp_server', 'rag_query'
+  resourceId      String   @map("resource_id")
   action          String   // 'invoke', 'sync', 'search'
-  bucketTimestamp DateTime // 15-minute bucket for aggregation
+  bucketTimestamp DateTime @map("bucket_timestamp") // 15-minute bucket for aggregation
   count           Int      @default(1)
   metadata        Json?    // Non-identifying metadata only
-  createdAt       DateTime @default(now())
+  createdAt       DateTime @default(now()) @map("created_at")
 
   // NO user_id - this is intentional!
   // NO foreign key to users table - this is intentional!
@@ -581,21 +602,21 @@ model UsageEvent {
 
 model Model {
   id                 String     @id @default(cuid())
-  tenantId           String
+  tenantId           String     @map("tenant_id")
   scope              ModelScope @default(TENANT)
-  teamId             String?    // null for tenant-wide models
-  displayName        String     // User-friendly name
-  providerTemplateId String?    // null = YAML mode
-  modelIdentifier    String     // e.g., "claude-3-sonnet-20240229"
-  publicConfig       Json       @default("{}") // Non-secret config
-  secretRef          String?    // FK to ModelSecret (null if no secrets)
-  yamlOverride       String?    // Raw LiteLLM YAML for advanced users
+  teamId             String?    @map("team_id") // null for tenant-wide models
+  displayName        String     @map("display_name") // User-friendly name
+  providerTemplateId String?    @map("provider_template_id") // null = YAML mode
+  modelIdentifier    String     @map("model_identifier") // e.g., "claude-3-sonnet-20240229"
+  publicConfig       Json       @default("{}") @map("public_config") // Non-secret config
+  secretRef          String?    @map("secret_ref") // FK to ModelSecret (null if no secrets)
+  yamlOverride       String?    @map("yaml_override") // Raw LiteLLM YAML for advanced users
   enabled            Boolean    @default(true)
-  createdById        String
-  lastSyncedAt       DateTime?  // Last time synced to LiteLLM
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
-  deletedAt          DateTime?  // Soft delete
+  createdById        String     @map("created_by_id")
+  lastSyncedAt       DateTime?  @map("last_synced_at") // Last time synced to LiteLLM
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+  deletedAt          DateTime?  @map("deleted_at") // Soft delete
 
   // Relations
   tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -612,11 +633,11 @@ model Model {
 
 model ModelSecret {
   id               String   @id @default(cuid())
-  tenantId         String
-  encryptedPayload Bytes    // XChaCha20-Poly1305 encrypted JSON
+  tenantId         String   @map("tenant_id")
+  encryptedPayload Bytes    @map("encrypted_payload") // XChaCha20-Poly1305 encrypted JSON
   nonce            Bytes    // 24-byte nonce for XChaCha20-Poly1305
   version          Int      @default(1) // Key version for rotation
-  createdAt        DateTime @default(now())
+  createdAt        DateTime @default(now()) @map("created_at")
 
   // Relations
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -628,16 +649,16 @@ model ModelSecret {
 
 model VirtualKey {
   id         String    @id @default(cuid())
-  tenantId   String
-  userId     String
-  keyPrefix  String    @unique @db.VarChar(8) // 8-char prefix for lookup
-  keyHash    String    // bcrypt hash of full key
+  tenantId   String    @map("tenant_id")
+  userId     String    @map("user_id")
+  keyPrefix  String    @unique @db.VarChar(8) @map("key_prefix") // 8-char prefix for lookup
+  keyHash    String    @map("key_hash") // bcrypt hash of full key
   label      String?   // User-friendly label
   enabled    Boolean   @default(true)
-  expiresAt  DateTime?
-  lastUsedAt DateTime?
-  createdAt  DateTime  @default(now())
-  revokedAt  DateTime?
+  expiresAt  DateTime? @map("expires_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  revokedAt  DateTime? @map("revoked_at")
 
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -650,18 +671,316 @@ model VirtualKey {
 }
 
 model TenantRoutingState {
-  tenantId             String        @id
-  litellmContainerName String?       // Docker container name
-  masterKeySecretRef   String?       // Reference to LiteLLM master key
+  tenantId             String        @id @map("tenant_id")
+  litellmContainerName String?       @map("litellm_container_name") // Docker container name
+  masterKeySecretRef   String?       @map("master_key_secret_ref") // Reference to LiteLLM master key
   status               RoutingStatus @default(STOPPED)
-  lastHealthCheckAt    DateTime?
-  lastError            String?
-  restartCount         Int           @default(0)
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  lastHealthCheckAt    DateTime?     @map("last_health_check_at")
+  lastError            String?       @map("last_error")
+  restartCount         Int           @default(0) @map("restart_count")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
 
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_routing_states")
+}
+
+// ============================================================================
+// Agent Memory System (8 Tables)
+// ============================================================================
+// Pattern from agent-research-assistant: episodic, semantic, procedural, tool memory
+
+enum MemoryRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum ToolLogStatus {
+  SUCCESS
+  ERROR
+  TIMEOUT
+}
+
+enum RagScope {
+  TENANT
+  TEAM
+}
+
+enum ExtractionStatus {
+  PENDING
+  EXTRACTING
+  EXTRACTED
+  FAILED
+}
+
+// 1. Conversational Memory (Episodic - SQL)
+// Recent dialogue history per thread
+model ConversationalMemory {
+  id        String     @id @default(cuid())
+  tenantId  String     @map("tenant_id")
+  threadId  String     @map("thread_id")
+  role      MemoryRole
+  content   String
+  metadata  Json       @default("{}")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@index([tenantId, threadId, createdAt(sort: Desc)])
+  @@index([threadId])
+  @@map("conversational_memory")
+}
+
+// 2. Semantic Memory (Knowledge Base - pgvector)
+// Research documents, team knowledge
+// Note: embedding vector(1024) stored via raw SQL for bgm-m3
+model SemanticMemory {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  teamId    String?  @map("team_id")
+  content   String
+  // embedding vector(1024) - stored via migration
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([teamId])
+  @@map("semantic_memory")
+}
+
+// 3. Workflow Memory (Procedural - pgvector)
+// Tool execution patterns, best practices
+model WorkflowMemory {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  content   String
+  // embedding vector(1024) - stored via migration
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("workflow_memory")
+}
+
+// 4. Toolbox Memory (Tool Registry - pgvector)
+// Augmented tool descriptions for semantic matching
+model ToolboxMemory {
+  id                   String   @id @default(cuid())
+  tenantId             String   @map("tenant_id")
+  toolName             String   @map("tool_name")
+  originalDescription  String   @map("original_description")
+  augmentedDescription String   @map("augmented_description") // LLM-enriched 200-300 word description
+  // embedding vector(1024) - stored via migration
+  category             String
+  metadata             Json     @default("{}")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, toolName])
+  @@index([tenantId])
+  @@index([category])
+  @@map("toolbox_memory")
+}
+
+// 5. Entity Memory (Named Entities - pgvector)
+// Projects, people, concepts
+model EntityMemory {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  entityType  String   @map("entity_type") // 'project', 'person', 'concept', 'organization'
+  entityName  String   @map("entity_name")
+  description String
+  // embedding vector(1024) - stored via migration
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, entityType])
+  @@index([entityName])
+  @@map("entity_memory")
+}
+
+// 6. Summary Memory (Compressed - pgvector)
+// JIT-expandable conversation summaries
+model SummaryMemory {
+  id                   String   @id @default(cuid())
+  tenantId             String   @map("tenant_id")
+  threadId             String   @map("thread_id")
+  content              String   // Compressed summary
+  // embedding vector(1024) - stored via migration
+  originalMessageCount Int      @map("original_message_count") // How many messages were summarized
+  metadata             Json     @default("{}")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, threadId])
+  @@map("summary_memory")
+}
+
+// 7. Persona Memory (Identity - pgvector)
+// Agent/team preferences, traits
+model PersonaMemory {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  teamId    String?  @map("team_id")
+  name      String
+  content   String   // Persona description
+  // embedding vector(1024) - stored via migration
+  traits    Json     @default("[]") // Array of trait strings
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([teamId])
+  @@map("persona_memory")
+}
+
+// 8. Tool Log Memory (Audit - SQL)
+// Tool call history with timing
+model ToolLogMemory {
+  id         String        @id @default(cuid())
+  tenantId   String        @map("tenant_id")
+  threadId   String        @map("thread_id")
+  toolName   String        @map("tool_name")
+  input      Json
+  output     Json
+  status     ToolLogStatus
+  durationMs Int           @map("duration_ms") // Execution time in milliseconds
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  @@index([tenantId, threadId, createdAt(sort: Desc)])
+  @@index([toolName])
+  @@index([status])
+  @@map("tool_log_memory")
+}
+
+// ============================================================================
+// RAG Document Management (Admin-Controlled)
+// ============================================================================
+// Pattern: Tenant/Team-scoped document collections for grounding LLM responses
+// Tables: rag_collections, rag_documents, rag_chunks
+
+model RagCollection {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  description String?
+  scope       RagScope  @default(TENANT)
+  teamId      String?   @map("team_id") // null for tenant-scoped collections
+  createdById String    @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at") // Soft delete
+
+  // Relations - no direct FK to avoid circular issues
+  documents RagDocument[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, deletedAt])
+  @@index([teamId])
+  @@index([scope])
+  @@map("rag_collections")
+}
+
+model RagDocument {
+  id               String           @id @default(cuid())
+  collectionId     String           @map("collection_id")
+  tenantId         String           @map("tenant_id") // Denormalized for efficient tenant isolation
+  originalFilename String           @map("original_filename")
+  mimeType         String           @map("mime_type")
+  sizeBytes        Int              @map("size_bytes")
+  filePath         String           @map("file_path") // Relative path on disk
+  fileSha256       String           @map("file_sha256") // For deduplication
+  extractionStatus ExtractionStatus @default(PENDING) @map("extraction_status")
+  extractionError  String?          @map("extraction_error")
+  chunkCount       Int              @default(0) @map("chunk_count")
+  uploadedById     String           @map("uploaded_by_id")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  deletedAt        DateTime?        @map("deleted_at") // Soft delete
+
+  // Relations
+  collection RagCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  chunks     RagChunk[]
+
+  @@unique([collectionId, fileSha256])
+  @@index([tenantId, collectionId, deletedAt])
+  @@index([extractionStatus])
+  @@index([fileSha256])
+  @@map("rag_documents")
+}
+
+model RagChunk {
+  id          String   @id @default(cuid())
+  documentId  String   @map("document_id")
+  tenantId    String   @map("tenant_id") // Denormalized for efficient tenant isolation
+  chunkIndex  Int      @map("chunk_index") // Order within document
+  content     String   // Chunk text
+  pageNumber  Int?     @map("page_number") // For PDFs
+  tokenCount  Int      @map("token_count") // Token count for context budget
+  // embedding vector(1536) - stored via raw SQL migration
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  document RagDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([tenantId])
+  @@index([documentId, chunkIndex])
+  @@map("rag_chunks")
+}
+
+// ============================================================================
+// Tool Calls Tracking
+// ============================================================================
+// Tracks agent tool invocations for usage analytics and debugging
+
+model ToolCall {
+  id          String   @id @default(cuid())
+  agentId     String   @map("agent_id")
+  toolName    String   @map("tool_name")
+  input       Json     @default("{}")
+  output      Json     @default("{}")
+  status      String   @default("completed") // 'pending', 'completed', 'error'
+  durationMs  Int?     @map("duration_ms")
+  sessionKey  String?  @map("session_key")
+  errorMsg    String?  @map("error_msg")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([toolName])
+  @@index([status])
+  @@map("tool_calls")
+}
+
+// ============================================================================
+// Daily Stats (Aggregated Usage)
+// ============================================================================
+// Pre-aggregated daily statistics per agent for fast dashboard queries
+
+model DailyStats {
+  id               String   @id @default(cuid())
+  agentId          String   @map("agent_id")
+  tenantId         String   @map("tenant_id")
+  day              DateTime @db.Date
+  messagesReceived Int      @default(0) @map("messages_received")
+  messagesSent     Int      @default(0) @map("messages_sent")
+  toolCalls        Int      @default(0) @map("tool_calls")
+  errors           Int      @default(0)
+  inputTokens      Int      @default(0) @map("input_tokens")
+  outputTokens     Int      @default(0) @map("output_tokens")
+  estimatedCostUsd Decimal  @default(0) @map("estimated_cost_usd") @db.Decimal(10, 6)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@unique([agentId, day])
+  @@index([tenantId, day])
+  @@map("daily_stats")
 }

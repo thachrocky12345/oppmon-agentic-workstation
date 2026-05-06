@@ -15,7 +15,7 @@
 
 import { pino } from 'pino';
 import { embed, deleteSourceEmbeddings, embedBatch } from './embedding.js';
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 
 const logger = pino({ name: 'embedding-hooks' });
 

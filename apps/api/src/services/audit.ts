@@ -10,8 +10,8 @@
  * Audit logs are append-only and should never be updated or deleted.
  */
 
-import { prisma, Prisma } from "@arkon/database";
-import type { AuditAction } from "@arkon/database";
+import { prisma, Prisma } from "@oppmon/database";
+import type { AuditAction } from "@oppmon/database";
 import { AuthenticatedRequest } from "../middleware/request-auth.js";
 
 // ============================================================================

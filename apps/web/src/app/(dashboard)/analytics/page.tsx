@@ -72,23 +72,62 @@ export default function AnalyticsPage() {
 
       if (overviewRes.ok) {
         const data = await overviewRes.json()
-        setOverview(data.data)
+        // Map API response to expected structure
+        const summary = data.summary || data.data || {}
+        setOverview({
+          totalRequests: summary.totalRequests || summary.totalEvents || 0,
+          totalTokens: summary.totalTokens || 0,
+          totalCost: summary.estimatedCost || summary.totalCost || 0,
+          avgLatency: summary.avgLatency || 0,
+          errorRate: summary.totalErrors && summary.totalEvents
+            ? summary.totalErrors / summary.totalEvents
+            : 0,
+        })
       }
       if (agentsRes.ok) {
         const data = await agentsRes.json()
-        setAgentStats(data.data || [])
+        // Map API response to expected structure
+        const agents = (data.data || []).map((a: any) => ({
+          agentId: a.id,
+          agentName: a.name,
+          requests: parseInt(a.total_events || '0'),
+          tokens: 0, // Not tracked per agent
+          cost: 0, // Not tracked per agent
+          errorRate: a.total_events > 0
+            ? parseInt(a.total_errors || '0') / parseInt(a.total_events || '1')
+            : 0,
+        }))
+        setAgentStats(agents)
       }
       if (modelsRes.ok) {
         const data = await modelsRes.json()
-        setModelStats(data.data || [])
+        // Map API response to expected structure
+        const models = (data.data || []).map((m: any) => ({
+          model: m.model,
+          provider: m.provider,
+          requests: parseInt(m.request_count || '0'),
+          tokens: parseInt(m.total_input_tokens || '0') + parseInt(m.total_output_tokens || '0'),
+          cost: (parseInt(m.total_input_tokens || '0') + parseInt(m.total_output_tokens || '0')) * 0.000001,
+          avgLatency: 0, // Not tracked
+        }))
+        setModelStats(models)
       }
       if (errorsRes.ok) {
         const data = await errorsRes.json()
-        setErrorStats(data.data || [])
+        // Map API response to expected structure
+        const totalErrors = (data.byType || []).reduce((sum: number, e: any) => sum + parseInt(e.count || '0'), 0)
+        const errors = (data.byType || []).map((e: any) => ({
+          type: e.error_type,
+          count: parseInt(e.count || '0'),
+          percentage: totalErrors > 0 ? (parseInt(e.count || '0') / totalErrors) * 100 : 0,
+          lastOccurred: '', // Not tracked
+        }))
+        setErrorStats(errors)
       }
       if (perfRes.ok) {
         const data = await perfRes.json()
-        setPerformance(data.data || [])
+        // Performance data not available in current schema - use empty array
+        setPerformance([])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load analytics')
@@ -101,17 +140,18 @@ export default function AnalyticsPage() {
     fetchData()
   }, [period])
 
-  const formatNumber = (n: number): string => {
-    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
-    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
-    return n.toLocaleString()
+  const formatNumber = (n: number | undefined | null): string => {
+    const num = n ?? 0
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
+    return num.toLocaleString()
   }
 
-  const formatCurrency = (n: number): string => {
+  const formatCurrency = (n: number | undefined | null): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(n)
+    }).format(n ?? 0)
   }
 
   const maxLatency = performance.length > 0 ? Math.max(...performance.map(p => p.latency), 1) : 1

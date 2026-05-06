@@ -1,7 +1,7 @@
 /**
  * API Client
  *
- * HTTP client for communicating with the Arkon API
+ * HTTP client for communicating with the OppMon API
  */
 
 import { getApiUrl } from './config.js'

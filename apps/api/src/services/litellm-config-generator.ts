@@ -3,7 +3,7 @@
  * Generates LiteLLM YAML configuration from tenant's models
  */
 
-import { providerRegistry } from '@arkon/shared';
+import { providerRegistry } from '@oppmon/shared';
 import { getEnabledModelsForTenant } from './models.js';
 
 // ============================================================================

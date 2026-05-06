@@ -20,7 +20,7 @@ const HOOKS_FILE = join(CLAUDE_DIR, 'hooks.json')
 
 // The hook script that captures events (must be <1ms execution)
 const HOOK_SCRIPT = `#!/usr/bin/env node
-// Arkon event capture hook - executes in <1ms
+// OppMon event capture hook - executes in <1ms
 // This hook is called by Claude Code on skill/tool invocations
 
 const fs = require('fs');
@@ -72,7 +72,7 @@ interface ClaudeHooksConfig {
   }
 }
 
-const HOOK_ID = 'arkon-event-capture'
+const HOOK_ID = 'oppmon-event-capture'
 const HOOK_COMMAND = `node -e "${HOOK_SCRIPT.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`
 
 /**
@@ -105,14 +105,14 @@ function writeHooksConfig(config: ClaudeHooksConfig): void {
 function isHookInstalled(): boolean {
   const config = readHooksConfig()
   const hooks = config.hooks?.postSkillInvoke || []
-  return hooks.some(h => h.includes(HOOK_ID) || h.includes('arkon'))
+  return hooks.some(h => h.includes(HOOK_ID) || h.includes('oppmon'))
 }
 
 /**
  * Install the event capture hook
  */
 async function installCommand(): Promise<void> {
-  console.log(chalk.bold('\nInstalling Arkon event capture hook...\n'))
+  console.log(chalk.bold('\nInstalling OppMon event capture hook...\n'))
 
   if (isHookInstalled()) {
     console.log(chalk.yellow('Hook is already installed.'))
@@ -150,7 +150,7 @@ async function installCommand(): Promise<void> {
  * Uninstall the event capture hook
  */
 async function uninstallCommand(): Promise<void> {
-  console.log(chalk.bold('\nUninstalling Arkon event capture hook...\n'))
+  console.log(chalk.bold('\nUninstalling OppMon event capture hook...\n'))
 
   if (!isHookInstalled()) {
     console.log(chalk.yellow('Hook is not installed.'))
@@ -163,7 +163,7 @@ async function uninstallCommand(): Promise<void> {
     // Remove from postSkillInvoke
     if (config.hooks.postSkillInvoke) {
       config.hooks.postSkillInvoke = config.hooks.postSkillInvoke.filter(
-        h => !h.includes(HOOK_ID) && !h.includes('arkon')
+        h => !h.includes(HOOK_ID) && !h.includes('oppmon')
       )
       if (config.hooks.postSkillInvoke.length === 0) {
         delete config.hooks.postSkillInvoke
@@ -173,7 +173,7 @@ async function uninstallCommand(): Promise<void> {
     // Remove from postToolCall
     if (config.hooks.postToolCall) {
       config.hooks.postToolCall = config.hooks.postToolCall.filter(
-        h => !h.includes(HOOK_ID) && !h.includes('arkon')
+        h => !h.includes(HOOK_ID) && !h.includes('oppmon')
       )
       if (config.hooks.postToolCall.length === 0) {
         delete config.hooks.postToolCall
@@ -196,7 +196,7 @@ async function uninstallCommand(): Promise<void> {
  * Check hook installation status
  */
 async function statusCommand(): Promise<void> {
-  console.log(chalk.bold('\nArkon Hook Status\n'))
+  console.log(chalk.bold('\nOppMon Hook Status\n'))
 
   const installed = isHookInstalled()
   const config = readHooksConfig()

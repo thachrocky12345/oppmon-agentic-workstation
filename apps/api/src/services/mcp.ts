@@ -4,8 +4,8 @@
  * Business logic for MCP server registry operations.
  */
 
-import { prisma } from "@arkon/database";
-import type { SkillScope } from "@arkon/database";
+import { prisma } from "@oppmon/database";
+import type { SkillScope } from "@oppmon/database";
 import { createHash } from "crypto";
 
 // ============================================================================

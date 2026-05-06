@@ -5,7 +5,7 @@
  */
 
 import nacl from 'tweetnacl';
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { createId } from '@paralleldrive/cuid2';
 
 // ============================================================================

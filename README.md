@@ -1,6 +1,6 @@
-# Arkon - AI Gateway Platform
+# OppMon - AI Gateway Platform
 
-Arkon is an AI Gateway platform providing observability, security, and management capabilities for AI agent deployments. The platform includes multi-provider LLM integration, semantic search with embeddings, and RAG (Retrieval Augmented Generation) pipelines.
+OppMon is an AI Gateway platform providing observability, security, and management capabilities for AI agent deployments. The platform includes multi-provider LLM integration, semantic search with embeddings, and RAG (Retrieval Augmented Generation) pipelines.
 
 ## Features
 
@@ -24,7 +24,7 @@ Arkon is an AI Gateway platform providing observability, security, and managemen
 ## Project Structure
 
 ```
-arkon-workstation/
+oppmon-workstation/
 ├── apps/
 │   ├── api/                 # Express API server
 │   │   ├── src/
@@ -57,7 +57,7 @@ arkon-workstation/
 
 ```bash
 git clone <repository>
-cd arkon-workstation
+cd oppmon-workstation
 pnpm install
 ```
 
@@ -81,7 +81,7 @@ cp .env.example .env
 
 Required environment variables:
 ```env
-DATABASE_URL=postgres://arkon:arkon_dev_password@localhost:5433/arkon
+DATABASE_URL=postgres://oppmon:oppmon_dev_password@localhost:5433/oppmon
 JWT_SECRET=your-secret-key
 
 # LLM Providers (at least one required)
@@ -97,29 +97,29 @@ OPENAI_API_KEY=sk-...
 
 ```bash
 # Generate Prisma client
-pnpm --filter @arkon/database db:generate
+pnpm --filter @oppmon/database db:generate
 
 # Push schema to database
-pnpm --filter @arkon/database db:push
+pnpm --filter @oppmon/database db:push
 
 # Run pgvector migration (cross-platform)
-pnpm --filter @arkon/api migrate
+pnpm --filter @oppmon/api migrate
 
 # Seed development data
-pnpm --filter @arkon/database db:seed
+pnpm --filter @oppmon/database db:seed
 ```
 
 ### 5. Start Development Server
 
 ```bash
-pnpm --filter @arkon/api dev
+pnpm --filter @oppmon/api dev
 # API available at http://localhost:3001
 ```
 
 ### 6. Run Smoke Tests
 
 ```bash
-pnpm --filter @arkon/api smoke:week1
+pnpm --filter @oppmon/api smoke:week1
 ```
 
 ## API Reference
@@ -219,33 +219,33 @@ docker-compose down
 
 ```bash
 # Unit tests
-pnpm --filter @arkon/api test
+pnpm --filter @oppmon/api test
 
 # Coverage report
-pnpm --filter @arkon/api test:coverage
+pnpm --filter @oppmon/api test:coverage
 
 # Smoke tests
-pnpm --filter @arkon/api smoke:week1
+pnpm --filter @oppmon/api smoke:week1
 ```
 
 ### Code Quality
 
 ```bash
 # Lint
-pnpm --filter @arkon/api lint
+pnpm --filter @oppmon/api lint
 
 # Type check
-pnpm --filter @arkon/api typecheck
+pnpm --filter @oppmon/api typecheck
 ```
 
 ### Database Migrations
 
 ```bash
 # Generate migration
-pnpm --filter @arkon/database db:generate
+pnpm --filter @oppmon/database db:generate
 
 # Push schema changes
-pnpm --filter @arkon/database db:push
+pnpm --filter @oppmon/database db:push
 ```
 
 ## Configuration

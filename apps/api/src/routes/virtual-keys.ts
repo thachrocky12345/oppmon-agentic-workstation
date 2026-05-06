@@ -12,7 +12,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { createId } from '@paralleldrive/cuid2';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { AuthenticatedRequest } from '../middleware/request-auth.js';

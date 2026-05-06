@@ -16,7 +16,7 @@ import {
   oauthConfig,
 } from "../lib/oauth.js";
 import { signToken } from "../lib/jwt.js";
-import type { Role, TeamRole, TeamMembership } from "@arkon/shared";
+import type { Role, TeamRole, TeamMembership } from "@oppmon/shared";
 
 export const oauthRouter = Router();
 

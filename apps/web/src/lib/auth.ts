@@ -7,7 +7,7 @@
 import { jwtVerify, SignJWT } from 'jose'
 
 // JWT secret - should match backend
-const JWT_SECRET = process.env.JWT_SECRET || 'arkon-dev-secret-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET || 'oppmon-dev-secret-change-in-production'
 
 export interface JWTClaims {
   sub: string        // user ID

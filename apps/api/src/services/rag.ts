@@ -7,8 +7,8 @@
  * - Usage tracking and audit logging
  */
 
-import { prisma } from '@arkon/database';
-import { Prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
+import { Prisma } from '@oppmon/database';
 import {
   executeRAG,
   retrieve,

@@ -15,7 +15,7 @@ import { skillsRouter } from './skills.js';
 import { SkillScope, Role } from '@prisma/client';
 
 // Mock prisma
-vi.mock('@arkon/database', () => ({
+vi.mock('@oppmon/database', () => ({
   prisma: {
     skill: {
       findMany: vi.fn(),
@@ -42,7 +42,7 @@ vi.mock('@arkon/database', () => ({
   },
 }));
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 
 // Mock user for request authentication
 const mockUser = {

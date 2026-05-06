@@ -5,7 +5,7 @@
  * and confidence scoring.
  */
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import {
   HybridSearchOptions,
   HybridSearchResponse,

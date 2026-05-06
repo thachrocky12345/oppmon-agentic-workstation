@@ -12,8 +12,8 @@
 
 import { Router, Response } from "express";
 import { z } from "zod";
-import { prisma } from "@arkon/database";
-import { SkillScope } from "@arkon/database";
+import { prisma } from "@oppmon/database";
+import { SkillScope } from "@oppmon/database";
 import { asyncHandler, ApiError } from "../middleware/error-handler.js";
 import { AuthenticatedRequest } from "../middleware/request-auth.js";
 import { rbac, buildRBACContext, RBACContext } from "../middleware/rbac.js";

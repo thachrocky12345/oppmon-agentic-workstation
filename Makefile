@@ -1,11 +1,11 @@
-# Arkon Workstation Makefile
+# OppMon Workstation Makefile
 # Use 'make help' to see available commands
 
 .PHONY: help init diagrams dev build test clean docker-up docker-down
 
 # Default target
 help:
-	@echo "Arkon Workstation Commands"
+	@echo "OppMon Workstation Commands"
 	@echo ""
 	@echo "Documentation:"
 	@echo "  make init        - Run post_init hook and remind to run /init in Claude Code"

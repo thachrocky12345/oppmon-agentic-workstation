@@ -10,7 +10,7 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgres://arkon:arkon_dev_password@localhost:5432/arkon',
+  connectionString: process.env.DATABASE_URL || 'postgres://oppmon:oppmon_dev_password@localhost:5433/oppmon',
 });
 
 async function ensureMigrationsTable() {

@@ -19,7 +19,7 @@ import { EXIT_CODES } from '../lib/types.js'
 
 export function createLoginCommand(): Command {
   const command = new Command('login')
-    .description('Authenticate with the Arkon Gateway')
+    .description('Authenticate with the OppMon Gateway')
     .option('--headless', 'Use headless mode for CI environments (expects TAG_TOKEN or TOKEN env var)')
     .option('--no-open', 'Do not automatically open browser')
     .action(async (options) => {

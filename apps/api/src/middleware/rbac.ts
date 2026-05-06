@@ -9,8 +9,8 @@
 
 import { Response, NextFunction } from "express";
 import { AuthenticatedRequest } from "./request-auth.js";
-import { prisma } from "@arkon/database";
-import { Role, TeamRole, SkillScope } from "@arkon/database";
+import { prisma } from "@oppmon/database";
+import { Role, TeamRole, SkillScope } from "@oppmon/database";
 import { logDenied, getAuditContext } from "../services/audit.js";
 
 // ============================================================================

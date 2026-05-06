@@ -28,7 +28,7 @@ import {
 } from './context.js';
 import { createLLMClient, getDefaultProvider, LLMMessage, LLMProvider } from '../llm/index.js';
 import { createEmbeddingClient, getDefaultEmbeddingProvider, toPgVector, EmbeddingProvider } from '../embedding/index.js';
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { hasSearchVector } from '../search/index.js';
 import { hybridSearch as hybridSearchFn } from '../../services/search.js';
 

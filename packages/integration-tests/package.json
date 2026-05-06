@@ -1,0 +1,21 @@
+{
+  "name": "@arkon/integration-tests",
+  "version": "1.0.0",
+  "description": "Integration and smoke tests for Arkon AI Gateway",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:smoke": "vitest run --config vitest.smoke.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@arkon/skill-framework": "workspace:*",
+    "@arkon/agent-engine": "workspace:*",
+    "@arkon/observability": "workspace:*",
+    "@arkon/guardrails": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -8,7 +8,7 @@
  * - Model Registry integration
  */
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 import { createId } from '@paralleldrive/cuid2';
 import {
   createLLMClient,

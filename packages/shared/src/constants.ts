@@ -1,5 +1,5 @@
 /**
- * Shared constants for the Arkon platform
+ * Shared constants for the OppMon platform
  */
 
 // ============================================================================
@@ -14,7 +14,7 @@ export const JWT_CONFIG = {
   /** Algorithm for signing tokens */
   ALGORITHM: "HS256" as const,
   /** Token issuer */
-  ISSUER: "arkon",
+  ISSUER: "oppmon",
 } as const;
 
 // ============================================================================

@@ -205,8 +205,8 @@ async function checkClaudeCode(): Promise<CheckResult> {
 
         // Create basic hook script
         const hookScript = `#!/bin/bash
-# Arkon event collection hook
-# This sends tool usage events to the Arkon API
+# OppMon event collection hook
+# This sends tool usage events to the OppMon API
 
 # Only send if enabled
 if [ -f ~/.tag/events_enabled ]; then
@@ -460,7 +460,7 @@ export function createDoctorCommand(): Command {
           console.log(JSON.stringify({ checks: output, summary }, null, 2))
         } else {
           console.log()
-          console.log(chalk.bold('Arkon CLI Diagnostics'))
+          console.log(chalk.bold('OppMon CLI Diagnostics'))
           console.log()
 
           for (const result of results) {

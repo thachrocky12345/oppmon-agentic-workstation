@@ -1,6 +1,6 @@
-# Arkon API
+# OppMon API
 
-Express.js backend API for the Arkon AI Gateway platform.
+Express.js backend API for the OppMon AI Gateway platform.
 
 ## Quick Start
 
@@ -40,7 +40,7 @@ pnpm dev
 See `.env.example` for all available configuration options.
 
 **Required:**
-- `DATABASE_URL` - PostgreSQL connection string (default: `postgres://arkon:arkon_dev_password@localhost:5433/arkon`)
+- `DATABASE_URL` - PostgreSQL connection string (default: `postgres://oppmon:oppmon_dev_password@localhost:5433/oppmon`)
 - `JWT_SECRET` - Secret for JWT token signing
 
 **Optional:**
@@ -193,10 +193,10 @@ SQL migrations are stored in `scripts/migrations/` and tracked in a `_migrations
 
 ```bash
 # Run all pending migrations
-pnpm --filter @arkon/api migrate
+pnpm --filter @oppmon/api migrate
 
 # Preview without applying
-pnpm --filter @arkon/api migrate --dry-run
+pnpm --filter @oppmon/api migrate --dry-run
 ```
 
 ### Creating a New Migration
@@ -218,7 +218,7 @@ pnpm --filter @arkon/api migrate --dry-run
 
 3. Run:
    ```bash
-   pnpm --filter @arkon/api migrate
+   pnpm --filter @oppmon/api migrate
    ```
 
 See `scripts/migrations/README.md` for full documentation.
@@ -238,7 +238,7 @@ This error means raw SQL is using snake_case instead of camelCase. Fix by:
 
 The database runs on port **5433** (Docker host port), not 5432:
 ```
-DATABASE_URL=postgres://arkon:arkon_dev_password@localhost:5433/arkon
+DATABASE_URL=postgres://oppmon:oppmon_dev_password@localhost:5433/oppmon
 ```
 
 ### "EADDRINUSE port 3001"

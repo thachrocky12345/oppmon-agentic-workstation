@@ -33,6 +33,8 @@ import { skillsRouter } from './routes/skills.js';
 import { llmRouter } from './routes/llm.js';
 import { embeddingRouter } from './routes/embedding.js';
 import { ragRouter } from './routes/rag.js';
+import { ragAdminRouter } from './routes/rag-admin.js';
+import { ragChatRouter } from './routes/rag-chat.js';
 import { mcpRouter } from './routes/mcp.js';
 import { usageRouter } from './routes/usage.js';
 import { teamsRouter } from './routes/teams.js';
@@ -109,6 +111,8 @@ app.use('/api/skills', requestAuth, skillsRouter);
 app.use('/api/llm', requestAuth, llmRouter);
 app.use('/api/embedding', requestAuth, embeddingRouter);
 app.use('/api/rag', requestAuth, ragRouter);
+app.use('/api/rag', requestAuth, ragChatRouter);
+app.use('/api/admin/rag', requestAuth, ragAdminRouter);
 app.use('/api/mcp', requestAuth, mcpRouter);
 app.use('/api/models', requestAuth, modelsRouter);
 app.use('/api/virtual-keys', requestAuth, virtualKeysRouter);
@@ -124,7 +128,7 @@ app.use(errorHandler);
 
 // Start server
 app.listen(port, '0.0.0.0', () => {
-  logger.info(`Arkon Backend API running on port ${port}`);
+  logger.info(`OppMon Backend API running on port ${port}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 

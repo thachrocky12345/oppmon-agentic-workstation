@@ -3,7 +3,7 @@
  * Tests AWS credentials and Bedrock model access
  */
 
-import type { ConnectionTestResult } from '@arkon/shared';
+import type { ConnectionTestResult } from '@oppmon/shared';
 import {
   type ValidationContext,
   registerValidator,

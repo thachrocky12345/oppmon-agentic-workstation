@@ -22,7 +22,7 @@ import {
 import { Request } from 'express';
 
 // Mock prisma
-vi.mock('@arkon/database', () => ({
+vi.mock('@oppmon/database', () => ({
   prisma: {
     auditLog: {
       create: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('@arkon/database', () => ({
   },
 }));
 
-import { prisma } from '@arkon/database';
+import { prisma } from '@oppmon/database';
 
 describe('Audit Service', () => {
   beforeEach(() => {

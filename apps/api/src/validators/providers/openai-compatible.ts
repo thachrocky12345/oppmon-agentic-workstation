@@ -3,8 +3,8 @@
  * Tests generic OpenAI-compatible API endpoints
  */
 
-import type { ConnectionTestResult } from '@arkon/shared';
-import { openAICompatiblePresets } from '@arkon/shared';
+import type { ConnectionTestResult } from '@oppmon/shared';
+import { openAICompatiblePresets } from '@oppmon/shared';
 import {
   type ValidationContext,
   registerValidator,
