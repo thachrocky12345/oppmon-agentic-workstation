@@ -60,7 +60,7 @@ function getAuthContext(req: AuthenticatedRequest): { tenantId: string; userId: 
 async function getUserTeamIds(tenantId: string, userId: string): Promise<string[]> {
   try {
     const result = await query(
-      `SELECT "teamId" FROM team_members WHERE "userId" = $1`,
+      `SELECT team_id AS "teamId" FROM team_members WHERE user_id = $1`,
       [userId]
     );
     return result.rows.map((row: any) => row.teamId);
@@ -82,13 +82,15 @@ async function getModelCredentials(
   try {
     // Find model by identifier and provider using raw SQL
     const result = await query(`
-      SELECT "secretRef", "publicConfig"
+      SELECT
+        secret_ref AS "secretRef",
+        public_config AS "publicConfig"
       FROM models
-      WHERE "tenantId" = $1
-        AND "modelIdentifier" = $2
-        AND "providerTemplateId" = $3
+      WHERE tenant_id = $1
+        AND model_identifier = $2
+        AND provider_template_id = $3
         AND enabled = true
-        AND "deletedAt" IS NULL
+        AND deleted_at IS NULL
       LIMIT 1
     `, [tenantId, modelIdentifier, provider]);
 

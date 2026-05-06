@@ -417,16 +417,16 @@ adminRouter.get('/llm-usage', asyncHandler(async (req: AuthenticatedRequest, res
     output_tokens: bigint;
   }>>`
     SELECT
-      DATE(lm."createdAt") as date,
+      DATE(lm.created_at) as date,
       lm.provider,
       COUNT(*) as calls,
-      COALESCE(SUM(lm."inputTokens"), 0) as input_tokens,
-      COALESCE(SUM(lm."outputTokens"), 0) as output_tokens
+      COALESCE(SUM(lm.input_tokens), 0) as input_tokens,
+      COALESCE(SUM(lm.output_tokens), 0) as output_tokens
     FROM llm_messages lm
-    JOIN llm_sessions ls ON lm."sessionId" = ls.id
-    WHERE ls."tenantId" = ${req.tenantId}
-      AND lm."createdAt" >= NOW() - INTERVAL '30 days'
-    GROUP BY DATE(lm."createdAt"), lm.provider
+    JOIN llm_sessions ls ON lm.session_id = ls.id
+    WHERE ls.tenant_id = ${req.tenantId}
+      AND lm.created_at >= NOW() - INTERVAL '30 days'
+    GROUP BY DATE(lm.created_at), lm.provider
     ORDER BY date DESC
     LIMIT 30
   `;
@@ -590,12 +590,12 @@ adminRouter.get('/llm-usage/users', asyncHandler(async (req: AuthenticatedReques
       u.email as user_email,
       COUNT(DISTINCT ls.id) as sessions,
       COUNT(lm.id) as messages,
-      COALESCE(SUM(lm."inputTokens"), 0) as input_tokens,
-      COALESCE(SUM(lm."outputTokens"), 0) as output_tokens
+      COALESCE(SUM(lm.input_tokens), 0) as input_tokens,
+      COALESCE(SUM(lm.output_tokens), 0) as output_tokens
     FROM users u
-    LEFT JOIN llm_sessions ls ON u.id = ls."userId" AND ls."tenantId" = ${req.tenantId}
-    LEFT JOIN llm_messages lm ON ls.id = lm."sessionId"
-    WHERE u."tenantId" = ${req.tenantId}
+    LEFT JOIN llm_sessions ls ON u.id = ls.user_id AND ls.tenant_id = ${req.tenantId}
+    LEFT JOIN llm_messages lm ON ls.id = lm.session_id
+    WHERE u.tenant_id = ${req.tenantId}
     GROUP BY u.id, u.name, u.email
     HAVING COUNT(lm.id) > 0
     ORDER BY output_tokens DESC

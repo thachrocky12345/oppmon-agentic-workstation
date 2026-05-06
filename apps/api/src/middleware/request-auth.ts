@@ -56,14 +56,15 @@ export async function requestAuth(
       return;
     }
 
-    // Verify user still exists and is active (Prisma uses camelCase columns)
+    // Verify user still exists and is active.
+    // DB columns are snake_case; alias preserves camelCase shape.
     const result = await query<{
       id: string;
       email: string;
       role: string;
       tenantId: string;
     }>(
-      'SELECT id, email, role, "tenantId" FROM users WHERE id = $1 AND "isActive" = true',
+      'SELECT id, email, role, tenant_id AS "tenantId" FROM users WHERE id = $1 AND is_active = true',
       [decoded.sub],
     );
 

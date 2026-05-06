@@ -23,22 +23,22 @@ costsRouter.get('/overview', asyncHandler(async (req: AuthenticatedRequest, res:
   // Get token usage from llm_messages
   const result = await query(`
     SELECT
-      COALESCE(SUM(m."inputTokens" + m."outputTokens"), 0) as total_tokens,
-      COUNT(DISTINCT DATE(m."createdAt")) as active_days,
-      COUNT(DISTINCT s."userId") as active_users
+      COALESCE(SUM(m.input_tokens + m.output_tokens), 0) as total_tokens,
+      COUNT(DISTINCT DATE(m.created_at)) as active_days,
+      COUNT(DISTINCT s.user_id) as active_users
     FROM llm_messages m
-    JOIN llm_sessions s ON s.id = m."sessionId"
-    WHERE s."tenantId" = $1 AND m."createdAt" > NOW() - ($2 || ' days')::interval
+    JOIN llm_sessions s ON s.id = m.session_id
+    WHERE s.tenant_id = $1 AND m.created_at > NOW() - ($2 || ' days')::interval
   `, [req.tenantId, days]);
 
   // Get daily trend
   const trend = await query(`
-    SELECT DATE(m."createdAt") as day,
-      SUM(m."inputTokens" + m."outputTokens") as tokens
+    SELECT DATE(m.created_at) as day,
+      SUM(m.input_tokens + m.output_tokens) as tokens
     FROM llm_messages m
-    JOIN llm_sessions s ON s.id = m."sessionId"
-    WHERE s."tenantId" = $1 AND m."createdAt" > NOW() - ($2 || ' days')::interval
-    GROUP BY DATE(m."createdAt")
+    JOIN llm_sessions s ON s.id = m.session_id
+    WHERE s.tenant_id = $1 AND m.created_at > NOW() - ($2 || ' days')::interval
+    GROUP BY DATE(m.created_at)
     ORDER BY day ASC
   `, [req.tenantId, days]);
 
@@ -80,8 +80,8 @@ costsRouter.get('/by-agent', asyncHandler(async (req: AuthenticatedRequest, res:
       COUNT(e.id) as total_events,
       COUNT(DISTINCT DATE(e.timestamp)) as active_days
     FROM agents a
-    LEFT JOIN events e ON e."agentId" = a.id AND e.timestamp > NOW() - ($2 || ' days')::interval
-    WHERE a."tenantId" = $1
+    LEFT JOIN events e ON e.agent_id = a.id AND e.timestamp > NOW() - ($2 || ' days')::interval
+    WHERE a.tenant_id = $1
     GROUP BY a.id, a.name
     ORDER BY total_events DESC
     LIMIT $3
@@ -110,14 +110,14 @@ costsRouter.get('/by-model', asyncHandler(async (req: AuthenticatedRequest, res:
     SELECT
       m.model as model_id,
       m.provider,
-      COALESCE(SUM(m."inputTokens"), 0) as input_tokens,
-      COALESCE(SUM(m."outputTokens"), 0) as output_tokens,
+      COALESCE(SUM(m.input_tokens), 0) as input_tokens,
+      COALESCE(SUM(m.output_tokens), 0) as output_tokens,
       COUNT(*) as request_count
     FROM llm_messages m
-    JOIN llm_sessions s ON s.id = m."sessionId"
-    WHERE s."tenantId" = $1 AND m."createdAt" > NOW() - ($2 || ' days')::interval
+    JOIN llm_sessions s ON s.id = m.session_id
+    WHERE s.tenant_id = $1 AND m.created_at > NOW() - ($2 || ' days')::interval
     GROUP BY m.model, m.provider
-    ORDER BY SUM(m."inputTokens") + SUM(m."outputTokens") DESC
+    ORDER BY SUM(m.input_tokens) + SUM(m.output_tokens) DESC
   `, [req.tenantId, days]);
 
   // Add calculated costs

@@ -26,10 +26,10 @@ infraRouter.get('/nodes', asyncHandler(async (req: AuthenticatedRequest, res: Re
       a.name,
       'agent' as node_type,
       a.status,
-      a."lastSeen" as last_seen,
+      a.last_seen as last_seen,
       a.config as metadata
     FROM agents a
-    WHERE a."tenantId" = $1
+    WHERE a.tenant_id = $1
     ORDER BY a.name
   `, [req.tenantId]);
 
@@ -47,11 +47,11 @@ infraRouter.get('/nodes/:id', asyncHandler(async (req: AuthenticatedRequest, res
       a.name,
       'agent' as node_type,
       a.status,
-      a."lastSeen" as last_seen,
+      a.last_seen as last_seen,
       a.config as metadata,
       a.description
     FROM agents a
-    WHERE a.id = $1 AND a."tenantId" = $2
+    WHERE a.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (result.rows.length === 0) {
@@ -88,8 +88,8 @@ infraRouter.post('/nodes/:id/action', requireRole('TENANT_ADMIN'), asyncHandler(
 
   const result = await query(`
     UPDATE agents
-    SET status = $3, "updatedAt" = NOW()
-    WHERE id = $1 AND "tenantId" = $2
+    SET status = $3, updated_at = NOW()
+    WHERE id = $1 AND tenant_id = $2
     RETURNING *
   `, [req.params.id, req.tenantId, newStatus]);
 
@@ -124,7 +124,7 @@ infraRouter.get('/topology', asyncHandler(async (req: AuthenticatedRequest, res:
       a.status,
       a.config as metadata
     FROM agents a
-    WHERE a."tenantId" = $1
+    WHERE a.tenant_id = $1
     ORDER BY a.name
   `, [req.tenantId]);
 
@@ -147,7 +147,7 @@ infraRouter.get('/report', asyncHandler(async (req: AuthenticatedRequest, res: R
       COUNT(*) FILTER (WHERE status = 'INACTIVE') as stopped,
       COUNT(*) FILTER (WHERE status = 'ERROR') as error
     FROM agents
-    WHERE "tenantId" = $1
+    WHERE tenant_id = $1
     GROUP BY 'agent'
   `, [req.tenantId]);
 
@@ -169,7 +169,7 @@ infraRouter.post('/collect', asyncHandler(async (req: AuthenticatedRequest, res:
 
   if (nodeId) {
     await query(`
-      UPDATE agents SET "lastSeen" = NOW() WHERE id = $1 AND "tenantId" = $2
+      UPDATE agents SET last_seen = NOW() WHERE id = $1 AND tenant_id = $2
     `, [nodeId, req.tenantId]);
   }
 

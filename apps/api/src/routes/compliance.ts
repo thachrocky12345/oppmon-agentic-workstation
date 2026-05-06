@@ -11,36 +11,40 @@ export const complianceRouter = Router();
 complianceRouter.use(requireRole('TENANT_ADMIN'));
 
 /**
+ * Compliance Routes
+ *
+ * NOTE: The audit table is `audit_logs` (not `audit_log_v2`).
+ * Columns: id, tenant_id, resource_type, resource_id, action, actor_id,
+ *          before_state, after_state, ip_address, user_agent, metadata, created_at
+ *
+ * Events have agent_id (not tenant_id) — tenant scoping is via JOIN to agents.
+ */
+
+/**
  * GET /api/compliance/audit-log
  * Query audit log with filters
  */
 complianceRouter.get('/audit-log', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const {
-    actorType,
     action,
-    targetType,
+    resourceType,
     startDate,
     endDate,
     limit = 100,
-    offset = 0
+    offset = 0,
   } = req.query;
 
   let whereClause = 'WHERE tenant_id = $1';
   const params: unknown[] = [req.tenantId];
 
-  if (actorType) {
-    params.push(actorType);
-    whereClause += ` AND actor_type = $${params.length}`;
-  }
-
   if (action) {
     params.push(`%${action}%`);
-    whereClause += ` AND action ILIKE $${params.length}`;
+    whereClause += ` AND action::text ILIKE $${params.length}`;
   }
 
-  if (targetType) {
-    params.push(targetType);
-    whereClause += ` AND target_type = $${params.length}`;
+  if (resourceType) {
+    params.push(resourceType);
+    whereClause += ` AND resource_type = $${params.length}`;
   }
 
   if (startDate) {
@@ -54,16 +58,26 @@ complianceRouter.get('/audit-log', asyncHandler(async (req: AuthenticatedRequest
   }
 
   const result = await query(`
-    SELECT id, actor_type, actor_id, action, target_type, target_id,
-           description, metadata, created_at, ip_address
-    FROM audit_log_v2
+    SELECT
+      id,
+      actor_id      AS "actorId",
+      action,
+      resource_type AS "resourceType",
+      resource_id   AS "resourceId",
+      before_state  AS "beforeState",
+      after_state   AS "afterState",
+      metadata,
+      ip_address    AS "ipAddress",
+      user_agent    AS "userAgent",
+      created_at    AS "createdAt"
+    FROM audit_logs
     ${whereClause}
     ORDER BY created_at DESC
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `, [...params, limit, offset]);
 
   const countResult = await query(`
-    SELECT COUNT(*) as total FROM audit_log_v2 ${whereClause}
+    SELECT COUNT(*) as total FROM audit_logs ${whereClause}
   `, params);
 
   res.json({
@@ -86,16 +100,25 @@ complianceRouter.get('/export', asyncHandler(async (req: AuthenticatedRequest, r
   }
 
   const auditLog = await query(`
-    SELECT * FROM audit_log_v2
+    SELECT * FROM audit_logs
     WHERE tenant_id = $1 AND created_at BETWEEN $2::timestamp AND $3::timestamp
     ORDER BY created_at ASC
   `, [req.tenantId, startDate, endDate]);
 
+  // Events don't have tenant_id; scope via agent
   const events = await query(`
-    SELECT id, event_type, agent_id, created_at, metadata
-    FROM events
-    WHERE tenant_id = $1 AND created_at BETWEEN $2::timestamp AND $3::timestamp
-    ORDER BY created_at ASC
+    SELECT
+      e.id,
+      e.event_type AS "eventType",
+      e.agent_id   AS "agentId",
+      e.payload,
+      e.severity,
+      e.timestamp,
+      e.created_at AS "createdAt"
+    FROM events e
+    JOIN agents a ON a.id = e.agent_id
+    WHERE a.tenant_id = $1 AND e.created_at BETWEEN $2::timestamp AND $3::timestamp
+    ORDER BY e.created_at ASC
   `, [req.tenantId, startDate, endDate]);
 
   logAudit({
@@ -142,13 +165,16 @@ complianceRouter.post('/purge', requireRole('SUPER_ADMIN'), asyncHandler(async (
 
   if (data.dryRun) {
     // Dry run - just count what would be deleted
+    // events scoped via agent join
     const eventCount = await query(`
-      SELECT COUNT(*) as count FROM events
-      WHERE tenant_id = $1 AND created_at < $2
+      SELECT COUNT(*) as count
+      FROM events e
+      JOIN agents a ON a.id = e.agent_id
+      WHERE a.tenant_id = $1 AND e.created_at < $2
     `, [req.tenantId, cutoffDate]);
 
     const auditCount = await query(`
-      SELECT COUNT(*) as count FROM audit_log_v2
+      SELECT COUNT(*) as count FROM audit_logs
       WHERE tenant_id = $1 AND created_at < $2
     `, [req.tenantId, cutoffDate]);
 
@@ -164,11 +190,14 @@ complianceRouter.post('/purge', requireRole('SUPER_ADMIN'), asyncHandler(async (
     // Actual purge
     const eventResult = await query(`
       DELETE FROM events
-      WHERE tenant_id = $1 AND created_at < $2
+      USING agents a
+      WHERE events.agent_id = a.id
+        AND a.tenant_id = $1
+        AND events.created_at < $2
     `, [req.tenantId, cutoffDate]);
 
     const auditResult = await query(`
-      DELETE FROM audit_log_v2
+      DELETE FROM audit_logs
       WHERE tenant_id = $1 AND created_at < $2
     `, [req.tenantId, cutoffDate]);
 

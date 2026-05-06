@@ -14,11 +14,14 @@ teamsRouter.use(requireRole('TENANT_ADMIN'));
 /**
  * GET /api/admin/teams
  * List all teams for the tenant
+ *
+ * NOTE: Database columns are snake_case per Prisma @map() directives.
+ * RETURNING aliases preserve camelCase for API response shape.
  */
 teamsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { search, limit = '10', offset = '0' } = req.query;
 
-  let whereClause = 'WHERE t."tenantId" = $1';
+  let whereClause = 'WHERE t.tenant_id = $1';
   const params: unknown[] = [req.tenantId];
 
   if (search) {
@@ -37,12 +40,12 @@ teamsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Respons
     SELECT
       t.id,
       t.name,
-      t."createdAt",
-      t."updatedAt",
-      (SELECT COUNT(*) FROM team_members tm WHERE tm."teamId" = t.id) as "memberCount"
+      t.created_at AS "createdAt",
+      t.updated_at AS "updatedAt",
+      (SELECT COUNT(*) FROM team_members tm WHERE tm.team_id = t.id) as "memberCount"
     FROM teams t
     ${whereClause}
-    ORDER BY t."createdAt" DESC
+    ORDER BY t.created_at DESC
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `, [...params, parseInt(limit as string), parseInt(offset as string)]);
 
@@ -67,10 +70,10 @@ teamsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Resp
     SELECT
       t.id,
       t.name,
-      t."createdAt",
-      t."updatedAt"
+      t.created_at AS "createdAt",
+      t.updated_at AS "updatedAt"
     FROM teams t
-    WHERE t.id = $1 AND t."tenantId" = $2
+    WHERE t.id = $1 AND t.tenant_id = $2
   `, [id, req.tenantId]);
 
   if (result.rows.length === 0) {
@@ -81,15 +84,15 @@ teamsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Resp
   const membersResult = await query(`
     SELECT
       tm.id,
-      tm."userId",
+      tm.user_id AS "userId",
       tm.role,
-      tm."createdAt",
+      tm.created_at AS "createdAt",
       u.email,
       u.name as "userName"
     FROM team_members tm
-    JOIN users u ON u.id = tm."userId"
-    WHERE tm."teamId" = $1
-    ORDER BY tm."createdAt" DESC
+    JOIN users u ON u.id = tm.user_id
+    WHERE tm.team_id = $1
+    ORDER BY tm.created_at DESC
   `, [id]);
 
   res.json({
@@ -113,7 +116,7 @@ teamsRouter.post('/', asyncHandler(async (req: AuthenticatedRequest, res: Respon
 
   // Check if team name already exists for this tenant
   const existing = await query(
-    'SELECT id FROM teams WHERE "tenantId" = $1 AND name = $2',
+    'SELECT id FROM teams WHERE tenant_id = $1 AND name = $2',
     [req.tenantId, data.name]
   );
 
@@ -124,9 +127,9 @@ teamsRouter.post('/', asyncHandler(async (req: AuthenticatedRequest, res: Respon
   const teamId = createId();
   const now = new Date();
   const result = await query(`
-    INSERT INTO teams (id, name, "tenantId", "createdAt", "updatedAt")
+    INSERT INTO teams (id, name, tenant_id, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5)
-    RETURNING id, name, "createdAt", "updatedAt"
+    RETURNING id, name, created_at AS "createdAt", updated_at AS "updatedAt"
   `, [teamId, data.name, req.tenantId, now, now]);
 
   logAudit({
@@ -157,7 +160,7 @@ teamsRouter.put('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Resp
 
   // Check if team exists
   const existing = await query(
-    'SELECT * FROM teams WHERE id = $1 AND "tenantId" = $2',
+    'SELECT * FROM teams WHERE id = $1 AND tenant_id = $2',
     [id, req.tenantId]
   );
 
@@ -167,7 +170,7 @@ teamsRouter.put('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Resp
 
   // Check if new name conflicts with another team
   const conflict = await query(
-    'SELECT id FROM teams WHERE "tenantId" = $1 AND name = $2 AND id != $3',
+    'SELECT id FROM teams WHERE tenant_id = $1 AND name = $2 AND id != $3',
     [req.tenantId, data.name, id]
   );
 
@@ -177,9 +180,9 @@ teamsRouter.put('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Resp
 
   const result = await query(`
     UPDATE teams
-    SET name = $1, "updatedAt" = NOW()
-    WHERE id = $2 AND "tenantId" = $3
-    RETURNING id, name, "createdAt", "updatedAt"
+    SET name = $1, updated_at = NOW()
+    WHERE id = $2 AND tenant_id = $3
+    RETURNING id, name, created_at AS "createdAt", updated_at AS "updatedAt"
   `, [data.name, id, req.tenantId]);
 
   logAudit({
@@ -205,7 +208,7 @@ teamsRouter.delete('/:id', asyncHandler(async (req: AuthenticatedRequest, res: R
   const { id } = req.params;
 
   const existing = await query(
-    'SELECT * FROM teams WHERE id = $1 AND "tenantId" = $2',
+    'SELECT * FROM teams WHERE id = $1 AND tenant_id = $2',
     [id, req.tenantId]
   );
 
@@ -244,7 +247,7 @@ teamsRouter.post('/:id/members', asyncHandler(async (req: AuthenticatedRequest, 
 
   // Check team exists
   const team = await query(
-    'SELECT id FROM teams WHERE id = $1 AND "tenantId" = $2',
+    'SELECT id FROM teams WHERE id = $1 AND tenant_id = $2',
     [id, req.tenantId]
   );
 
@@ -254,7 +257,7 @@ teamsRouter.post('/:id/members', asyncHandler(async (req: AuthenticatedRequest, 
 
   // Check user exists and belongs to same tenant
   const user = await query(
-    'SELECT id, email FROM users WHERE id = $1 AND "tenantId" = $2',
+    'SELECT id, email FROM users WHERE id = $1 AND tenant_id = $2',
     [data.userId, req.tenantId]
   );
 
@@ -264,7 +267,7 @@ teamsRouter.post('/:id/members', asyncHandler(async (req: AuthenticatedRequest, 
 
   // Check if already a member
   const existing = await query(
-    'SELECT id FROM team_members WHERE "teamId" = $1 AND "userId" = $2',
+    'SELECT id FROM team_members WHERE team_id = $1 AND user_id = $2',
     [id, data.userId]
   );
 
@@ -274,9 +277,9 @@ teamsRouter.post('/:id/members', asyncHandler(async (req: AuthenticatedRequest, 
 
   const memberId = createId();
   const result = await query(`
-    INSERT INTO team_members (id, "teamId", "userId", role)
-    VALUES ($1, $2, $3, $4)
-    RETURNING id, "userId", role, "createdAt"
+    INSERT INTO team_members (id, team_id, user_id, role, created_at)
+    VALUES ($1, $2, $3, $4, NOW())
+    RETURNING id, user_id AS "userId", role, created_at AS "createdAt"
   `, [memberId, id, data.userId, data.role]);
 
   logAudit({
@@ -302,7 +305,7 @@ teamsRouter.delete('/:id/members/:memberId', asyncHandler(async (req: Authentica
 
   // Check team exists
   const team = await query(
-    'SELECT id FROM teams WHERE id = $1 AND "tenantId" = $2',
+    'SELECT id FROM teams WHERE id = $1 AND tenant_id = $2',
     [id, req.tenantId]
   );
 
@@ -311,7 +314,7 @@ teamsRouter.delete('/:id/members/:memberId', asyncHandler(async (req: Authentica
   }
 
   const existing = await query(
-    'SELECT * FROM team_members WHERE id = $1 AND "teamId" = $2',
+    'SELECT * FROM team_members WHERE id = $1 AND team_id = $2',
     [memberId, id]
   );
 

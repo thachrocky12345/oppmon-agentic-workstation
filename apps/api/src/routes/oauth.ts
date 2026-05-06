@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from "express";
 import { generateState, OAuth2RequestError } from "arctic";
+import { createId } from "@paralleldrive/cuid2";
 import { query } from "../lib/db.js";
 import { asyncHandler, ApiError } from "../middleware/error-handler.js";
 import {
@@ -99,46 +100,49 @@ oauthRouter.get(
 
         // Upsert OAuth account
         await query(
-          `INSERT INTO oauth_accounts (user_id, provider, provider_account_id, access_token)
-           VALUES ($1, 'GITHUB', $2, $3)
+          `INSERT INTO oauth_accounts (id, user_id, provider, provider_account_id, access_token)
+           VALUES ($1, $2, 'GITHUB', $3, $4)
            ON CONFLICT (provider, provider_account_id)
-           DO UPDATE SET access_token = $3, updated_at = NOW()`,
-          [userId, githubUser.id.toString(), accessToken]
+           DO UPDATE SET access_token = $4, updated_at = NOW()`,
+          [createId(), userId, githubUser.id.toString(), accessToken]
         );
       } else {
         // New user - create tenant, user, and OAuth account
+        const newTenantId = createId();
         const tenantResult = await query<{ id: string }>(
-          `INSERT INTO tenants (name, slug) VALUES ($1, $2) RETURNING id`,
-          [name, `tenant-${Date.now()}`]
+          `INSERT INTO tenants (id, name, slug) VALUES ($1, $2, $3) RETURNING id`,
+          [newTenantId, name, `tenant-${Date.now()}`]
         );
         tenantId = tenantResult.rows[0].id;
         role = "TENANT_ADMIN" as Role;
 
+        const newUserId = createId();
         const userResult = await query<{ id: string }>(
-          `INSERT INTO users (email, name, role, tenant_id, active)
-           VALUES ($1, $2, $3, $4, true)
+          `INSERT INTO users (id, email, name, role, tenant_id, is_active)
+           VALUES ($1, $2, $3, $4, $5, true)
            RETURNING id`,
-          [email.toLowerCase(), name, role, tenantId]
+          [newUserId, email.toLowerCase(), name, role, tenantId]
         );
         userId = userResult.rows[0].id;
 
         // Create OAuth account
         await query(
-          `INSERT INTO oauth_accounts (user_id, provider, provider_account_id, access_token)
-           VALUES ($1, 'GITHUB', $2, $3)`,
-          [userId, githubUser.id.toString(), accessToken]
+          `INSERT INTO oauth_accounts (id, user_id, provider, provider_account_id, access_token)
+           VALUES ($1, $2, 'GITHUB', $3, $4)`,
+          [createId(), userId, githubUser.id.toString(), accessToken]
         );
 
         // Create default team
+        const newTeamId = createId();
         const teamResult = await query<{ id: string }>(
-          `INSERT INTO teams (name, tenant_id) VALUES ($1, $2) RETURNING id`,
-          ["Default", tenantId]
+          `INSERT INTO teams (id, name, tenant_id) VALUES ($1, $2, $3) RETURNING id`,
+          [newTeamId, "Default", tenantId]
         );
 
         // Add user to default team as admin
         await query(
-          `INSERT INTO team_members (user_id, team_id, role) VALUES ($1, $2, 'ADMIN')`,
-          [userId, teamResult.rows[0].id]
+          `INSERT INTO team_members (id, user_id, team_id, role) VALUES ($1, $2, $3, 'ADMIN')`,
+          [createId(), userId, teamResult.rows[0].id]
         );
       }
 

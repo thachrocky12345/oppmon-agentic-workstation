@@ -11,9 +11,9 @@ export const securityRouter = Router();
  * GET /api/security/overview
  * Get security overview and threat summary
  *
- * NOTE: Uses camelCase columns per Prisma convention.
+ * NOTE: Database columns are snake_case per Prisma @map() directives.
  * Events table uses 'severity' instead of 'threat_level'.
- * Filter by tenant through agents join since events don't have tenantId.
+ * Filter by tenant through agents join since events don't have tenant_id.
  */
 securityRouter.get('/overview', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   // Threat summary - group by severity (error = critical, warning = medium)
@@ -22,8 +22,8 @@ securityRouter.get('/overview', asyncHandler(async (req: AuthenticatedRequest, r
       e.severity,
       COUNT(*) as count
     FROM events e
-    JOIN agents a ON a.id = e."agentId"
-    WHERE a."tenantId" = $1
+    JOIN agents a ON a.id = e.agent_id
+    WHERE a.tenant_id = $1
       AND e.severity IN ('error', 'warning')
       AND e.timestamp > NOW() - INTERVAL '30 days'
     GROUP BY e.severity
@@ -31,10 +31,10 @@ securityRouter.get('/overview', asyncHandler(async (req: AuthenticatedRequest, r
 
   // Recent critical events (severity = error)
   const criticalEvents = await query(`
-    SELECT e.id, e."eventType", e.payload, e.severity, e.timestamp, a.name as agent_name
+    SELECT e.id, e.event_type, e.payload, e.severity, e.timestamp, a.name as agent_name
     FROM events e
-    JOIN agents a ON a.id = e."agentId"
-    WHERE a."tenantId" = $1
+    JOIN agents a ON a.id = e.agent_id
+    WHERE a.tenant_id = $1
       AND e.severity = 'error'
     ORDER BY e.timestamp DESC
     LIMIT 10
@@ -43,15 +43,15 @@ securityRouter.get('/overview', asyncHandler(async (req: AuthenticatedRequest, r
   // Anomaly detection - use error events as anomalies
   const anomalies = await query(`
     SELECT
-      e."eventType" as anomaly_type,
+      e.event_type as anomaly_type,
       COUNT(*) as count,
       MAX(e.timestamp) as latest
     FROM events e
-    JOIN agents a ON a.id = e."agentId"
-    WHERE a."tenantId" = $1
+    JOIN agents a ON a.id = e.agent_id
+    WHERE a.tenant_id = $1
       AND e.timestamp > NOW() - INTERVAL '7 days'
       AND e.severity = 'error'
-    GROUP BY e."eventType"
+    GROUP BY e.event_type
   `, [req.tenantId]);
 
   res.json({
@@ -70,7 +70,7 @@ securityRouter.get('/overview', asyncHandler(async (req: AuthenticatedRequest, r
 securityRouter.get('/threats', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { level, limit = 50, offset = 0 } = req.query;
 
-  let whereClause = `WHERE a."tenantId" = $1 AND e.severity IN ('error', 'warning')`;
+  let whereClause = `WHERE a.tenant_id = $1 AND e.severity IN ('error', 'warning')`;
   const params: unknown[] = [req.tenantId];
 
   // Map threat levels to severity
@@ -81,10 +81,10 @@ securityRouter.get('/threats', asyncHandler(async (req: AuthenticatedRequest, re
   }
 
   const result = await query(`
-    SELECT e.id, e."eventType", e."agentId", e.payload, e.severity, e.timestamp,
+    SELECT e.id, e.event_type, e.agent_id, e.payload, e.severity, e.timestamp,
            a.name as agent_name
     FROM events e
-    JOIN agents a ON a.id = e."agentId"
+    JOIN agents a ON a.id = e.agent_id
     ${whereClause}
     ORDER BY
       CASE e.severity
@@ -112,8 +112,8 @@ securityRouter.post('/threats/:id/dismiss', asyncHandler(async (req: Authenticat
   // Verify the event belongs to this tenant
   const check = await query(`
     SELECT e.id FROM events e
-    JOIN agents a ON a.id = e."agentId"
-    WHERE e.id = $1 AND a."tenantId" = $2
+    JOIN agents a ON a.id = e.agent_id
+    WHERE e.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (check.rows.length === 0) {
@@ -157,20 +157,20 @@ securityRouter.post('/threats/:id/dismiss', asyncHandler(async (req: Authenticat
 securityRouter.get('/anomalies', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { type, limit = 50 } = req.query;
 
-  let whereClause = `WHERE a."tenantId" = $1 AND e.severity = 'error'`;
+  let whereClause = `WHERE a.tenant_id = $1 AND e.severity = 'error'`;
   const params: unknown[] = [req.tenantId];
 
   if (type) {
     params.push(type);
-    whereClause += ` AND e."eventType" = $${params.length}`;
+    whereClause += ` AND e.event_type = $${params.length}`;
   }
 
   const result = await query(`
-    SELECT e.id, e."agentId", e."eventType" as anomaly_type, e.severity,
+    SELECT e.id, e.agent_id, e.event_type as anomaly_type, e.severity,
            e.payload->>'message' as description, e.timestamp as detected_at,
            a.name as agent_name
     FROM events e
-    JOIN agents a ON a.id = e."agentId"
+    JOIN agents a ON a.id = e.agent_id
     ${whereClause}
     ORDER BY e.timestamp DESC
     LIMIT $${params.length + 1}
@@ -189,8 +189,8 @@ securityRouter.post('/anomalies/:id/resolve', asyncHandler(async (req: Authentic
   // Verify the event belongs to this tenant
   const check = await query(`
     SELECT e.id FROM events e
-    JOIN agents a ON a.id = e."agentId"
-    WHERE e.id = $1 AND a."tenantId" = $2
+    JOIN agents a ON a.id = e.agent_id
+    WHERE e.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (check.rows.length === 0) {
@@ -235,10 +235,10 @@ securityRouter.get('/audit-trail', requireRole('TENANT_ADMIN'), asyncHandler(asy
 
   const result = await query(`
     SELECT * FROM audit_logs
-    WHERE "tenantId" = $1
+    WHERE tenant_id = $1
       AND action IN ('CREATE', 'UPDATE', 'DELETE', 'DENIED')
-      AND "createdAt" > NOW() - ($2::int || ' days')::interval
-    ORDER BY "createdAt" DESC
+      AND created_at > NOW() - ($2::int || ' days')::interval
+    ORDER BY created_at DESC
     LIMIT $3
   `, [req.tenantId, days, limit]);
 

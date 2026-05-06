@@ -8,32 +8,61 @@ import { logAudit, getClientIp } from '../lib/audit.js';
 export const eventsRouter = Router();
 
 /**
+ * Events Routes
+ *
+ * NOTE: events schema columns:
+ *   id, agent_id, event_type, direction, session_key, channel_id, sender,
+ *   content, payload, severity, input_tokens, output_tokens, threat_level,
+ *   timestamp, created_at
+ *
+ * There is no tenant_id column on events — tenant scoping is via JOIN to agents.
+ * There are no dismissed/redacted_* columns; those endpoints are not supported
+ * by the current schema and respond accordingly.
+ */
+
+/**
  * GET /api/events
  * List events with pagination
  */
 eventsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { agentId, eventType, threatLevel, limit = 50, offset = 0 } = req.query;
 
-  let whereClause = 'WHERE tenant_id = $1';
+  let whereClause = 'WHERE a.tenant_id = $1';
   const params: unknown[] = [req.tenantId];
 
   if (agentId) {
     params.push(agentId);
-    whereClause += ` AND agent_id = $${params.length}`;
+    whereClause += ` AND e.agent_id = $${params.length}`;
   }
 
   if (eventType) {
     params.push(eventType);
-    whereClause += ` AND event_type = $${params.length}`;
+    whereClause += ` AND e.event_type = $${params.length}`;
   }
 
   if (threatLevel) {
     params.push(threatLevel);
-    whereClause += ` AND threat_level = $${params.length}`;
+    whereClause += ` AND e.threat_level = $${params.length}`;
   }
 
   const result = await query(`
-    SELECT e.*, a.name as agent_name
+    SELECT
+      e.id,
+      e.agent_id     AS "agentId",
+      e.event_type   AS "eventType",
+      e.direction,
+      e.session_key  AS "sessionKey",
+      e.channel_id   AS "channelId",
+      e.sender,
+      e.content,
+      e.payload,
+      e.severity,
+      e.input_tokens  AS "inputTokens",
+      e.output_tokens AS "outputTokens",
+      e.threat_level  AS "threatLevel",
+      e.timestamp,
+      e.created_at    AS "createdAt",
+      a.name          AS agent_name
     FROM events e
     LEFT JOIN agents a ON a.id = e.agent_id
     ${whereClause}
@@ -42,7 +71,10 @@ eventsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Respon
   `, [...params, limit, offset]);
 
   const countResult = await query(`
-    SELECT COUNT(*) as total FROM events ${whereClause}
+    SELECT COUNT(*) as total
+    FROM events e
+    LEFT JOIN agents a ON a.id = e.agent_id
+    ${whereClause}
   `, params);
 
   res.json({
@@ -59,10 +91,26 @@ eventsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Respon
  */
 eventsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
-    SELECT e.*, a.name as agent_name
+    SELECT
+      e.id,
+      e.agent_id     AS "agentId",
+      e.event_type   AS "eventType",
+      e.direction,
+      e.session_key  AS "sessionKey",
+      e.channel_id   AS "channelId",
+      e.sender,
+      e.content,
+      e.payload,
+      e.severity,
+      e.input_tokens  AS "inputTokens",
+      e.output_tokens AS "outputTokens",
+      e.threat_level  AS "threatLevel",
+      e.timestamp,
+      e.created_at    AS "createdAt",
+      a.name          AS agent_name
     FROM events e
     LEFT JOIN agents a ON a.id = e.agent_id
-    WHERE e.id = $1 AND e.tenant_id = $2
+    WHERE e.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (result.rows.length === 0) {
@@ -75,18 +123,22 @@ eventsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Res
 /**
  * POST /api/events/:id/dismiss
  * Dismiss a threat event
+ *
+ * NOTE: events table has no dismissed/dismissed_at/dismissed_by/dismiss_reason
+ * columns. Dismissal is recorded in the audit log only.
  */
 eventsRouter.post('/:id/dismiss', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { reason } = req.body;
 
-  const result = await query(`
-    UPDATE events
-    SET dismissed = true, dismissed_at = NOW(), dismissed_by = $3, dismiss_reason = $4
-    WHERE id = $1 AND tenant_id = $2
-    RETURNING *
-  `, [req.params.id, req.tenantId, req.userId, reason || null]);
+  // Verify event exists and belongs to tenant
+  const eventResult = await query(`
+    SELECT e.id
+    FROM events e
+    JOIN agents a ON a.id = e.agent_id
+    WHERE e.id = $1 AND a.tenant_id = $2
+  `, [req.params.id, req.tenantId]);
 
-  if (result.rows.length === 0) {
+  if (eventResult.rows.length === 0) {
     throw ApiError.notFound('Event not found');
   }
 
@@ -101,12 +153,12 @@ eventsRouter.post('/:id/dismiss', asyncHandler(async (req: AuthenticatedRequest,
     ipAddress: getClientIp(req),
   });
 
-  res.json(result.rows[0]);
+  res.json({ id: req.params.id, dismissed: true, reason: reason || null });
 }));
 
 /**
  * POST /api/events/:id/redact
- * Redact sensitive data from an event
+ * Redact sensitive data from an event payload
  */
 eventsRouter.post('/:id/redact', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { fields } = req.body;
@@ -115,9 +167,12 @@ eventsRouter.post('/:id/redact', requireRole('TENANT_ADMIN'), asyncHandler(async
     throw ApiError.badRequest('Fields to redact are required');
   }
 
-  // Get the event first
+  // Get the event first (scoped via agent)
   const eventResult = await query(`
-    SELECT * FROM events WHERE id = $1 AND tenant_id = $2
+    SELECT e.id, e.payload
+    FROM events e
+    JOIN agents a ON a.id = e.agent_id
+    WHERE e.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (eventResult.rows.length === 0) {
@@ -125,22 +180,29 @@ eventsRouter.post('/:id/redact', requireRole('TENANT_ADMIN'), asyncHandler(async
   }
 
   const event = eventResult.rows[0];
-  const oldMetadata = { ...event.metadata };
+  const currentPayload = (event.payload || {}) as Record<string, unknown>;
 
-  // Redact specified fields from metadata
-  const newMetadata = { ...event.metadata };
+  // Redact specified fields from payload
+  const newPayload: Record<string, unknown> = { ...currentPayload };
   for (const field of fields) {
-    if (field in newMetadata) {
-      newMetadata[field] = '[REDACTED]';
+    if (field in newPayload) {
+      newPayload[field] = '[REDACTED]';
     }
   }
 
   const result = await query(`
     UPDATE events
-    SET metadata = $3, redacted_at = NOW(), redacted_by = $4
-    WHERE id = $1 AND tenant_id = $2
-    RETURNING *
-  `, [req.params.id, req.tenantId, newMetadata, req.userId]);
+    SET payload = $2
+    WHERE id = $1
+    RETURNING
+      id,
+      agent_id     AS "agentId",
+      event_type   AS "eventType",
+      payload,
+      severity,
+      timestamp,
+      created_at   AS "createdAt"
+  `, [req.params.id, newPayload]);
 
   logAudit({
     actorType: 'user',
@@ -162,7 +224,12 @@ eventsRouter.post('/:id/redact', requireRole('TENANT_ADMIN'), asyncHandler(async
  */
 eventsRouter.post('/:id/purge', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
-    DELETE FROM events WHERE id = $1 AND tenant_id = $2 RETURNING id
+    DELETE FROM events
+    USING agents a
+    WHERE events.id = $1
+      AND events.agent_id = a.id
+      AND a.tenant_id = $2
+    RETURNING events.id
   `, [req.params.id, req.tenantId]);
 
   if (result.rows.length === 0) {
@@ -184,7 +251,7 @@ eventsRouter.post('/:id/purge', requireRole('TENANT_ADMIN'), asyncHandler(async 
 }));
 
 const bulkPurgeSchema = z.object({
-  eventIds: z.array(z.string().uuid()).min(1).max(100),
+  eventIds: z.array(z.string()).min(1).max(100),
 });
 
 /**
@@ -196,7 +263,10 @@ eventsRouter.post('/bulk-purge', requireRole('TENANT_ADMIN'), asyncHandler(async
 
   const result = await query(`
     DELETE FROM events
-    WHERE id = ANY($1) AND tenant_id = $2
+    USING agents a
+    WHERE events.agent_id = a.id
+      AND a.tenant_id = $2
+      AND events.id = ANY($1)
   `, [data.eventIds, req.tenantId]);
 
   logAudit({

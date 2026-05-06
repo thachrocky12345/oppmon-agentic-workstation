@@ -8,48 +8,36 @@ import { logAudit, getClientIp } from '../lib/audit.js';
 export const gatewayRouter = Router();
 
 /**
+ * Gateway Routes
+ *
+ * NOTE: The current Prisma schema does not include `gateway_instances` or
+ * `active_runs` tables. Gateway lifecycle endpoints are stubbed; kill-agent
+ * still flips the agent's status to INACTIVE (the only valid AgentStatus values
+ * are ACTIVE, INACTIVE, ERROR, PENDING).
+ */
+
+/**
  * GET /api/gateway/probe
  * Check gateway health and connectivity
  */
-gatewayRouter.get('/probe', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const result = await query(`
-    SELECT status, last_heartbeat, config, metadata
-    FROM gateway_instances
-    WHERE tenant_id = $1 AND status = 'active'
-    ORDER BY last_heartbeat DESC
-    LIMIT 1
-  `, [req.tenantId]);
-
-  if (result.rows.length === 0) {
-    res.json({
-      status: 'no_gateway',
-      message: 'No active gateway instance found',
-    });
-    return;
-  }
-
-  const gateway = result.rows[0];
-  const isHealthy = new Date().getTime() - new Date(gateway.last_heartbeat).getTime() < 60000;
-
+gatewayRouter.get('/probe', asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
   res.json({
-    status: isHealthy ? 'healthy' : 'stale',
-    lastHeartbeat: gateway.last_heartbeat,
-    config: gateway.config,
+    status: 'no_gateway',
+    message: 'Gateway instance registry not yet implemented',
   });
 }));
 
 /**
  * POST /api/gateway/proxy
- * Proxy request through gateway
+ * Proxy request through gateway (placeholder)
  */
 gatewayRouter.post('/proxy', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { targetUrl, method = 'GET', headers, body } = req.body;
+  const { targetUrl, method = 'GET' } = req.body;
 
   if (!targetUrl) {
     throw ApiError.badRequest('targetUrl is required');
   }
 
-  // Log the proxy request
   logAudit({
     actorType: 'user',
     actorId: req.userId,
@@ -59,8 +47,6 @@ gatewayRouter.post('/proxy', asyncHandler(async (req: AuthenticatedRequest, res:
     ipAddress: getClientIp(req),
   });
 
-  // In production, this would proxy the request through the gateway
-  // For now, return a placeholder response
   res.json({
     message: 'Proxy request received',
     targetUrl,
@@ -70,38 +56,32 @@ gatewayRouter.post('/proxy', asyncHandler(async (req: AuthenticatedRequest, res:
 }));
 
 const killAgentSchema = z.object({
-  agentId: z.string().uuid(),
+  agentId: z.string(),
   reason: z.string().optional(),
   force: z.boolean().default(false),
 });
 
 /**
  * POST /api/gateway/kill-agent
- * Kill a running agent
+ * Kill a running agent (sets status to INACTIVE)
  */
 gatewayRouter.post('/kill-agent', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const data = killAgentSchema.parse(req.body);
 
   // Verify agent exists and belongs to tenant
   const agentResult = await query(`
-    SELECT * FROM agents WHERE id = $1 AND tenant_id = $2
+    SELECT id, status FROM agents WHERE id = $1 AND tenant_id = $2
   `, [data.agentId, req.tenantId]);
 
   if (agentResult.rows.length === 0) {
     throw ApiError.notFound('Agent not found');
   }
 
-  // Update agent status
+  // AgentStatus enum doesn't include 'killed'; mark INACTIVE
   await query(`
-    UPDATE agents SET status = 'killed', updated_at = NOW()
-    WHERE id = $1
-  `, [data.agentId]);
-
-  // Record the kill in active_runs
-  await query(`
-    UPDATE active_runs SET status = 'killed', ended_at = NOW(), kill_reason = $2
-    WHERE agent_id = $1 AND status = 'running'
-  `, [data.agentId, data.reason || 'Manual kill via gateway']);
+    UPDATE agents SET status = 'INACTIVE', updated_at = NOW()
+    WHERE id = $1 AND tenant_id = $2
+  `, [data.agentId, req.tenantId]);
 
   logAudit({
     actorType: 'user',
@@ -117,21 +97,18 @@ gatewayRouter.post('/kill-agent', requireRole('TENANT_ADMIN'), asyncHandler(asyn
   res.json({
     message: 'Agent kill signal sent',
     agentId: data.agentId,
-    status: 'killed',
+    status: 'INACTIVE',
   });
 }));
 
 /**
  * POST /api/gateway/restart-gateway
  * Restart the gateway instance
+ *
+ * NOTE: gateway_instances table does not exist; returns 501.
  */
 gatewayRouter.post('/restart-gateway', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { graceful = true } = req.body;
-
-  await query(`
-    UPDATE gateway_instances SET status = 'restarting', updated_at = NOW()
-    WHERE tenant_id = $1 AND status = 'active'
-  `, [req.tenantId]);
 
   logAudit({
     actorType: 'user',
@@ -142,22 +119,19 @@ gatewayRouter.post('/restart-gateway', requireRole('TENANT_ADMIN'), asyncHandler
     ipAddress: getClientIp(req),
   });
 
-  res.json({
-    message: 'Gateway restart initiated',
-    graceful,
+  res.status(501).json({
+    error: 'Gateway lifecycle management not yet implemented',
+    message: 'gateway_instances table is not present in this schema.',
   });
 }));
 
 /**
  * POST /api/gateway/stop-gateway
  * Stop the gateway instance
+ *
+ * NOTE: gateway_instances table does not exist; returns 501.
  */
 gatewayRouter.post('/stop-gateway', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  await query(`
-    UPDATE gateway_instances SET status = 'stopped', updated_at = NOW()
-    WHERE tenant_id = $1 AND status IN ('active', 'restarting')
-  `, [req.tenantId]);
-
   logAudit({
     actorType: 'user',
     actorId: req.userId,
@@ -166,7 +140,8 @@ gatewayRouter.post('/stop-gateway', requireRole('TENANT_ADMIN'), asyncHandler(as
     ipAddress: getClientIp(req),
   });
 
-  res.json({
-    message: 'Gateway stopped',
+  res.status(501).json({
+    error: 'Gateway lifecycle management not yet implemented',
+    message: 'gateway_instances table is not present in this schema.',
   });
 }));

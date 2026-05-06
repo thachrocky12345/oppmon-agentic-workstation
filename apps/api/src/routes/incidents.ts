@@ -12,7 +12,7 @@ export const incidentsRouter = Router();
  * Incidents Routes
  *
  * Uses the incidents table from Prisma schema.
- * Column names use camelCase per Prisma convention.
+ * Database columns are snake_case per Prisma @map() directives.
  */
 
 const createIncidentSchema = z.object({
@@ -29,7 +29,7 @@ const createIncidentSchema = z.object({
 incidentsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { status, severity, limit = 10, offset = 0 } = req.query;
 
-  let whereClause = `WHERE a."tenantId" = $1`;
+  let whereClause = `WHERE a.tenant_id = $1`;
   const params: unknown[] = [req.tenantId];
 
   if (status) {
@@ -44,9 +44,9 @@ incidentsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Res
 
   const result = await query(`
     SELECT i.*, a.name as agent_name,
-      (SELECT COUNT(*) FROM incident_updates iu WHERE iu."incidentId" = i.id) as update_count
+      (SELECT COUNT(*) FROM incident_updates iu WHERE iu.incident_id = i.id) as update_count
     FROM incidents i
-    JOIN agents a ON a.id = i."agentId"
+    JOIN agents a ON a.id = i.agent_id
     ${whereClause}
     ORDER BY
       CASE i.severity
@@ -55,14 +55,14 @@ incidentsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Res
         WHEN 'MEDIUM' THEN 3
         WHEN 'LOW' THEN 4
       END,
-      i."createdAt" DESC
+      i.created_at DESC
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `, [...params, limit, offset]);
 
   const countResult = await query(`
     SELECT COUNT(*) as total
     FROM incidents i
-    JOIN agents a ON a.id = i."agentId"
+    JOIN agents a ON a.id = i.agent_id
     ${whereClause}
   `, params);
 
@@ -82,8 +82,8 @@ incidentsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
   const result = await query(`
     SELECT i.*, a.name as agent_name
     FROM incidents i
-    JOIN agents a ON a.id = i."agentId"
-    WHERE i.id = $1 AND a."tenantId" = $2
+    JOIN agents a ON a.id = i.agent_id
+    WHERE i.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (result.rows.length === 0) {
@@ -94,9 +94,9 @@ incidentsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
   const updates = await query(`
     SELECT iu.*, u.name as user_name
     FROM incident_updates iu
-    JOIN users u ON u.id = iu."userId"
-    WHERE iu."incidentId" = $1
-    ORDER BY iu."createdAt" DESC
+    JOIN users u ON u.id = iu.user_id
+    WHERE iu.incident_id = $1
+    ORDER BY iu.created_at DESC
   `, [req.params.id]);
 
   res.json({
@@ -114,7 +114,7 @@ incidentsRouter.post('/', asyncHandler(async (req: AuthenticatedRequest, res: Re
 
   // Verify agent belongs to tenant
   const agentCheck = await query(`
-    SELECT id FROM agents WHERE id = $1 AND "tenantId" = $2
+    SELECT id FROM agents WHERE id = $1 AND tenant_id = $2
   `, [data.agentId, req.tenantId]);
 
   if (agentCheck.rows.length === 0) {
@@ -123,7 +123,7 @@ incidentsRouter.post('/', asyncHandler(async (req: AuthenticatedRequest, res: Re
 
   const incidentId = createId();
   const result = await query(`
-    INSERT INTO incidents (id, "agentId", title, description, severity, status, "createdAt")
+    INSERT INTO incidents (id, agent_id, title, description, severity, status, created_at)
     VALUES ($1, $2, $3, $4, $5, 'OPEN', NOW())
     RETURNING *
   `, [incidentId, data.agentId, data.title, data.description, data.severity]);
@@ -157,8 +157,8 @@ incidentsRouter.put('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
   // Verify incident belongs to tenant's agent
   const currentResult = await query(`
     SELECT i.* FROM incidents i
-    JOIN agents a ON a.id = i."agentId"
-    WHERE i.id = $1 AND a."tenantId" = $2
+    JOIN agents a ON a.id = i.agent_id
+    WHERE i.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (currentResult.rows.length === 0) {
@@ -173,7 +173,7 @@ incidentsRouter.put('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
     updates.push(`status = $${paramIndex++}`);
     values.push(data.status);
     if (data.status === 'RESOLVED' || data.status === 'CLOSED') {
-      updates.push(`"resolvedAt" = NOW()`);
+      updates.push(`resolved_at = NOW()`);
     }
   }
 
@@ -223,8 +223,8 @@ incidentsRouter.post('/:id/updates', asyncHandler(async (req: AuthenticatedReque
   // Verify incident exists and belongs to tenant
   const incidentResult = await query(`
     SELECT i.id FROM incidents i
-    JOIN agents a ON a.id = i."agentId"
-    WHERE i.id = $1 AND a."tenantId" = $2
+    JOIN agents a ON a.id = i.agent_id
+    WHERE i.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (incidentResult.rows.length === 0) {
@@ -233,7 +233,7 @@ incidentsRouter.post('/:id/updates', asyncHandler(async (req: AuthenticatedReque
 
   const updateId = createId();
   const result = await query(`
-    INSERT INTO incident_updates (id, "incidentId", "userId", message, "createdAt")
+    INSERT INTO incident_updates (id, incident_id, user_id, message, created_at)
     VALUES ($1, $2, $3, $4, NOW())
     RETURNING *
   `, [updateId, req.params.id, req.userId, data.message]);
@@ -249,8 +249,8 @@ incidentsRouter.get('/:id/updates', asyncHandler(async (req: AuthenticatedReques
   // Verify incident exists and belongs to tenant
   const incidentResult = await query(`
     SELECT i.id FROM incidents i
-    JOIN agents a ON a.id = i."agentId"
-    WHERE i.id = $1 AND a."tenantId" = $2
+    JOIN agents a ON a.id = i.agent_id
+    WHERE i.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (incidentResult.rows.length === 0) {
@@ -260,9 +260,9 @@ incidentsRouter.get('/:id/updates', asyncHandler(async (req: AuthenticatedReques
   const result = await query(`
     SELECT iu.*, u.name as user_name
     FROM incident_updates iu
-    JOIN users u ON u.id = iu."userId"
-    WHERE iu."incidentId" = $1
-    ORDER BY iu."createdAt" DESC
+    JOIN users u ON u.id = iu.user_id
+    WHERE iu.incident_id = $1
+    ORDER BY iu.created_at DESC
   `, [req.params.id]);
 
   res.json({ data: result.rows });

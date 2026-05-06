@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import { createId } from '@paralleldrive/cuid2';
 import { query } from '../lib/db.js';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { AuthenticatedRequest, requireRole } from '../middleware/request-auth.js';
@@ -28,26 +29,26 @@ const createEntrySchema = z.object({
 journalRouter.get('/entries', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { agentId, limit = 20, offset = 0 } = req.query;
 
-  let whereClause = `WHERE a."tenantId" = $1`;
+  let whereClause = `WHERE a.tenant_id = $1`;
   const params: unknown[] = [req.tenantId];
 
   if (agentId) {
     params.push(agentId);
-    whereClause += ` AND e."agentId" = $${params.length}`;
+    whereClause += ` AND e.agent_id = $${params.length}`;
   }
 
   // Use events as journal entries
   const result = await query(`
     SELECT
       e.id,
-      e."agentId" as agent_id,
+      e.agent_id as agent_id,
       a.name as agent_name,
-      e."eventType" as type,
+      e.event_type as type,
       e.payload,
       e.severity,
       e.timestamp as created_at
     FROM events e
-    JOIN agents a ON a.id = e."agentId"
+    JOIN agents a ON a.id = e.agent_id
     ${whereClause}
     ORDER BY e.timestamp DESC
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -56,7 +57,7 @@ journalRouter.get('/entries', asyncHandler(async (req: AuthenticatedRequest, res
   const countResult = await query(`
     SELECT COUNT(*) as total
     FROM events e
-    JOIN agents a ON a.id = e."agentId"
+    JOIN agents a ON a.id = e.agent_id
     ${whereClause}
   `, params);
 
@@ -76,8 +77,8 @@ journalRouter.get('/entries/:id', asyncHandler(async (req: AuthenticatedRequest,
   const result = await query(`
     SELECT e.*, a.name as agent_name
     FROM events e
-    JOIN agents a ON a.id = e."agentId"
-    WHERE e.id = $1 AND a."tenantId" = $2
+    JOIN agents a ON a.id = e.agent_id
+    WHERE e.id = $1 AND a.tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (result.rows.length === 0) {
@@ -98,7 +99,7 @@ journalRouter.post('/entries', asyncHandler(async (req: AuthenticatedRequest, re
   let agentId = data.agentId;
   if (agentId) {
     const agentCheck = await query(`
-      SELECT id FROM agents WHERE id = $1 AND "tenantId" = $2
+      SELECT id FROM agents WHERE id = $1 AND tenant_id = $2
     `, [agentId, req.tenantId]);
 
     if (agentCheck.rows.length === 0) {
@@ -107,7 +108,7 @@ journalRouter.post('/entries', asyncHandler(async (req: AuthenticatedRequest, re
   } else {
     // Get first agent for tenant
     const defaultAgent = await query(`
-      SELECT id FROM agents WHERE "tenantId" = $1 LIMIT 1
+      SELECT id FROM agents WHERE tenant_id = $1 LIMIT 1
     `, [req.tenantId]);
 
     if (defaultAgent.rows.length === 0) {
@@ -116,11 +117,13 @@ journalRouter.post('/entries', asyncHandler(async (req: AuthenticatedRequest, re
     agentId = defaultAgent.rows[0].id;
   }
 
+  const eventId = createId();
   const result = await query(`
-    INSERT INTO events ("agentId", "eventType", payload, severity, timestamp)
-    VALUES ($1, $2, $3, $4, NOW())
+    INSERT INTO events (id, agent_id, event_type, payload, severity, timestamp, created_at)
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
     RETURNING *
   `, [
+    eventId,
     agentId,
     'JOURNAL',
     JSON.stringify({ title: data.title, content: data.content, tags: data.tags || [], visibility: data.visibility }),
@@ -138,7 +141,7 @@ journalRouter.delete('/entries/:id', asyncHandler(async (req: AuthenticatedReque
   const result = await query(`
     DELETE FROM events e
     USING agents a
-    WHERE e.id = $1 AND e."agentId" = a.id AND a."tenantId" = $2
+    WHERE e.id = $1 AND e.agent_id = a.id AND a.tenant_id = $2
     RETURNING e.id
   `, [req.params.id, req.tenantId]);
 

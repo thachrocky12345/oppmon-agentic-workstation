@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import { createId } from '@paralleldrive/cuid2';
 import { query } from '../lib/db.js';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { AuthenticatedRequest, requireRole } from '../middleware/request-auth.js';
@@ -11,7 +12,7 @@ export const workflowsRouter = Router();
  * Workflows Routes
  *
  * Uses the workflows table from Prisma schema.
- * Column names use camelCase per Prisma convention.
+ * Database columns are snake_case per Prisma @map() directives.
  */
 
 const createWorkflowSchema = z.object({
@@ -29,11 +30,11 @@ workflowsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Res
 
   const result = await query(`
     SELECT w.*,
-      (SELECT COUNT(*) FROM workflow_runs wr WHERE wr."workflowId" = w.id) as total_runs,
-      (SELECT MAX(wr."startedAt") FROM workflow_runs wr WHERE wr."workflowId" = w.id) as last_run
+      (SELECT COUNT(*) FROM workflow_runs wr WHERE wr.workflow_id = w.id) as total_runs,
+      (SELECT MAX(wr.started_at) FROM workflow_runs wr WHERE wr.workflow_id = w.id) as last_run
     FROM workflows w
-    WHERE w."tenantId" = $1
-    ORDER BY w."createdAt" DESC
+    WHERE w.tenant_id = $1
+    ORDER BY w.created_at DESC
     LIMIT $2 OFFSET $3
   `, [req.tenantId, limit, offset]);
 
@@ -46,7 +47,7 @@ workflowsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Res
  */
 workflowsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
-    SELECT * FROM workflows WHERE id = $1 AND "tenantId" = $2
+    SELECT * FROM workflows WHERE id = $1 AND tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (result.rows.length === 0) {
@@ -56,8 +57,8 @@ workflowsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
   // Get recent runs
   const runs = await query(`
     SELECT * FROM workflow_runs
-    WHERE "workflowId" = $1
-    ORDER BY "startedAt" DESC
+    WHERE workflow_id = $1
+    ORDER BY started_at DESC
     LIMIT 10
   `, [req.params.id]);
 
@@ -74,11 +75,13 @@ workflowsRouter.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
 workflowsRouter.post('/', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const data = createWorkflowSchema.parse(req.body);
 
+  const workflowId = createId();
   const result = await query(`
-    INSERT INTO workflows (name, description, definition, "tenantId", "isActive")
-    VALUES ($1, $2, $3, $4, false)
+    INSERT INTO workflows (id, name, description, definition, tenant_id, is_active, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, false, NOW(), NOW())
     RETURNING *
   `, [
+    workflowId,
     data.name,
     data.description || null,
     JSON.stringify(data.definition || {}),
@@ -107,14 +110,14 @@ workflowsRouter.put('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
   const data = createWorkflowSchema.partial().parse(req.body);
 
   const currentResult = await query(`
-    SELECT * FROM workflows WHERE id = $1 AND "tenantId" = $2
+    SELECT * FROM workflows WHERE id = $1 AND tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (currentResult.rows.length === 0) {
     throw ApiError.notFound('Workflow not found');
   }
 
-  const updates: string[] = ['"updatedAt" = NOW()'];
+  const updates: string[] = ['updated_at = NOW()'];
   const values: unknown[] = [];
   let paramIndex = 1;
 
@@ -137,7 +140,7 @@ workflowsRouter.put('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
 
   const result = await query(`
     UPDATE workflows SET ${updates.join(', ')}
-    WHERE id = $${paramIndex++} AND "tenantId" = $${paramIndex}
+    WHERE id = $${paramIndex++} AND tenant_id = $${paramIndex}
     RETURNING *
   `, values);
 
@@ -162,8 +165,8 @@ workflowsRouter.put('/:id', asyncHandler(async (req: AuthenticatedRequest, res: 
  */
 workflowsRouter.post('/:id/activate', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
-    UPDATE workflows SET "isActive" = true, "updatedAt" = NOW()
-    WHERE id = $1 AND "tenantId" = $2
+    UPDATE workflows SET is_active = true, updated_at = NOW()
+    WHERE id = $1 AND tenant_id = $2
     RETURNING *
   `, [req.params.id, req.tenantId]);
 
@@ -190,8 +193,8 @@ workflowsRouter.post('/:id/activate', asyncHandler(async (req: AuthenticatedRequ
  */
 workflowsRouter.post('/:id/deactivate', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
-    UPDATE workflows SET "isActive" = false, "updatedAt" = NOW()
-    WHERE id = $1 AND "tenantId" = $2
+    UPDATE workflows SET is_active = false, updated_at = NOW()
+    WHERE id = $1 AND tenant_id = $2
     RETURNING *
   `, [req.params.id, req.tenantId]);
 
@@ -220,18 +223,19 @@ workflowsRouter.post('/:id/run', asyncHandler(async (req: AuthenticatedRequest, 
   const { input } = req.body;
 
   const workflowResult = await query(`
-    SELECT * FROM workflows WHERE id = $1 AND "tenantId" = $2
+    SELECT * FROM workflows WHERE id = $1 AND tenant_id = $2
   `, [req.params.id, req.tenantId]);
 
   if (workflowResult.rows.length === 0) {
     throw ApiError.notFound('Workflow not found');
   }
 
+  const runId = createId();
   const runResult = await query(`
-    INSERT INTO workflow_runs ("workflowId", status, context, "startedAt")
-    VALUES ($1, 'pending', $2, NOW())
+    INSERT INTO workflow_runs (id, workflow_id, status, context, started_at)
+    VALUES ($1, $2, 'pending', $3, NOW())
     RETURNING *
-  `, [req.params.id, JSON.stringify(input || {})]);
+  `, [runId, req.params.id, JSON.stringify(input || {})]);
 
   logAudit({
     actorType: 'user',
@@ -253,7 +257,7 @@ workflowsRouter.post('/:id/run', asyncHandler(async (req: AuthenticatedRequest, 
  */
 workflowsRouter.delete('/:id', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
-    DELETE FROM workflows WHERE id = $1 AND "tenantId" = $2
+    DELETE FROM workflows WHERE id = $1 AND tenant_id = $2
     RETURNING id
   `, [req.params.id, req.tenantId]);
 

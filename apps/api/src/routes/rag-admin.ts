@@ -82,7 +82,7 @@ ragAdminRouter.get('/collections', asyncHandler(async (req: AuthenticatedRequest
 
   // Get user's team memberships
   const teamResult = await query(`
-    SELECT "teamId" FROM team_members WHERE "userId" = $1
+    SELECT team_id AS "teamId" FROM team_members WHERE user_id = $1
   `, [userId]);
   const teamIds = teamResult.rows.map((r: any) => r.teamId);
 
@@ -95,12 +95,12 @@ ragAdminRouter.get('/collections', asyncHandler(async (req: AuthenticatedRequest
   const params: unknown[] = [tenantId];
 
   if (isTenantAdmin) {
-    whereClause = `WHERE c."tenantId" = $1 AND c."deletedAt" IS NULL`;
+    whereClause = `WHERE c.tenant_id = $1 AND c.deleted_at IS NULL`;
   } else {
     whereClause = `
-      WHERE c."tenantId" = $1
-      AND c."deletedAt" IS NULL
-      AND (c.scope = 'TENANT' OR c."teamId" = ANY($2))
+      WHERE c.tenant_id = $1
+      AND c.deleted_at IS NULL
+      AND (c.scope = 'TENANT' OR c.team_id = ANY($2))
     `;
     params.push(teamIds);
   }
@@ -113,17 +113,20 @@ ragAdminRouter.get('/collections', asyncHandler(async (req: AuthenticatedRequest
   // Get collections with document counts
   const result = await query(`
     SELECT
-      c.id, c.name, c.description, c.scope, c."teamId",
-      c."createdById", c."createdAt", c."updatedAt",
-      COUNT(d.id) FILTER (WHERE d."deletedAt" IS NULL) as document_count,
-      COALESCE(SUM(d."chunkCount") FILTER (WHERE d."deletedAt" IS NULL), 0) as total_chunks,
+      c.id, c.name, c.description, c.scope,
+      c.team_id AS "teamId",
+      c.created_by_id AS "createdById",
+      c.created_at AS "createdAt",
+      c.updated_at AS "updatedAt",
+      COUNT(d.id) FILTER (WHERE d.deleted_at IS NULL) as document_count,
+      COALESCE(SUM(d.chunk_count) FILTER (WHERE d.deleted_at IS NULL), 0) as total_chunks,
       t.name as team_name
     FROM rag_collections c
-    LEFT JOIN rag_documents d ON d."collectionId" = c.id
-    LEFT JOIN teams t ON t.id = c."teamId"
+    LEFT JOIN rag_documents d ON d.collection_id = c.id
+    LEFT JOIN teams t ON t.id = c.team_id
     ${whereClause}
     GROUP BY c.id, t.name
-    ORDER BY c."createdAt" DESC
+    ORDER BY c.created_at DESC
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `, [...params, queryParams.limit, queryParams.offset]);
 
@@ -152,8 +155,8 @@ ragAdminRouter.get('/collections/:id', asyncHandler(async (req: AuthenticatedReq
   const result = await query(`
     SELECT c.*, t.name as team_name
     FROM rag_collections c
-    LEFT JOIN teams t ON t.id = c."teamId"
-    WHERE c.id = $1 AND c."tenantId" = $2 AND c."deletedAt" IS NULL
+    LEFT JOIN teams t ON t.id = c.team_id
+    WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL
   `, [req.params.id, tenantId]);
 
   if (result.rows.length === 0) {
@@ -163,12 +166,18 @@ ragAdminRouter.get('/collections/:id', asyncHandler(async (req: AuthenticatedReq
   // Get recent documents
   const documents = await query(`
     SELECT
-      id, "originalFilename", "mimeType", "sizeBytes",
-      "extractionStatus", "extractionError", "chunkCount",
-      "createdAt", "updatedAt"
+      id,
+      original_filename AS "originalFilename",
+      mime_type AS "mimeType",
+      size_bytes AS "sizeBytes",
+      extraction_status AS "extractionStatus",
+      extraction_error AS "extractionError",
+      chunk_count AS "chunkCount",
+      created_at AS "createdAt",
+      updated_at AS "updatedAt"
     FROM rag_documents
-    WHERE "collectionId" = $1 AND "deletedAt" IS NULL
-    ORDER BY "createdAt" DESC
+    WHERE collection_id = $1 AND deleted_at IS NULL
+    ORDER BY created_at DESC
     LIMIT 50
   `, [req.params.id]);
 
@@ -192,7 +201,7 @@ ragAdminRouter.post('/collections', requireRole('TEAM_ADMIN', 'TENANT_ADMIN'), a
   if (input.scope === 'TEAM' && input.teamId) {
     const teamCheck = await query(`
       SELECT tm.role FROM team_members tm
-      WHERE tm."userId" = $1 AND tm."teamId" = $2
+      WHERE tm.user_id = $1 AND tm.team_id = $2
     `, [userId, input.teamId]);
 
     if (teamCheck.rows.length === 0) {
@@ -212,7 +221,7 @@ ragAdminRouter.post('/collections', requireRole('TEAM_ADMIN', 'TENANT_ADMIN'), a
 
   const collectionId = createId();
   const result = await query(`
-    INSERT INTO rag_collections (id, "tenantId", name, description, scope, "teamId", "createdById", "createdAt", "updatedAt")
+    INSERT INTO rag_collections (id, tenant_id, name, description, scope, team_id, created_by_id, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
     RETURNING *
   `, [
@@ -249,8 +258,8 @@ ragAdminRouter.patch('/collections/:id', requireRole('TEAM_ADMIN', 'TENANT_ADMIN
 
   // Check collection exists and user has access
   const current = await query(`
-    SELECT * FROM rag_collections
-    WHERE id = $1 AND "tenantId" = $2 AND "deletedAt" IS NULL
+    SELECT *, team_id AS "teamId" FROM rag_collections
+    WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
   `, [req.params.id, tenantId]);
 
   if (current.rows.length === 0) {
@@ -262,7 +271,7 @@ ragAdminRouter.patch('/collections/:id', requireRole('TEAM_ADMIN', 'TENANT_ADMIN
   // Check permission
   if (collection.scope === 'TEAM' && collection.teamId) {
     const teamCheck = await query(`
-      SELECT role FROM team_members WHERE "userId" = $1 AND "teamId" = $2
+      SELECT role FROM team_members WHERE user_id = $1 AND team_id = $2
     `, [userId, collection.teamId]);
 
     if (teamCheck.rows.length === 0 || (teamCheck.rows[0].role !== 'ADMIN' && req.user?.role !== 'TENANT_ADMIN')) {
@@ -272,7 +281,7 @@ ragAdminRouter.patch('/collections/:id', requireRole('TEAM_ADMIN', 'TENANT_ADMIN
     throw ApiError.forbidden('Only tenant admins can update tenant-scoped collections');
   }
 
-  const updates: string[] = ['"updatedAt" = NOW()'];
+  const updates: string[] = ['updated_at = NOW()'];
   const values: unknown[] = [];
   let paramIndex = 1;
 
@@ -290,7 +299,7 @@ ragAdminRouter.patch('/collections/:id', requireRole('TEAM_ADMIN', 'TENANT_ADMIN
 
   const result = await query(`
     UPDATE rag_collections SET ${updates.join(', ')}
-    WHERE id = $${paramIndex++} AND "tenantId" = $${paramIndex}
+    WHERE id = $${paramIndex++} AND tenant_id = $${paramIndex}
     RETURNING *
   `, values);
 
@@ -319,7 +328,7 @@ ragAdminRouter.delete('/collections/:id', requireRole('TEAM_ADMIN', 'TENANT_ADMI
   // Check collection exists
   const current = await query(`
     SELECT * FROM rag_collections
-    WHERE id = $1 AND "tenantId" = $2 AND "deletedAt" IS NULL
+    WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
   `, [req.params.id, tenantId]);
 
   if (current.rows.length === 0) {
@@ -335,14 +344,14 @@ ragAdminRouter.delete('/collections/:id', requireRole('TEAM_ADMIN', 'TENANT_ADMI
 
   // Soft delete collection
   await query(`
-    UPDATE rag_collections SET "deletedAt" = NOW()
-    WHERE id = $1 AND "tenantId" = $2
+    UPDATE rag_collections SET deleted_at = NOW()
+    WHERE id = $1 AND tenant_id = $2
   `, [req.params.id, tenantId]);
 
   // Soft delete all documents
   await query(`
-    UPDATE rag_documents SET "deletedAt" = NOW()
-    WHERE "collectionId" = $1
+    UPDATE rag_documents SET deleted_at = NOW()
+    WHERE collection_id = $1
   `, [req.params.id]);
 
   logAudit({
@@ -412,8 +421,8 @@ ragAdminRouter.post('/collections/:collectionId/documents', requireRole('TEAM_AD
 
   // Verify collection exists and user has access
   const collectionResult = await query(`
-    SELECT * FROM rag_collections
-    WHERE id = $1 AND "tenantId" = $2 AND "deletedAt" IS NULL
+    SELECT *, team_id AS "teamId" FROM rag_collections
+    WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
   `, [req.params.collectionId, tenantId]);
 
   if (collectionResult.rows.length === 0) {
@@ -425,7 +434,7 @@ ragAdminRouter.post('/collections/:collectionId/documents', requireRole('TEAM_AD
   // Check permission for team-scoped collections
   if (collection.scope === 'TEAM' && collection.teamId) {
     const teamCheck = await query(`
-      SELECT role FROM team_members WHERE "userId" = $1 AND "teamId" = $2
+      SELECT role FROM team_members WHERE user_id = $1 AND team_id = $2
     `, [userId, collection.teamId]);
 
     if (teamCheck.rows.length === 0 || (teamCheck.rows[0].role !== 'ADMIN' && req.user?.role !== 'TENANT_ADMIN')) {
@@ -471,7 +480,7 @@ ragAdminRouter.post('/collections/:collectionId/documents', requireRole('TEAM_AD
         // Check for duplicate
         const existingDoc = await query(`
           SELECT id FROM rag_documents
-          WHERE "collectionId" = $1 AND "fileSha256" = $2 AND "deletedAt" IS NULL
+          WHERE collection_id = $1 AND file_sha256 = $2 AND deleted_at IS NULL
         `, [req.params.collectionId, storageResult.sha256]);
 
         if (existingDoc.rows.length > 0) {
@@ -488,9 +497,9 @@ ragAdminRouter.post('/collections/:collectionId/documents', requireRole('TEAM_AD
         // Insert document record
         const docResult = await query(`
           INSERT INTO rag_documents (
-            id, "collectionId", "tenantId", "originalFilename", "mimeType",
-            "sizeBytes", "filePath", "fileSha256", "extractionStatus", "uploadedById",
-            "createdAt", "updatedAt"
+            id, collection_id, tenant_id, original_filename, mime_type,
+            size_bytes, file_path, file_sha256, extraction_status, uploaded_by_id,
+            created_at, updated_at
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9, NOW(), NOW())
           RETURNING *
         `, [
@@ -550,10 +559,10 @@ ragAdminRouter.get('/documents/:id', asyncHandler(async (req: AuthenticatedReque
   const { tenantId } = getAuthContext(req);
 
   const result = await query(`
-    SELECT d.*, c.name as collection_name, c.scope, c."teamId"
+    SELECT d.*, c.name as collection_name, c.scope, c.team_id AS "teamId"
     FROM rag_documents d
-    JOIN rag_collections c ON c.id = d."collectionId"
-    WHERE d.id = $1 AND d."tenantId" = $2 AND d."deletedAt" IS NULL
+    JOIN rag_collections c ON c.id = d.collection_id
+    WHERE d.id = $1 AND d.tenant_id = $2 AND d.deleted_at IS NULL
   `, [req.params.id, tenantId]);
 
   if (result.rows.length === 0) {
@@ -574,8 +583,8 @@ ragAdminRouter.get('/documents/:id/chunks', asyncHandler(async (req: Authenticat
   // Verify document exists and user has access
   const docResult = await query(`
     SELECT d.id FROM rag_documents d
-    JOIN rag_collections c ON c.id = d."collectionId"
-    WHERE d.id = $1 AND d."tenantId" = $2 AND d."deletedAt" IS NULL
+    JOIN rag_collections c ON c.id = d.collection_id
+    WHERE d.id = $1 AND d.tenant_id = $2 AND d.deleted_at IS NULL
   `, [documentId, tenantId]);
 
   if (docResult.rows.length === 0) {
@@ -588,16 +597,22 @@ ragAdminRouter.get('/documents/:id/chunks', asyncHandler(async (req: Authenticat
   const offset = (page - 1) * limit;
 
   const chunksResult = await query(`
-    SELECT id, "chunkIndex", content, "tokenCount", "pageNumber", "createdAt"
+    SELECT
+      id,
+      chunk_index AS "chunkIndex",
+      content,
+      token_count AS "tokenCount",
+      page_number AS "pageNumber",
+      created_at AS "createdAt"
     FROM rag_chunks
-    WHERE "documentId" = $1 AND "tenantId" = $2
-    ORDER BY "chunkIndex"
+    WHERE document_id = $1 AND tenant_id = $2
+    ORDER BY chunk_index
     LIMIT $3 OFFSET $4
   `, [documentId, tenantId, limit, offset]);
 
   const countResult = await query(`
     SELECT COUNT(*) as total FROM rag_chunks
-    WHERE "documentId" = $1 AND "tenantId" = $2
+    WHERE document_id = $1 AND tenant_id = $2
   `, [documentId, tenantId]);
 
   res.json({
@@ -619,9 +634,12 @@ ragAdminRouter.get('/documents/:id/status', asyncHandler(async (req: Authenticat
   const { tenantId } = getAuthContext(req);
 
   const result = await query(`
-    SELECT "extractionStatus", "extractionError", "chunkCount"
+    SELECT
+      extraction_status AS "extractionStatus",
+      extraction_error AS "extractionError",
+      chunk_count AS "chunkCount"
     FROM rag_documents
-    WHERE id = $1 AND "tenantId" = $2 AND "deletedAt" IS NULL
+    WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
   `, [req.params.id, tenantId]);
 
   if (result.rows.length === 0) {
@@ -639,10 +657,10 @@ ragAdminRouter.post('/documents/:id/reindex', requireRole('TEAM_ADMIN', 'TENANT_
   const { tenantId, userId } = getAuthContext(req);
 
   const result = await query(`
-    SELECT d.*, c.scope, c."teamId"
+    SELECT d.*, c.scope, c.team_id AS "teamId"
     FROM rag_documents d
-    JOIN rag_collections c ON c.id = d."collectionId"
-    WHERE d.id = $1 AND d."tenantId" = $2 AND d."deletedAt" IS NULL
+    JOIN rag_collections c ON c.id = d.collection_id
+    WHERE d.id = $1 AND d.tenant_id = $2 AND d.deleted_at IS NULL
   `, [req.params.id, tenantId]);
 
   if (result.rows.length === 0) {
@@ -650,12 +668,12 @@ ragAdminRouter.post('/documents/:id/reindex', requireRole('TEAM_ADMIN', 'TENANT_
   }
 
   // Delete existing chunks
-  await query(`DELETE FROM rag_chunks WHERE "documentId" = $1`, [req.params.id]);
+  await query(`DELETE FROM rag_chunks WHERE document_id = $1`, [req.params.id]);
 
   // Reset status
   await query(`
     UPDATE rag_documents
-    SET "extractionStatus" = 'PENDING', "extractionError" = NULL, "chunkCount" = 0, "updatedAt" = NOW()
+    SET extraction_status = 'PENDING', extraction_error = NULL, chunk_count = 0, updated_at = NOW()
     WHERE id = $1
   `, [req.params.id]);
 
@@ -685,10 +703,10 @@ ragAdminRouter.delete('/documents/:id', requireRole('TEAM_ADMIN', 'TENANT_ADMIN'
   const { tenantId, userId } = getAuthContext(req);
 
   const result = await query(`
-    SELECT d.*, c.scope, c."teamId"
+    SELECT d.*, c.scope, c.team_id AS "teamId"
     FROM rag_documents d
-    JOIN rag_collections c ON c.id = d."collectionId"
-    WHERE d.id = $1 AND d."tenantId" = $2 AND d."deletedAt" IS NULL
+    JOIN rag_collections c ON c.id = d.collection_id
+    WHERE d.id = $1 AND d.tenant_id = $2 AND d.deleted_at IS NULL
   `, [req.params.id, tenantId]);
 
   if (result.rows.length === 0) {
@@ -697,7 +715,7 @@ ragAdminRouter.delete('/documents/:id', requireRole('TEAM_ADMIN', 'TENANT_ADMIN'
 
   // Soft delete document (chunks will be orphaned but ignored in queries)
   await query(`
-    UPDATE rag_documents SET "deletedAt" = NOW() WHERE id = $1
+    UPDATE rag_documents SET deleted_at = NOW() WHERE id = $1
   `, [req.params.id]);
 
   logAudit({
@@ -722,10 +740,15 @@ ragAdminRouter.get('/documents/:id/view', asyncHandler(async (req: Authenticated
   const { tenantId, userId } = getAuthContext(req);
 
   const result = await query(`
-    SELECT d.*, c.scope, c."teamId"
+    SELECT
+      d.*,
+      d.original_filename AS "originalFilename",
+      d.mime_type AS "mimeType",
+      c.scope,
+      c.team_id AS "teamId"
     FROM rag_documents d
-    JOIN rag_collections c ON c.id = d."collectionId"
-    WHERE d.id = $1 AND d."tenantId" = $2 AND d."deletedAt" IS NULL
+    JOIN rag_collections c ON c.id = d.collection_id
+    WHERE d.id = $1 AND d.tenant_id = $2 AND d.deleted_at IS NULL
   `, [req.params.id, tenantId]);
 
   if (result.rows.length === 0) {
@@ -738,7 +761,7 @@ ragAdminRouter.get('/documents/:id/view', asyncHandler(async (req: Authenticated
   // Check team access for team-scoped collections
   if (doc.scope === 'TEAM' && doc.teamId) {
     const teamCheck = await query(`
-      SELECT 1 FROM team_members WHERE "userId" = $1 AND "teamId" = $2
+      SELECT 1 FROM team_members WHERE user_id = $1 AND team_id = $2
     `, [userId, doc.teamId]);
 
     if (teamCheck.rows.length === 0 && req.user?.role !== 'TENANT_ADMIN') {
@@ -778,14 +801,18 @@ ragAdminRouter.get('/documents/:id/view', asyncHandler(async (req: Authenticated
 async function processDocumentExtraction(documentId: string, tenantId: string): Promise<void> {
   // Update status to extracting
   await query(`
-    UPDATE rag_documents SET "extractionStatus" = 'EXTRACTING', "updatedAt" = NOW()
+    UPDATE rag_documents SET extraction_status = 'EXTRACTING', updated_at = NOW()
     WHERE id = $1
   `, [documentId]);
 
   try {
     // Get document info
     const docResult = await query(`
-      SELECT * FROM rag_documents WHERE id = $1
+      SELECT
+        *,
+        original_filename AS "originalFilename",
+        mime_type AS "mimeType"
+      FROM rag_documents WHERE id = $1
     `, [documentId]);
 
     if (docResult.rows.length === 0) {
@@ -859,7 +886,7 @@ async function processDocumentExtraction(documentId: string, tenantId: string): 
         const embeddingResult = embeddingResponse.embeddings[j];
 
         await query(`
-          INSERT INTO rag_chunks (id, "documentId", "tenantId", "chunkIndex", content, "tokenCount", embedding, "createdAt")
+          INSERT INTO rag_chunks (id, document_id, tenant_id, chunk_index, content, token_count, embedding, created_at)
           VALUES ($1, $2, $3, $4, $5, $6, $7::vector, NOW())
         `, [
           createId(),
@@ -878,7 +905,7 @@ async function processDocumentExtraction(documentId: string, tenantId: string): 
     // Update document status
     await query(`
       UPDATE rag_documents
-      SET "extractionStatus" = 'EXTRACTED', "chunkCount" = $2, "updatedAt" = NOW()
+      SET extraction_status = 'EXTRACTED', chunk_count = $2, updated_at = NOW()
       WHERE id = $1
     `, [documentId, totalChunks]);
 
@@ -887,7 +914,7 @@ async function processDocumentExtraction(documentId: string, tenantId: string): 
 
     await query(`
       UPDATE rag_documents
-      SET "extractionStatus" = 'FAILED', "extractionError" = $2, "updatedAt" = NOW()
+      SET extraction_status = 'FAILED', extraction_error = $2, updated_at = NOW()
       WHERE id = $1
     `, [documentId, (error as Error).message]);
   }
