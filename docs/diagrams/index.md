@@ -1,6 +1,6 @@
 # Architecture Diagrams
 
-**Last Updated:** 2026-05-07 (init sync)
+**Last Updated:** 2026-05-07 (post migration ID-cutover consolidation)
 
 This directory contains Mermaid architecture diagrams for the OppMon (Arkon) project.
 
@@ -10,14 +10,14 @@ This directory contains Mermaid architecture diagrams for the OppMon (Arkon) pro
 |------|-------------|--------------|
 | [architecture.md](architecture.md) | System component overview with LLM/RAG services | 2026-05-07 (init sync) |
 | [dependencies.md](dependencies.md) | Package dependency graph (monorepo structure) | 2026-05-07 (init sync) |
-| [data-model.md](data-model.md) | Entity relationship diagram (Prisma schema) | 2026-05-07 (init sync) |
+| [data-model.md](data-model.md) | Full DB inventory: 82 tables across 11 domains, per-domain ERDs, migration error→fix lookup, ops quick-reference | 2026-05-07 (post migration cutover) |
 | [deployment.md](deployment.md) | Docker Compose deployment architecture | 2026-05-07 (init sync) |
 
 ## Quick Links
 
 - **System Architecture**: How components connect (frontend, API, router, database, LLM providers, agent subsystem, guardrails, CLI)
 - **Dependencies**: Package graph for the monorepo including router app, agent-engine, guardrails, observability, skill-framework
-- **Data Model**: Database schema with multi-tenancy, skills, LLM sessions, embeddings, MCP servers, usage analytics, models, virtual keys, routing state
+- **Data Model**: Comprehensive DB schema reference covering all 82 tables across Identity & Tenancy, Agent Runtime, LLM/Routing/MCP, Memory Subsystem, RAG, Journal, Workflows/Skills, Audit & Usage, Notifications, Infrastructure & Cost, Security & Rate Limit. Includes pgvector dimensions, TimescaleDB hypertables, RLS policies, idempotent migration patterns, and an error→fix lookup for the seven legacy migrations consolidated on 2026-05-09.
 - **Deployment**: Docker services (oppmon-*), ports, volumes, and profiles + production Swarm stack
 
 ## Usage

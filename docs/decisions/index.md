@@ -1,8 +1,15 @@
 # Architecture Decision Records
 
-**Last Updated:** 2026-05-07 (init sync)
+**Last Updated:** 2026-05-09 (post migration cutover + tenant/user review)
 
 This directory contains Architecture Decision Records (ADRs) for the OppMon (Arkon) project.
+
+## Active WIP / Handoff Notes
+
+| File | Topic | Date |
+|------|-------|------|
+| [WIP-2026-05-09-migration-id-cutover.md](WIP-2026-05-09-migration-id-cutover.md) | TEXT-id cutover, legacy migration consolidation, error→fix lookup | 2026-05-09 |
+| [WIP-2026-05-09-tenant-user-gap-review.md](WIP-2026-05-09-tenant-user-gap-review.md) | Identity & Tenancy domain code review against the new data-model; RLS / token-version / tenant-context wiring gaps | 2026-05-09 |
 
 ## What is an ADR?
 

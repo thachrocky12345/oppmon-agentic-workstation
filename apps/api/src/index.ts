@@ -45,7 +45,13 @@ import { cliRoutingRouter } from './routes/cli-routing.js';
 // Import middleware
 import { errorHandler } from './middleware/error-handler.js';
 import { requestAuth, optionalAuth } from './middleware/request-auth.js';
+import { tenantContext } from './middleware/tenant-context.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
+
+// Bundle: requestAuth then tenantContext. Every authenticated route gets a
+// `req.dbTx` factory that wraps Prisma transactions with the correct
+// `app.current_tenant` GUC for RLS enforcement.
+const authChain = [requestAuth, tenantContext];
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -90,35 +96,35 @@ app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/auth', oauthRouter);
 
-// Protected routes
-app.use('/api/agents', requestAuth, agentsRouter);
-app.use('/api/events', requestAuth, eventsRouter);
-app.use('/api/dashboard', requestAuth, dashboardRouter);
-app.use('/api/admin', requestAuth, adminRouter);
-app.use('/api/admin/teams', requestAuth, teamsRouter);
-app.use('/api/analytics', requestAuth, analyticsRouter);
-app.use('/api/compliance', requestAuth, complianceRouter);
-app.use('/api/costs', requestAuth, costsRouter);
-app.use('/api/tools', requestAuth, toolsRouter);
-app.use('/api/workflows', requestAuth, workflowsRouter);
-app.use('/api/gateway', requestAuth, gatewayRouter);
-app.use('/api/infra', requestAuth, infraRouter);
-app.use('/api/journal', requestAuth, journalRouter);
-app.use('/api/incidents', requestAuth, incidentsRouter);
-app.use('/api/notifications', requestAuth, notificationsRouter);
-app.use('/api/security', requestAuth, securityRouter);
-app.use('/api/skills', requestAuth, skillsRouter);
-app.use('/api/llm', requestAuth, llmRouter);
-app.use('/api/embedding', requestAuth, embeddingRouter);
-app.use('/api/rag', requestAuth, ragRouter);
-app.use('/api/rag', requestAuth, ragChatRouter);
-app.use('/api/admin/rag', requestAuth, ragAdminRouter);
-app.use('/api/mcp', requestAuth, mcpRouter);
+// Protected routes — authChain = [requestAuth, tenantContext]
+app.use('/api/agents', authChain, agentsRouter);
+app.use('/api/events', authChain, eventsRouter);
+app.use('/api/dashboard', authChain, dashboardRouter);
+app.use('/api/admin', authChain, adminRouter);
+app.use('/api/admin/teams', authChain, teamsRouter);
+app.use('/api/analytics', authChain, analyticsRouter);
+app.use('/api/compliance', authChain, complianceRouter);
+app.use('/api/costs', authChain, costsRouter);
+app.use('/api/tools', authChain, toolsRouter);
+app.use('/api/workflows', authChain, workflowsRouter);
+app.use('/api/gateway', authChain, gatewayRouter);
+app.use('/api/infra', authChain, infraRouter);
+app.use('/api/journal', authChain, journalRouter);
+app.use('/api/incidents', authChain, incidentsRouter);
+app.use('/api/notifications', authChain, notificationsRouter);
+app.use('/api/security', authChain, securityRouter);
+app.use('/api/skills', authChain, skillsRouter);
+app.use('/api/llm', authChain, llmRouter);
+app.use('/api/embedding', authChain, embeddingRouter);
+app.use('/api/rag', authChain, ragRouter);
+app.use('/api/rag', authChain, ragChatRouter);
+app.use('/api/admin/rag', authChain, ragAdminRouter);
+app.use('/api/mcp', authChain, mcpRouter);
 // Alias: frontend admin pages call /api/admin/mcp; same router.
-app.use('/api/admin/mcp', requestAuth, mcpRouter);
-app.use('/api/models', requestAuth, modelsRouter);
-app.use('/api/virtual-keys', requestAuth, virtualKeysRouter);
-app.use('/api/cli', requestAuth, cliRoutingRouter);
+app.use('/api/admin/mcp', authChain, mcpRouter);
+app.use('/api/models', authChain, modelsRouter);
+app.use('/api/virtual-keys', authChain, virtualKeysRouter);
+app.use('/api/cli', authChain, cliRoutingRouter);
 
 // Usage API - Uses optionalAuth for privacy-first design
 // POST /events returns 204 even without auth (graceful degradation)
