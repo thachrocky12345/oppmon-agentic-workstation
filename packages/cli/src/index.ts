@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * OppMon CLI - tag command
+ * OppMon CLI - oppmon command
  *
- * AI Gateway management CLI for skills, MCP servers, and RAG.
+ * AI Gateway management CLI for skills, MCP servers, RAG, and chat.
  */
 
 import { Command, CommanderError } from 'commander'
@@ -16,6 +16,7 @@ import { createInitCommand } from './commands/init.js'
 import { createHooksCommand } from './commands/hooks.js'
 import { createEventsCommand } from './commands/events.js'
 import { createDoctorCommand } from './commands/doctor.js'
+import { createChatCommand } from './commands/chat.js'
 import { loadTokensCache } from './lib/credentials.js'
 
 const program = new Command()
@@ -24,7 +25,7 @@ const program = new Command()
 const VERSION = '0.1.0'
 
 program
-  .name('tag')
+  .name('oppmon')
   .description('OppMon CLI - AI Gateway management tool')
   .version(VERSION, '-v, --version', 'Output the current version')
   .helpOption('-h, --help', 'Display help for command')
@@ -45,57 +46,61 @@ program.addCommand(createInitCommand())
 program.addCommand(createHooksCommand())
 program.addCommand(createEventsCommand())
 program.addCommand(createDoctorCommand())
+program.addCommand(createChatCommand())
 
 // Add examples to help output
 program.addHelpText('after', `
 ${chalk.bold('Examples:')}
-  $ tag login                    # Authenticate with OAuth device flow
-  $ tag login --headless         # Authenticate using TAG_TOKEN env var
-  $ tag status                   # Show current auth status
-  $ tag logout                   # Clear stored credentials
+  $ oppmon login                       # Authenticate with OAuth device flow
+  $ oppmon login --headless            # Authenticate using TAG_TOKEN env var
+  $ oppmon status                      # Show current auth status
+  $ oppmon logout                      # Clear stored credentials
+
+${chalk.bold('Chat (RAG-grounded):')}
+  $ oppmon chat                        # Interactive REPL
+  $ oppmon chat "summarize the docs"   # One-shot
+  $ oppmon chat -p ollama -m llama3.2:latest -c <colId> "your question"
+  $ oppmon chat --no-stream "..."      # Non-streaming response
 
 ${chalk.bold('Project Init:')}
-  $ tag init                     # Interactive project setup wizard
-  $ tag init --team my-team      # Initialize with specific team
-  $ tag init --yes               # Accept all defaults (non-interactive)
+  $ oppmon init                        # Interactive project setup wizard
+  $ oppmon init --team my-team         # Initialize with specific team
+  $ oppmon init --yes                  # Accept all defaults
 
 ${chalk.bold('Skills Sync:')}
-  $ tag sync skills list         # Show sync status of all skills
-  $ tag sync skills push         # Push all local skills to remote
-  $ tag sync skills push myskill # Push specific skill
-  $ tag sync skills pull         # Pull all remote skills to local
+  $ oppmon sync skills list            # Show sync status of all skills
+  $ oppmon sync skills push            # Push all local skills to remote
+  $ oppmon sync skills pull            # Pull all remote skills to local
 
 ${chalk.bold('MCP Sync:')}
-  $ tag sync mcp list            # Show sync status of MCP servers
-  $ tag sync mcp push            # Push all local MCP servers to remote
-  $ tag sync mcp push myserver   # Push specific MCP server
-  $ tag sync mcp pull            # Pull all remote MCP servers to local
+  $ oppmon sync mcp list               # Show sync status of MCP servers
+  $ oppmon sync mcp push               # Push all local MCP servers to remote
+  $ oppmon sync mcp pull               # Pull all remote MCP servers to local
 
 ${chalk.bold('RAG Ingestion:')}
-  $ tag rag ingest README.md     # Ingest a single document
-  $ tag rag ingest-dir ./docs    # Ingest all documents in a directory
-  $ tag rag search "how to auth" # Semantic search across embeddings
-  $ tag rag query "explain auth" # Full RAG query with LLM response
-  $ tag rag list                 # List all embeddings
-  $ tag rag stats                # Show embedding statistics
-  $ tag rag status               # Show RAG pipeline status
+  $ oppmon rag ingest README.md        # Ingest a single document
+  $ oppmon rag ingest-dir ./docs       # Ingest all documents in a directory
+  $ oppmon rag search "how to auth"    # Semantic search across embeddings
+  $ oppmon rag query "explain auth"    # Full RAG query with LLM response
+  $ oppmon rag list                    # List all embeddings
+  $ oppmon rag stats                   # Show embedding statistics
+  $ oppmon rag status                  # Show RAG pipeline status
 
 ${chalk.bold('Event Collection:')}
-  $ tag hooks install            # Install Claude Code event hook
-  $ tag hooks uninstall          # Remove event hook
-  $ tag hooks status             # Check hook installation
-  $ tag events enable            # Enable event collection
-  $ tag events disable           # Disable event collection
-  $ tag events status            # Show event collection status
-  $ tag events flush             # Manually flush buffered events
+  $ oppmon hooks install               # Install Claude Code event hook
+  $ oppmon hooks uninstall             # Remove event hook
+  $ oppmon hooks status                # Check hook installation
+  $ oppmon events enable               # Enable event collection
+  $ oppmon events disable              # Disable event collection
+  $ oppmon events status               # Show event collection status
+  $ oppmon events flush                # Manually flush buffered events
 
 ${chalk.bold('Diagnostics:')}
-  $ tag doctor                   # Run all diagnostic checks
-  $ tag doctor auth              # Check authentication only
-  $ tag doctor network           # Check API connectivity only
-  $ tag doctor claude            # Check Claude Code integration
-  $ tag doctor sync              # Check sync state
-  $ tag doctor --fix             # Attempt to auto-fix issues
+  $ oppmon doctor                      # Run all diagnostic checks
+  $ oppmon doctor auth                 # Check authentication only
+  $ oppmon doctor network              # Check API connectivity only
+  $ oppmon doctor sync                 # Check sync state
+  $ oppmon doctor --fix                # Attempt to auto-fix issues
 
 ${chalk.bold('Environment Variables:')}
   TAG_API_URL    API endpoint (default: http://localhost:3001)
@@ -123,7 +128,7 @@ program.on('command:*', (operands) => {
     console.error(chalk.yellow(`\nDid you mean: ${similar.join(', ')}?`))
   }
 
-  console.error(chalk.gray(`\nRun 'tag --help' for available commands.\n`))
+  console.error(chalk.gray(`\nRun 'oppmon --help' for available commands.\n`))
   process.exit(1)
 })
 
@@ -159,10 +164,10 @@ main().catch((error) => {
     console.error(chalk.yellow('\n💡 Hint: Make sure the API server is running (pnpm dev:api)'))
     console.error(chalk.gray('   You can also set TAG_API_URL to point to a different server.\n'))
   } else if (message.includes('Unauthorized') || message.includes('401')) {
-    console.error(chalk.yellow('\n💡 Hint: Run "tag login" to authenticate first.'))
+    console.error(chalk.yellow('\n💡 Hint: Run "oppmon login" to authenticate first.'))
     console.error(chalk.gray('   Or set TAG_TOKEN environment variable for headless auth.\n'))
   } else if (message.includes('Not authenticated')) {
-    console.error(chalk.yellow('\n💡 Hint: Run "tag login" to authenticate.'))
+    console.error(chalk.yellow('\n💡 Hint: Run "oppmon login" to authenticate.'))
   } else if (message.includes('ENOENT')) {
     console.error(chalk.yellow('\n💡 Hint: File or directory not found. Check the path and try again.\n'))
   }

@@ -1,9 +1,10 @@
 {
   "name": "@oppmon/cli",
   "version": "0.1.0",
-  "description": "OppMon CLI - tag command for AI Gateway management",
+  "description": "OppMon CLI - oppmon command for AI Gateway management",
   "type": "module",
   "bin": {
+    "oppmon": "./dist/index.js",
     "tag": "./dist/index.js"
   },
   "main": "./dist/index.js",
