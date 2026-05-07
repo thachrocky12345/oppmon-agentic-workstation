@@ -2,7 +2,8 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../lib/db.js';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
-import { AuthenticatedRequest, requireRole } from '../middleware/request-auth.js';
+import { AuthenticatedRequest } from '../middleware/request-auth.js';
+import { requireRole, requireSystemTenant } from '../middleware/rbac.js';
 import { logAudit, getClientIp } from '../lib/audit.js';
 
 export const complianceRouter = Router();
@@ -28,6 +29,7 @@ complianceRouter.get('/audit-log', asyncHandler(async (req: AuthenticatedRequest
   const {
     action,
     resourceType,
+    actorId,
     startDate,
     endDate,
     limit = 100,
@@ -45,6 +47,11 @@ complianceRouter.get('/audit-log', asyncHandler(async (req: AuthenticatedRequest
   if (resourceType) {
     params.push(resourceType);
     whereClause += ` AND resource_type = $${params.length}`;
+  }
+
+  if (actorId) {
+    params.push(actorId);
+    whereClause += ` AND actor_id = $${params.length}`;
   }
 
   if (startDate) {
@@ -158,7 +165,7 @@ const purgeSchema = z.object({
  * POST /api/compliance/purge
  * Purge old data based on retention policy
  */
-complianceRouter.post('/purge', requireRole('SUPER_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+complianceRouter.post('/purge', requireSystemTenant(), requireRole('SYSTEM_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const data = purgeSchema.parse(req.body);
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - data.retentionDays);

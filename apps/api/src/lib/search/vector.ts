@@ -48,14 +48,14 @@ export async function vectorSearch(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
-        AND "sourceType" = ANY(${sourceTypes})
+      WHERE tenant_id = ${tenantId}
+        AND source_type = ANY(${sourceTypes})
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}
@@ -64,14 +64,14 @@ export async function vectorSearch(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
-        AND "sourceId" = ANY(${sourceIds})
+      WHERE tenant_id = ${tenantId}
+        AND source_id = ANY(${sourceIds})
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}
@@ -80,13 +80,13 @@ export async function vectorSearch(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
+      WHERE tenant_id = ${tenantId}
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}
@@ -131,14 +131,14 @@ export async function vectorSearchWithEmbedding(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
-        AND "sourceType" = ANY(${sourceTypes})
+      WHERE tenant_id = ${tenantId}
+        AND source_type = ANY(${sourceTypes})
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}
@@ -147,14 +147,14 @@ export async function vectorSearchWithEmbedding(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
-        AND "sourceId" = ANY(${sourceIds})
+      WHERE tenant_id = ${tenantId}
+        AND source_id = ANY(${sourceIds})
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}
@@ -163,13 +163,13 @@ export async function vectorSearchWithEmbedding(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
+      WHERE tenant_id = ${tenantId}
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}

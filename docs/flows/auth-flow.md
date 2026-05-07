@@ -1,6 +1,6 @@
 # Authentication Flow
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
 ## Overview
 

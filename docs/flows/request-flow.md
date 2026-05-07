@@ -1,168 +1,74 @@
 # Request Flow
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
 ## Overview
 
-This diagram shows the complete lifecycle of an API request from the client through the Express backend to the database and back. The backend is located at `apps/api/`.
+This diagram shows the complete lifecycle of an API request from the client through Next.js (with `middleware.ts` using `jose`) into the Express backend at `apps/api/`. LLM-bound traffic from CLIs and SDKs may bypass `apps/web` and hit `apps/router/` (LiteLLM proxy) directly.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as Client
-    participant N as Next.js
-    participant M as Middleware
-    participant R as Router
-    participant S as Service
-    participant P as Prisma
-    participant D as PostgreSQL
+    participant C as Client (Browser / CLI / Agent)
+    participant N as Next.js (apps/web)
+    participant MW as web middleware.ts (jose)
+    participant Rtr as Router (apps/router)
+    participant Mdw as API Middleware Chain
+    participant Rt as Route Handler (apps/api/src/routes/*)
+    participant Sv as Service (apps/api/src/services/*)
+    participant Ag as Agent Subsystem (optional)
+    participant G as Guardrails
+    participant DB as Prisma → PostgreSQL
+    participant LLM as LLM Provider
 
-    C->>N: HTTP Request
-    Note over N: Server Component or<br/>API Route Proxy
-
-    N->>M: Forward to Backend<br/>/api/*
-
-    rect rgb(255, 245, 238)
-        Note over M: Middleware Chain
-        M->>M: morgan (logging)
-        M->>M: helmet (security headers)
-        M->>M: cors (origin validation)
-        M->>M: compression (gzip)
-        M->>M: express.json (body parsing)
-        M->>M: cookie-parser (cookies)
+    alt UI request
+        C->>N: HTTP request
+        N->>MW: middleware.ts (verify JWT cookie via jose)
+        MW-->>N: allow / redirect to /login
+        N->>Mdw: REST :3001 (cookies + Bearer)
+    else Direct API / CLI
+        C->>Mdw: REST :3001
+    else LLM proxy
+        C->>Rtr: POST /v1/chat/completions
+        Rtr->>DB: lookup virtual_key → tenant
+        Rtr->>LLM: forward (http-proxy-middleware)
+        LLM-->>Rtr: stream
+        Rtr-->>C: stream
     end
 
-    M->>R: Route Handler
-
-    alt Protected Route
-        R->>R: JWT Verification (request-auth.ts)
-        R-->>C: 401 if invalid
+    Mdw->>Mdw: morgan / helmet / cors / compression / cookie-parser / rate-limit
+    Mdw->>Mdw: request-auth.ts (JWT) + rbac.ts
+    Mdw->>Rt: req with claims
+    Rt->>Sv: invoke service
+    opt Agent path
+        Sv->>Ag: oracle loop / semantic cache / toolbox
+        Ag->>G: scope + constitution + filter checks
+        G-->>Ag: allow / deny + audit
+        Ag->>LLM: completion (Anthropic / Cerebras / Ollama)
+        LLM-->>Ag: tokens
     end
-
-    alt RBAC Protected
-        R->>R: RBAC Check (rbac.ts)
-        R-->>C: 403 if forbidden
-    end
-
-    R->>R: Zod Validation
-    R-->>C: 400 if invalid
-
-    R->>S: Service Method
-
-    rect rgb(232, 245, 233)
-        Note over S,D: Business Logic
-        S->>P: Prisma Query
-        P->>D: SQL
-        D-->>P: Result
-        P-->>S: Typed Result
-        S->>S: Transform Data
-    end
-
-    S-->>R: Service Result
-    R-->>M: Response Object
-    M-->>N: JSON Response
-    N-->>C: HTTP Response
-
-    Note over C,D: Total latency tracked<br/>via response headers
+    Sv->>DB: prisma.* (snake_case columns via @map)
+    DB-->>Sv: rows
+    Sv-->>Rt: data
+    Rt-->>Mdw: JSON
+    Mdw-->>N: response
+    N-->>C: render
 ```
 
-## Middleware Stack
+## Middleware Chain
 
-The Express app applies middleware in this order (defined in `apps/api/src/index.ts`):
+1. `morgan` — HTTP access log
+2. `helmet` — security headers
+3. `cors` — cross-origin
+4. `compression` — gzip
+5. `cookie-parser` — parse cookies
+6. `request-auth.ts` — JWT verification (skips public paths)
+7. `rbac.ts` — role / scope check
+8. `rate-limiter.ts` — per-route limits
+9. Route handler → service → Prisma → response
+10. `error-handler.ts` — last-resort error formatter
 
-| Order | Middleware | File | Purpose |
-|-------|------------|------|---------|
-| 1 | `morgan` | (built-in) | HTTP request logging |
-| 2 | `helmet` | (built-in) | Security headers (CSP, HSTS, etc.) |
-| 3 | `cors` | (built-in) | Cross-origin request handling |
-| 4 | `compression` | (built-in) | Gzip response compression |
-| 5 | `express.json` | (built-in) | JSON body parsing |
-| 6 | `cookie-parser` | (built-in) | Cookie parsing |
-| 7 | `requestAuth` | `middleware/request-auth.ts` | JWT verification (on protected routes) |
-| 8 | `rbac` | `middleware/rbac.ts` | Role-based access control |
-| 9 | `rateLimiter` | `middleware/rate-limiter.ts` | Rate limiting |
-| 10 | `errorHandler` | `middleware/error-handler.ts` | Standardized error responses |
+## Notes
 
-## Request Validation
-
-```mermaid
-flowchart TD
-    A[Incoming Request] --> B{Has Body?}
-    B -->|Yes| C[Parse JSON]
-    B -->|No| D{Has Query Params?}
-    C --> E[Zod Schema Validation]
-    D -->|Yes| E
-    D -->|No| F[Route Handler]
-    E -->|Valid| F
-    E -->|Invalid| G[400 Bad Request]
-    G --> H[Error Response]
-    F --> I[Service Layer]
-    I --> J[Prisma Client]
-    J --> K[PostgreSQL]
-```
-
-## Response Format
-
-### Success Response
-```json
-{
-  "success": true,
-  "data": { /* payload */ },
-  "meta": {
-    "timestamp": "2026-05-05T12:00:00Z",
-    "requestId": "cuid_abc123"
-  }
-}
-```
-
-### Error Response
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input",
-    "details": [
-      { "field": "email", "message": "Invalid email format" }
-    ]
-  },
-  "meta": {
-    "timestamp": "2026-05-05T12:00:00Z",
-    "requestId": "cuid_abc123"
-  }
-}
-```
-
-## Key Routes (apps/api/src/routes/)
-
-| Method | Path | File | Description |
-|--------|------|------|-------------|
-| GET | /api/health | `health.ts` | Health check (liveness/readiness) |
-| POST | /api/auth/login | `auth.ts` | User authentication |
-| POST | /api/auth/register | `auth.ts` | User registration |
-| GET | /api/auth/github | `oauth.ts` | GitHub OAuth initiate |
-| GET | /api/auth/github/callback | `oauth.ts` | GitHub OAuth callback |
-| GET | /api/agents | `agents.ts` | List agents |
-| POST | /api/events | `events.ts` | Ingest event |
-| GET | /api/dashboard | `dashboard.ts` | Dashboard metrics |
-| GET | /api/workflows | `workflows.ts` | List workflows |
-| GET | /api/incidents | `incidents.ts` | List incidents |
-| GET | /api/analytics | `analytics.ts` | Usage analytics |
-| GET | /api/costs | `costs.ts` | Cost tracking |
-| GET | /api/security | `security.ts` | Security overview |
-| GET | /api/compliance | `compliance.ts` | Compliance data |
-| POST | /api/gateway/* | `gateway.ts` | AI Gateway proxy |
-| GET | /api/notifications | `notifications.ts` | User notifications |
-| GET | /api/infra | `infra.ts` | Infrastructure nodes |
-| GET | /api/journal | `journal.ts` | Agent journals |
-| GET/POST | /api/skills | `skills.ts` | Skills registry |
-| POST | /api/llm/chat | `llm.ts` | LLM chat completion |
-| POST | /api/rag/query | `rag.ts` | RAG context retrieval |
-| POST | /api/rag/chat | `rag-chat.ts` | RAG-augmented chat completion |
-| GET/POST | /api/rag/admin | `rag-admin.ts` | RAG document management |
-| POST | /api/embedding | `embedding.ts` | Generate embeddings |
-| GET/POST | /api/teams | `teams.ts` | Team management |
-| GET | /api/usage | `usage.ts` | Usage analytics (privacy-first) |
-| GET/POST | /api/models | `models.ts` | Model configuration |
-| GET/POST | /api/virtual-keys | `virtual-keys.ts` | Virtual key management |
-| POST | /api/cli/routing | `cli-routing.ts` | CLI model routing |
+- The frontend's `middleware.ts` uses `jose` to verify the JWT at the edge before rendering protected pages.
+- The router (`apps/router`) is a separate Express service for LLM traffic — it does not run the full middleware chain because the API still owns auth/audit for non-LLM endpoints.

@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { query, transaction } from '../lib/db.js';
 import { prisma } from '@oppmon/database';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
-import { AuthenticatedRequest, requireRole } from '../middleware/request-auth.js';
+import { AuthenticatedRequest } from '../middleware/request-auth.js';
+import { requireRole, requireSystemTenant } from '../middleware/rbac.js';
 import { logAudit, getClientIp } from '../lib/audit.js';
 import { listSkills, createSkill, deleteSkill, type SkillFilter } from '../services/skills.js';
 import { listProvidersWithRegistry } from '../services/llm.js';
@@ -17,7 +18,7 @@ adminRouter.use(requireRole('TENANT_ADMIN'));
  * GET /api/admin/tenants
  * List all tenants (super admin only)
  */
-adminRouter.get('/tenants', requireRole('SUPER_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+adminRouter.get('/tenants', requireSystemTenant(), requireRole('SYSTEM_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
     SELECT id, name, domain, plan, created_at, settings
     FROM tenants
@@ -122,7 +123,7 @@ adminRouter.get('/crons', asyncHandler(async (req: AuthenticatedRequest, res: Re
  * GET /api/admin/infra-costs
  * Get infrastructure cost breakdown
  */
-adminRouter.get('/infra-costs', requireRole('SUPER_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+adminRouter.get('/infra-costs', requireSystemTenant(), requireRole('SYSTEM_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { period = '30d' } = req.query;
 
   const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
@@ -144,12 +145,31 @@ adminRouter.get('/infra-costs', requireRole('SUPER_ADMIN'), asyncHandler(async (
 
 /**
  * GET /api/admin/pricing
- * Get current pricing configuration
+ * Get current pricing configuration.
+ *
+ * NOTE: `model_pricing` is GLOBAL reference data (provider rate cards). It has
+ * no tenant_id column and is not tenant-private — rate cards are public info
+ * published by each provider. TENANT_ADMIN read access is acceptable.
+ *
+ * The actual columns are `cost_per_1k_input` / `cost_per_1k_output`
+ * (see migrations/000_base_schema.sql:387). Aliased here as
+ * input_price_per_1k / output_price_per_1k for backward-compat with the UI.
  */
 adminRouter.get('/pricing', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const result = await query(`
-    SELECT model_id, provider, input_price_per_1k, output_price_per_1k, updated_at
+    SELECT
+      model_id,
+      provider,
+      display_name,
+      cost_per_1k_input  AS input_price_per_1k,
+      cost_per_1k_output AS output_price_per_1k,
+      is_free,
+      effective_from,
+      effective_until,
+      cache_creation_multiplier,
+      created_at         AS updated_at
     FROM model_pricing
+    WHERE effective_until IS NULL OR effective_until >= CURRENT_DATE
     ORDER BY provider, model_id
   `);
 
@@ -160,7 +180,7 @@ adminRouter.get('/pricing', asyncHandler(async (req: AuthenticatedRequest, res: 
  * POST /api/admin/pricing/sync
  * Sync pricing from external sources
  */
-adminRouter.post('/pricing/sync', requireRole('SUPER_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+adminRouter.post('/pricing/sync', requireSystemTenant(), requireRole('SYSTEM_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   // In production, this would fetch from OpenRouter, Anthropic, etc.
   const syncedAt = new Date().toISOString();
 
@@ -374,6 +394,87 @@ const llmUsageQuerySchema = z.object({
   provider: z.string().optional(),
   limit: z.coerce.number().min(1).max(1000).optional(),
 });
+
+/**
+ * GET /api/admin/audit?limit=20&offset=0&actorId=&action=&resourceType=&startDate=&endDate=
+ * Recent audit log entries for the current tenant. All filters are optional
+ * and AND-combined. `action` is a case-insensitive substring match against
+ * the AuditAction enum text (CREATE, READ, UPDATE, DELETE, DENIED) so the UI
+ * can pass lowercase values like "create".
+ */
+adminRouter.get('/audit', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 200);
+  const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
+
+  const { actorId, action, resourceType, startDate, endDate } = req.query as Record<string, string | undefined>;
+
+  // Build WHERE incrementally. tenant_id is always $1.
+  let whereClause = 'a.tenant_id = $1';
+  const params: unknown[] = [req.tenantId];
+
+  if (actorId) {
+    params.push(actorId);
+    whereClause += ` AND a.actor_id = $${params.length}`;
+  }
+  if (action) {
+    params.push(`%${action}%`);
+    whereClause += ` AND a.action::text ILIKE $${params.length}`;
+  }
+  if (resourceType) {
+    params.push(resourceType);
+    whereClause += ` AND a.resource_type = $${params.length}`;
+  }
+  if (startDate) {
+    params.push(startDate);
+    whereClause += ` AND a.created_at >= $${params.length}::timestamptz`;
+  }
+  if (endDate) {
+    params.push(endDate);
+    whereClause += ` AND a.created_at <= $${params.length}::timestamptz`;
+  }
+
+  // Same WHERE for the count query (no pagination params), so reuse params.
+  const countParams = [...params];
+  params.push(limit);
+  const limitIdx = params.length;
+  params.push(offset);
+  const offsetIdx = params.length;
+
+  const [rowsResult, totalResult] = await Promise.all([
+    query(
+      `SELECT
+         a.id,
+         a.tenant_id    AS "tenantId",
+         a.resource_type AS "resourceType",
+         a.resource_id   AS "resourceId",
+         a.action,
+         a.actor_id     AS "actorId",
+         u.email        AS "actorEmail",
+         u.name         AS "actorName",
+         a.before_state AS "beforeState",
+         a.after_state  AS "afterState",
+         a.ip_address   AS "ipAddress",
+         a.user_agent   AS "userAgent",
+         a.metadata,
+         a.created_at   AS "createdAt"
+       FROM audit_logs a
+       LEFT JOIN users u ON u.id = a.actor_id
+       WHERE ${whereClause}
+       ORDER BY a.created_at DESC
+       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+      params,
+    ),
+    query(
+      `SELECT COUNT(*)::int AS total FROM audit_logs a WHERE ${whereClause}`,
+      countParams,
+    ),
+  ]);
+
+  res.json({
+    data: rowsResult.rows,
+    meta: { total: totalResult.rows[0]?.total ?? 0, limit, offset },
+  });
+}));
 
 /**
  * GET /api/admin/llm-usage

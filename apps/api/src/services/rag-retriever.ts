@@ -96,7 +96,7 @@ export async function retrieve(options: RetrieveOptions): Promise<RetrievedChunk
       teamFilter = `
         AND (
           c.scope = 'TENANT'
-          OR (c.scope = 'TEAM' AND c."teamId" = ANY($5))
+          OR (c.scope = 'TEAM' AND c.team_id = ANY($5))
         )
       `;
     } else {
@@ -113,22 +113,22 @@ export async function retrieve(options: RetrieveOptions): Promise<RetrievedChunk
     const sql = `
       SELECT
         ch.id as "chunkId",
-        ch."documentId",
-        d."originalFilename" as "documentFilename",
-        d."originalFilename" as "documentTitle",
+        ch.document_id as "documentId",
+        d.original_filename as "documentFilename",
+        d.original_filename as "documentTitle",
         ch.content as "chunkText",
-        ch."chunkIndex",
-        ch."pageNumber",
+        ch.chunk_index as "chunkIndex",
+        ch.page_number as "pageNumber",
         c.id as "collectionId",
         c.name as "collectionName",
         1 - (ch.embedding <=> $1::vector) as score
       FROM rag_chunks ch
-      JOIN rag_documents d ON d.id = ch."documentId"
-      JOIN rag_collections c ON c.id = d."collectionId"
-      WHERE ch."tenantId" = $2
-        AND d."deletedAt" IS NULL
-        AND c."deletedAt" IS NULL
-        AND d."extractionStatus" = 'EXTRACTED'
+      JOIN rag_documents d ON d.id = ch.document_id
+      JOIN rag_collections c ON c.id = d.collection_id
+      WHERE ch.tenant_id = $2
+        AND d.deleted_at IS NULL
+        AND c.deleted_at IS NULL
+        AND d.extraction_status = 'EXTRACTED'
         AND 1 - (ch.embedding <=> $1::vector) >= $3
         ${teamFilter}
         ${collectionFilter}
@@ -190,7 +190,7 @@ export async function getAccessibleCollections(
     teamFilter = `
       AND (
         scope = 'TENANT'
-        OR (scope = 'TEAM' AND "teamId" = ANY($2))
+        OR (scope = 'TEAM' AND team_id = ANY($2))
       )
     `;
   } else {
@@ -200,8 +200,8 @@ export async function getAccessibleCollections(
   const result = await query(`
     SELECT id, name, scope
     FROM rag_collections
-    WHERE "tenantId" = $1
-      AND "deletedAt" IS NULL
+    WHERE tenant_id = $1
+      AND deleted_at IS NULL
       ${teamFilter}
     ORDER BY name
   `, params);

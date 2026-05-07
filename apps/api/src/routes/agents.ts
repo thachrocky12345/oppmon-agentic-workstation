@@ -94,10 +94,10 @@ agentsRouter.post('/', asyncHandler(async (req: AuthenticatedRequest, res: Respo
   const frameworkValue = FRAMEWORK_MAP[data.framework];
 
   const result = await query(
-    `INSERT INTO agents (name, description, framework, config, tenant_id, status)
-     VALUES ($1, $2, $3, $4, $5, 'ACTIVE')
+    `INSERT INTO agents (id, name, description, framework, config, tenant_id, status, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', NOW())
      RETURNING id, name, description, framework, status, config, created_at`,
-    [data.name, data.description || null, frameworkValue, data.config || {}, req.tenantId],
+    [createId(), data.name, data.description || null, frameworkValue, data.config || {}, req.tenantId],
   );
 
   const agent = result.rows[0];
@@ -232,10 +232,10 @@ agentsRouter.post('/register', asyncHandler(async (req: AuthenticatedRequest, re
 
     // Create new agent
     const insertResult = await client.query(
-      `INSERT INTO agents (name, description, framework, config, tenant_id, status)
-       VALUES ($1, $2, $3, $4, $5, 'ACTIVE')
+      `INSERT INTO agents (id, name, description, framework, config, tenant_id, status, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', NOW())
        RETURNING id, name, description, framework, status, config`,
-      [data.name, data.description || null, frameworkValue, data.config || {}, req.tenantId],
+      [createId(), data.name, data.description || null, frameworkValue, data.config || {}, req.tenantId],
     );
     return { ...insertResult.rows[0], isNew: true };
   });

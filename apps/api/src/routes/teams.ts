@@ -5,6 +5,7 @@ import { query } from '../lib/db.js';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { AuthenticatedRequest, requireRole } from '../middleware/request-auth.js';
 import { logAudit, getClientIp } from '../lib/audit.js';
+import { bumpTokenVersion } from '../lib/token-version.js';
 
 export const teamsRouter = Router();
 
@@ -216,7 +217,19 @@ teamsRouter.delete('/:id', asyncHandler(async (req: AuthenticatedRequest, res: R
     throw new ApiError(404, 'Team not found');
   }
 
+  // Capture members BEFORE the cascade so we can revoke their JWTs.
+  // Team membership influences authorization (canAccess team-scoped resources),
+  // so deleting the team must invalidate every member's outstanding tokens.
+  const memberRows = await query<{ user_id: string }>(
+    'SELECT user_id FROM team_members WHERE team_id = $1',
+    [id],
+  );
+
   await query('DELETE FROM teams WHERE id = $1', [id]);
+
+  await Promise.all(
+    memberRows.rows.map((m) => bumpTokenVersion(m.user_id)),
+  );
 
   logAudit({
     actorType: 'user',
@@ -282,6 +295,10 @@ teamsRouter.post('/:id/members', asyncHandler(async (req: AuthenticatedRequest, 
     RETURNING id, user_id AS "userId", role, created_at AS "createdAt"
   `, [memberId, id, data.userId, data.role]);
 
+  // Membership change ⇒ this user's authorization surface changed. Bump their
+  // token version so any outstanding JWTs are rejected on next request.
+  await bumpTokenVersion(data.userId);
+
   logAudit({
     actorType: 'user',
     actorId: req.userId,
@@ -323,6 +340,10 @@ teamsRouter.delete('/:id/members/:memberId', asyncHandler(async (req: Authentica
   }
 
   await query('DELETE FROM team_members WHERE id = $1', [memberId]);
+
+  // Membership change ⇒ user's authorization surface shrank. Force JWT
+  // rotation so cached team-share grants don't outlive the membership.
+  await bumpTokenVersion(existing.rows[0].user_id);
 
   logAudit({
     actorType: 'user',

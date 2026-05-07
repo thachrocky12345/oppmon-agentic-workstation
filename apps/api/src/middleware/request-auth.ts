@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { query } from '../lib/db.js';
+import { getTokenVersion } from '../lib/token-version.js';
+import { SYSTEM_TENANT_ID } from '@oppmon/shared';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -8,6 +10,8 @@ export interface AuthenticatedRequest extends Request {
     email: string;
     role: string;
     tenantId: string;
+    /** True when the user belongs to the System Tenant (global admin context). */
+    isSystem: boolean;
   };
   userId?: string;
   tenantId?: string;
@@ -47,12 +51,24 @@ export async function requestAuth(
       email: string;
       role: string;
       tenantId: string;
+      tv?: number;
+      isSystem?: boolean;
       exp: number;
     };
 
     // Check if token is expired
     if (decoded.exp && decoded.exp * 1000 < Date.now()) {
       res.status(401).json({ error: 'Token expired' });
+      return;
+    }
+
+    // Event-driven revocation: compare the token's version snapshot to the
+    // current value. A mismatch means the user's role/team/password changed
+    // (or sessions were force-revoked) since this token was issued.
+    const claimedVersion = decoded.tv ?? 1;
+    const currentVersion = await getTokenVersion(decoded.sub);
+    if (claimedVersion !== currentVersion) {
+      res.status(401).json({ error: 'Session revoked, please re-authenticate' });
       return;
     }
 
@@ -75,12 +91,18 @@ export async function requestAuth(
 
     const user = result.rows[0];
 
+    // isSystem is authoritative from the DB tenant_id, not the JWT — we trust
+    // verified claims but the DB is the source of truth in case the user was
+    // moved between tenants.
+    const isSystem = user.tenantId === SYSTEM_TENANT_ID;
+
     // Attach user to request
     req.user = {
       id: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      isSystem,
     };
     req.userId = user.id;
     req.tenantId = user.tenantId;

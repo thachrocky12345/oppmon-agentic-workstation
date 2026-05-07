@@ -70,7 +70,12 @@ async function getUserTeamIds(tenantId: string, userId: string): Promise<string[
 }
 
 /**
- * Get model credentials by model identifier and provider
+ * Get model credentials by model identifier and provider.
+ *
+ * Keyless providers (e.g. Ollama running on a LAN host) legitimately have no
+ * `secret_ref`. In that case we still want to surface the registered
+ * `base_url` / `timeout` from `public_config` so the LLM client connects to
+ * the right host instead of silently defaulting to `http://localhost:11434`.
  */
 async function getModelCredentials(
   tenantId: string,
@@ -97,14 +102,18 @@ async function getModelCredentials(
     if (result.rows.length === 0) return undefined;
 
     const model = result.rows[0];
-    if (!model.secretRef) return undefined;
-
-    // Retrieve secrets
-    const secrets = await retrieveSecret(model.secretRef);
     const publicConfig = (model.publicConfig || {}) as Record<string, unknown>;
 
+    // Only retrieve the secret if one is registered. Keyless providers like
+    // Ollama may have no secret but still need `base_url` from publicConfig.
+    let apiKey: string | undefined;
+    if (model.secretRef) {
+      const secrets = await retrieveSecret(model.secretRef);
+      apiKey = secrets.api_key;
+    }
+
     return {
-      apiKey: secrets.api_key,
+      apiKey,
       baseUrl: publicConfig.base_url as string | undefined,
       timeout: publicConfig.timeout as number | undefined,
     };

@@ -1,17 +1,17 @@
 # Flow Diagrams
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
-This directory contains Mermaid flow diagrams showing how data and processes move through the Arkon system.
+This directory contains Mermaid flow diagrams showing how data and processes move through the OppMon (Arkon) system.
 
 ## Flows
 
 | File | Description | Last Updated |
 |------|-------------|--------------|
-| [request-flow.md](request-flow.md) | API request lifecycle with middleware chain | 2026-05-06 (init sync) |
-| [auth-flow.md](auth-flow.md) | JWT + GitHub OAuth authentication | 2026-05-06 (init sync) |
-| [data-flow.md](data-flow.md) | Data pipeline with LLM/RAG/embeddings | 2026-05-06 (init sync) |
-| [error-flow.md](error-flow.md) | Error propagation and handling | 2026-05-06 (init sync) |
+| [request-flow.md](request-flow.md) | API request lifecycle with middleware chain | 2026-05-07 (init sync) |
+| [auth-flow.md](auth-flow.md) | JWT + GitHub OAuth authentication | 2026-05-07 (init sync) |
+| [data-flow.md](data-flow.md) | Data pipeline with LLM/RAG/embeddings | 2026-05-07 (init sync) |
+| [error-flow.md](error-flow.md) | Error propagation and handling | 2026-05-07 (init sync) |
 
 ## Flow Types
 
@@ -29,8 +29,11 @@ Details the authentication process including:
 Illustrates how data enters the system through multiple channels:
 - REST API and WebSocket for events
 - LLM proxy for chat completions (Anthropic, Cerebras, Ollama)
+- LiteLLM proxy via `apps/router` (http-proxy-middleware)
 - Embedding generation (OpenAI) and RAG context retrieval
 - Hybrid search (BM25 + vector + RRF fusion)
+- Document ingestion (busboy + pdf-parse + mammoth)
+- Agent oracle loop with semantic cache, memory, toolbox, guardrails
 - Storage to PostgreSQL, TimescaleDB, and pgvector
 
 ### Error Flow

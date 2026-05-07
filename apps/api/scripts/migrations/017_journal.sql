@@ -5,6 +5,17 @@
 -- Scope: per-tenant. Safe re-run with IF NOT EXISTS guards.
 
 -- ============================================================
+-- 0. Defensive: ensure the `transformate` tenant exists.
+--    The agent_identities seed below references it. Production already
+--    has it; on fresh dev/CI DBs only `default` exists (from 001).
+-- ============================================================
+INSERT INTO tenants (id, name, slug, plan, created_at, updated_at)
+SELECT 'transformate', 'Transformate', 'transformate', 'owner', NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM tenants WHERE id = 'transformate' OR slug = 'transformate'
+);
+
+-- ============================================================
 -- 1. Agent identities — who can write, what their role is
 -- ============================================================
 CREATE TABLE IF NOT EXISTS agent_identities (
@@ -46,10 +57,10 @@ ON CONFLICT (slug) DO UPDATE SET
 -- 2. work_entries — the tracker itself
 -- ============================================================
 CREATE TABLE IF NOT EXISTS work_entries (
-  id BIGSERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   owner_agent TEXT NOT NULL REFERENCES agent_identities(slug),
-  parent_id BIGINT REFERENCES work_entries(id) ON DELETE SET NULL,
+  parent_id TEXT REFERENCES work_entries(id) ON DELETE SET NULL,
 
   -- classification
   category TEXT NOT NULL CHECK (category IN ('task','log','decision','insight','question','blocker','ship','note')),
@@ -147,7 +158,7 @@ CREATE INDEX IF NOT EXISTS idx_warden_sessions_tenant ON warden_sessions(tenant_
 CREATE INDEX IF NOT EXISTS idx_warden_sessions_recent ON warden_sessions(tenant_id, last_activity_at DESC);
 
 CREATE TABLE IF NOT EXISTS warden_messages (
-  id BIGSERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   session_id TEXT NOT NULL REFERENCES warden_sessions(id) ON DELETE CASCADE,
   tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   author_agent TEXT NOT NULL REFERENCES agent_identities(slug),
@@ -167,9 +178,9 @@ CREATE INDEX IF NOT EXISTS idx_warden_messages_session ON warden_messages(sessio
 -- 4. journal_reminders — lightweight scheduler (uses Arkon workflows scheduler later)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS journal_reminders (
-  id BIGSERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  entry_id BIGINT NOT NULL REFERENCES work_entries(id) ON DELETE CASCADE,
+  entry_id TEXT NOT NULL REFERENCES work_entries(id) ON DELETE CASCADE,
   fire_at TIMESTAMPTZ NOT NULL,
   fired_at TIMESTAMPTZ,
   channel TEXT NOT NULL DEFAULT 'discord' CHECK (channel IN ('discord','email','arkon-banner','lumina-wa')),

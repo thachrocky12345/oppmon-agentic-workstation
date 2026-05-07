@@ -12,10 +12,26 @@ CREATE TABLE IF NOT EXISTS tenants (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Create default tenant (created by setup wizard on first run)
-INSERT INTO tenants (id, name, plan)
-VALUES ('default', 'Default', 'owner')
-ON CONFLICT (id) DO NOTHING;
+-- 1b. Defensive: when Prisma `db push` already created `tenants` (it doesn't
+-- include `plan`/`domain`/`metadata`/`settings`), CREATE TABLE above is a
+-- no-op. Add the legacy columns explicitly so this migration can populate
+-- them and downstream code (e.g. /api/admin/tenants) keeps working.
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS plan     TEXT NOT NULL DEFAULT 'starter';
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS domain   TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings JSONB DEFAULT '{}';
+
+-- 2. Create default tenant (created by setup wizard on first run).
+-- `slug` is a Prisma-side NOT NULL UNIQUE column; supply it explicitly.
+-- `updated_at` is `@updatedAt` in Prisma (NOT NULL, set client-side); raw
+-- SQL INSERT must populate it explicitly because there's no DB default.
+-- Skip the insert entirely when a tenant with this id OR slug already
+-- exists (Prisma seed / earlier migration may have created one).
+INSERT INTO tenants (id, name, slug, plan, created_at, updated_at)
+SELECT 'default', 'Default', 'default', 'owner', NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM tenants WHERE id = 'default' OR slug = 'default'
+);
 
 -- 3. Add tenant_id column to agents (nullable first for safe migration)
 ALTER TABLE agents ADD COLUMN IF NOT EXISTS tenant_id TEXT;

@@ -10,10 +10,16 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
+// Roles that should land on the admin console by default.
+const ADMIN_ROLES = new Set(['SYSTEM_ADMIN', 'TENANT_ADMIN', 'TEAM_ADMIN'])
+
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/dashboard'
+  // If the caller passed an explicit ?redirect=, honor it. Otherwise we pick
+  // the destination after we know the user's role (admin → /admin,
+  // everyone else → /dashboard).
+  const explicitRedirect = searchParams.get('redirect')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -52,8 +58,14 @@ function LoginForm() {
       const expiresAt = new Date(data.expiresAt || Date.now() + 24 * 60 * 60 * 1000)
       document.cookie = `auth_token=${data.token}; expires=${expiresAt.toUTCString()}; path=/; SameSite=Lax`
 
-      // Redirect
-      router.push(redirect)
+      // Pick destination: explicit redirect param wins; otherwise route admins
+      // to /admin and everyone else to /dashboard.
+      const role = data?.user?.role as string | undefined
+      const target =
+        explicitRedirect ||
+        (role && ADMIN_ROLES.has(role) ? '/admin' : '/dashboard')
+
+      router.push(target)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {

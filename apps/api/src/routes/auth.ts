@@ -7,6 +7,9 @@ import { createId } from '@paralleldrive/cuid2';
 import { query } from '../lib/db.js';
 import { asyncHandler, ApiError } from '../middleware/error-handler.js';
 import { requestAuth, AuthenticatedRequest } from '../middleware/request-auth.js';
+import { getTokenVersion } from '../lib/token-version.js';
+import { prisma } from '@oppmon/database';
+import { SYSTEM_TENANT_ID } from '@oppmon/shared';
 
 export const authRouter = Router();
 
@@ -86,16 +89,23 @@ authRouter.post('/login', asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.unauthorized('Invalid email or password');
   }
 
-  // Generate JWT
+  // Generate JWT — embed token version snapshot for event-driven revocation.
+  // `issuer: 'oppmon'` MUST match the verifier in apps/web/src/middleware.ts;
+  // omitting it causes the edge middleware to reject the token and bounce the
+  // user back to /login.
+  const tv = await getTokenVersion(user.id);
+  const isSystem = user.tenant_id === SYSTEM_TENANT_ID;
   const token = jwt.sign(
     {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenant_id,
+      tv,
+      ...(isSystem ? { isSystem: true } : {}),
     },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN },
+    { expiresIn: JWT_EXPIRES_IN, issuer: 'oppmon' },
   );
 
   // Update updated_at timestamp
@@ -151,16 +161,21 @@ authRouter.post('/register', asyncHandler(async (req: Request, res: Response) =>
     [userId, email.toLowerCase(), passwordHash, userName, 'TENANT_ADMIN', tenantId],
   );
 
-  // Generate JWT
+  // Seed the token version row so subsequent revocations have a counter to bump.
+  await prisma.tokenVersion.create({ data: { userId, version: 1 } });
+
+  // Generate JWT — embed initial token version (1).
+  // `issuer` must match the web edge middleware verifier.
   const token = jwt.sign(
     {
       sub: userId,
       email: email.toLowerCase(),
       role: 'TENANT_ADMIN',
       tenantId,
+      tv: 1,
     },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN },
+    { expiresIn: JWT_EXPIRES_IN, issuer: 'oppmon' },
   );
 
   res.status(201).json({
@@ -396,15 +411,19 @@ authRouter.post('/device/token', asyncHandler(async (req: Request, res: Response
 
   // Generate JWT
   const expiresIn = 86400; // 24 hours for CLI tokens
+  const tv = await getTokenVersion(user.id);
+  const isSystem = user.tenant_id === SYSTEM_TENANT_ID;
   const accessToken = jwt.sign(
     {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenant_id,
+      tv,
+      ...(isSystem ? { isSystem: true } : {}),
     },
     JWT_SECRET,
-    { expiresIn },
+    { expiresIn, issuer: 'oppmon' },
   );
 
   // Generate refresh token

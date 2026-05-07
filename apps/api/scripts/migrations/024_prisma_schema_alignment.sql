@@ -644,7 +644,24 @@ CREATE INDEX IF NOT EXISTS idx_rag_chunks_document_index ON rag_chunks(document_
 -- ============================================================================
 -- HNSW Indexes for Vector Search (if pgvector supports it)
 -- ============================================================================
--- These are created after data to be more efficient
+-- These are created after data to be more efficient.
+--
+-- Prisma's schema does NOT declare these `embedding` columns (Prisma can't
+-- model pgvector natively — see schema.prisma:566 comment). So when Prisma
+-- `db push` created these tables, the `embedding` column is absent and the
+-- `CREATE TABLE IF NOT EXISTS` above is a no-op. We must add the column
+-- defensively before creating the HNSW index, or the index creation fails
+-- with `column "embedding" does not exist`.
+
+-- Defensive: add the embedding column for every table with an HNSW index.
+ALTER TABLE embeddings        ADD COLUMN IF NOT EXISTS embedding vector(1536);
+ALTER TABLE rag_chunks        ADD COLUMN IF NOT EXISTS embedding vector(1536);
+ALTER TABLE semantic_memory   ADD COLUMN IF NOT EXISTS embedding vector(1024);
+ALTER TABLE workflow_memory   ADD COLUMN IF NOT EXISTS embedding vector(1024);
+ALTER TABLE toolbox_memory    ADD COLUMN IF NOT EXISTS embedding vector(1024);
+ALTER TABLE entity_memory     ADD COLUMN IF NOT EXISTS embedding vector(1024);
+ALTER TABLE summary_memory    ADD COLUMN IF NOT EXISTS embedding vector(1024);
+ALTER TABLE persona_memory    ADD COLUMN IF NOT EXISTS embedding vector(1024);
 
 -- For embeddings table (1536 dimensions - OpenAI)
 CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING hnsw (embedding vector_cosine_ops);

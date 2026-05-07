@@ -4,7 +4,10 @@
  * Provides typed methods for all API endpoints with error handling.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Empty string -> all calls go to /api/* (relative), proxied server-side by
+// Next.js rewrites to INTERNAL_API_URL. Keeps the browser on the same origin
+// so the UI works from any network without needing to reach the backend host.
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export class ApiError extends Error {
   constructor(
