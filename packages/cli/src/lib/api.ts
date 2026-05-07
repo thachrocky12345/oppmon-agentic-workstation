@@ -24,15 +24,20 @@ export interface ApiError {
 
 export interface Skill {
   id: string
+  tenantId?: string
   name: string
   description?: string
   content: string
   version: number
   sha256: string
   scope: 'TENANT' | 'TEAM'
+  enabled?: boolean
   teamId?: string
+  createdById?: string
+  createdBy?: { id: string; name?: string; email?: string }
   createdAt: string
   updatedAt: string
+  deletedAt?: string | null
 }
 
 export interface CreateSkillInput {
@@ -48,6 +53,17 @@ export interface UpdateSkillInput {
   content?: string
   scope?: 'TENANT' | 'TEAM'
   teamId?: string
+}
+
+export interface SkillVersion {
+  id: string
+  skillId: string
+  version: number
+  content: string
+  sha256: string
+  createdById: string
+  createdBy?: { id: string; name?: string; email?: string }
+  createdAt: string
 }
 
 // MCP Server types
@@ -269,6 +285,89 @@ export interface RAGUsageStats {
   averageSourcesPerQuery: number
 }
 
+// Model Registry types
+
+export type ModelScope = 'TENANT' | 'TEAM'
+
+export interface Model {
+  id: string
+  displayName: string
+  providerTemplateId: string | null
+  modelIdentifier: string
+  scope: ModelScope
+  teamId: string | null
+  publicConfig: Record<string, unknown>
+  hasSecret: boolean
+  isYamlMode: boolean
+  enabled: boolean
+  lastSyncedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateModelInput {
+  displayName: string
+  providerTemplateId?: string
+  modelIdentifier: string
+  publicConfig?: Record<string, unknown>
+  secretConfig?: Record<string, string>
+  yamlOverride?: string
+  scope: ModelScope
+  teamId?: string
+}
+
+export interface UpdateModelInput {
+  displayName?: string
+  modelIdentifier?: string
+  publicConfig?: Record<string, unknown>
+  secretConfig?: Record<string, string>
+  yamlOverride?: string
+  scope?: ModelScope
+  teamId?: string | null
+  enabled?: boolean
+}
+
+export interface ProviderField {
+  key: string
+  label: string
+  type: 'text' | 'password' | 'select' | 'textarea' | 'json' | 'number' | 'boolean'
+  secret: boolean
+  required: boolean
+  placeholder?: string
+  help?: string
+  default?: string | number | boolean
+  options?: Array<{ value: string; label: string; description?: string }>
+}
+
+export interface ProviderTemplate {
+  id: string
+  displayName: string
+  description: string
+  category: 'cloud' | 'local' | 'compatible'
+  icon: string
+  fields: ProviderField[]
+  docsUrl?: string
+  setupSteps?: string[]
+  supportsStreaming?: boolean
+  supportsFunctionCalling?: boolean
+  defaultModel?: string
+}
+
+export interface TestConnectionInput {
+  providerTemplateId?: string
+  publicConfig?: Record<string, unknown>
+  secretConfig?: Record<string, string>
+  yamlOverride?: string
+}
+
+export interface TestConnectionResult {
+  success: boolean
+  message?: string
+  latencyMs?: number
+  details?: Record<string, unknown>
+  errors?: string[]
+}
+
 // Usage Events types
 
 export interface UsageEventInput {
@@ -294,6 +393,131 @@ export interface UsageStats {
     action: string
     count: number
   }>
+}
+
+// Analytics types
+
+export interface AnalyticsOverview {
+  summary: {
+    totalEvents: number
+    totalErrors: number
+    activeAgents: number
+    activeDays: number
+    totalTokens: number
+    totalRequests: number
+    estimatedCost: number
+  }
+  trend: Array<{ day: string; events: number; errors: number }>
+  topAgents: Array<{ id: string; name: string; total_events: number; total_errors: number }>
+}
+
+export interface AnalyticsAgentRow {
+  id: string
+  name: string
+  status?: string
+  last_seen?: string | null
+  active_days: number
+  total_events: number
+  total_errors: number
+  last_event_at?: string | null
+}
+
+export interface AnalyticsModelRow {
+  model: string
+  provider: string
+  request_count: number
+  total_input_tokens: number
+  total_output_tokens: number
+  active_days: number
+}
+
+export interface AnalyticsErrorsResponse {
+  byType: Array<{ error_type: string; count: number }>
+  trend: Array<{ date: string; count: number }>
+  byAgent: Array<{ id: string; name: string; error_count: number }>
+}
+
+export interface CostsOverview {
+  summary: {
+    total_cost: number
+    total_tokens: number
+    avg_daily_cost: number
+    active_users: number
+  }
+  trend: Array<{ day: string; cost: number; tokens: number }>
+}
+
+export interface CostsByModelRow {
+  model_id: string
+  provider: string
+  input_tokens: number
+  output_tokens: number
+  request_count: number
+  total_tokens: number
+  total_cost: number
+}
+
+export interface UsageTopResource {
+  resource_type: string
+  resource_id: string
+  count: number
+}
+
+export type AuditAction = 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'DENIED'
+
+export interface AuditLogEntry {
+  id: string
+  tenantId: string
+  resourceType: string
+  resourceId: string
+  action: AuditAction
+  actorId: string
+  beforeState?: Record<string, unknown> | null
+  afterState?: Record<string, unknown> | null
+  ipAddress?: string | null
+  userAgent?: string | null
+  metadata?: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface AuditLogFilter {
+  resourceType?: string
+  resourceId?: string
+  action?: AuditAction
+  actorId?: string
+  startDate?: string
+  endDate?: string
+  limit?: number
+  offset?: number
+}
+
+// RAG Collections (rag-admin)
+
+export interface RagCollection {
+  id: string
+  name: string
+  description?: string | null
+  scope: 'TENANT' | 'TEAM'
+  teamId?: string | null
+  /** Camel-case alias from GET /collections aggregate; absent on POST RETURNING *. */
+  team_name?: string | null
+  document_count?: number | string
+  total_chunks?: number | string
+  createdById?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateRagCollectionInput {
+  name: string
+  description?: string
+  scope: 'TENANT' | 'TEAM'
+  teamId?: string
+}
+
+export interface UpdateRagCollectionInput {
+  name?: string
+  description?: string
 }
 
 export class ApiClient {
@@ -378,6 +602,14 @@ export class ApiClient {
     return this.request('DELETE', `/api/skills/${id}`)
   }
 
+  async getSkillVersions(id: string): Promise<ApiResponse<SkillVersion[]>> {
+    return this.request('GET', `/api/skills/${id}/versions`)
+  }
+
+  async toggleSkill(id: string, enabled: boolean): Promise<ApiResponse<Skill>> {
+    return this.request('PATCH', `/api/admin/skills/${id}/toggle`, { enabled })
+  }
+
   // MCP API
 
   async listMcpServers(options?: {
@@ -424,6 +656,58 @@ export class ApiClient {
 
   async toggleMcpServer(id: string, enabled: boolean): Promise<ApiResponse<McpServer>> {
     return this.request('PATCH', `/api/mcp/${id}/toggle`, { enabled })
+  }
+
+  // Models API
+
+  async listModels(options?: {
+    scope?: ModelScope
+    enabled?: boolean
+    search?: string
+    providerTemplateId?: string
+    includeDeleted?: boolean
+    limit?: number
+    offset?: number
+  }): Promise<ApiResponse<Model[]>> {
+    const params = new URLSearchParams()
+    if (options?.scope) params.set('scope', options.scope)
+    if (options?.enabled !== undefined) params.set('enabled', options.enabled.toString())
+    if (options?.search) params.set('search', options.search)
+    if (options?.providerTemplateId) params.set('providerTemplateId', options.providerTemplateId)
+    if (options?.includeDeleted) params.set('includeDeleted', 'true')
+    if (options?.limit) params.set('limit', options.limit.toString())
+    if (options?.offset) params.set('offset', options.offset.toString())
+
+    const query = params.toString()
+    return this.request('GET', `/api/models${query ? `?${query}` : ''}`)
+  }
+
+  async getModel(id: string): Promise<ApiResponse<Model>> {
+    return this.request('GET', `/api/models/${id}`)
+  }
+
+  async listProviders(): Promise<ApiResponse<ProviderTemplate[]>> {
+    return this.request('GET', '/api/models/providers')
+  }
+
+  async createModel(input: CreateModelInput): Promise<ApiResponse<Model>> {
+    return this.request('POST', '/api/models', input)
+  }
+
+  async updateModel(id: string, input: UpdateModelInput): Promise<ApiResponse<Model>> {
+    return this.request('PATCH', `/api/models/${id}`, input)
+  }
+
+  async deleteModel(id: string): Promise<{ success: boolean; data: Model }> {
+    return this.request('DELETE', `/api/models/${id}`)
+  }
+
+  async testModelConnection(input: TestConnectionInput): Promise<ApiResponse<TestConnectionResult>> {
+    return this.request('POST', '/api/models/test', input)
+  }
+
+  async rotateModelSecret(id: string, secretConfig: Record<string, string>): Promise<{ success: boolean; message: string }> {
+    return this.request('POST', `/api/models/${id}/rotate-secret`, { secretConfig })
   }
 
   // Health check
@@ -499,6 +783,43 @@ export class ApiClient {
 
   async getRagStatus(): Promise<ApiResponse<RAGStatus>> {
     return this.request('GET', '/api/rag/status')
+  }
+
+  // RAG Collections (admin)
+
+  async listRagCollections(options?: {
+    scope?: 'TENANT' | 'TEAM'
+    limit?: number
+    offset?: number
+  }): Promise<ApiResponse<RagCollection[]> & { meta: { total: number; limit: number; offset: number } }> {
+    const params = new URLSearchParams()
+    if (options?.scope) params.set('scope', options.scope)
+    if (options?.limit) params.set('limit', options.limit.toString())
+    if (options?.offset) params.set('offset', options.offset.toString())
+
+    const query = params.toString()
+    return this.request('GET', `/api/admin/rag/collections${query ? `?${query}` : ''}`)
+  }
+
+  async getRagCollection(id: string): Promise<ApiResponse<RagCollection>> {
+    return this.request('GET', `/api/admin/rag/collections/${id}`)
+  }
+
+  async createRagCollection(
+    input: CreateRagCollectionInput
+  ): Promise<ApiResponse<RagCollection>> {
+    return this.request('POST', '/api/admin/rag/collections', input)
+  }
+
+  async updateRagCollection(
+    id: string,
+    input: UpdateRagCollectionInput
+  ): Promise<ApiResponse<RagCollection>> {
+    return this.request('PATCH', `/api/admin/rag/collections/${id}`, input)
+  }
+
+  async deleteRagCollection(id: string): Promise<void> {
+    return this.request('DELETE', `/api/admin/rag/collections/${id}`)
   }
 
   async listRagSessions(options?: {
@@ -582,6 +903,86 @@ export class ApiClient {
 
   async updateUsageSettings(eventsEnabled: boolean): Promise<ApiResponse<{ eventsEnabled: boolean }>> {
     return this.request('PUT', '/api/usage/settings', { eventsEnabled })
+  }
+
+  async getUsageTopResources(options?: {
+    period?: '24h' | '7d' | '30d'
+    limit?: number
+    resourceType?: 'skill' | 'mcp_server' | 'rag_query'
+  }): Promise<ApiResponse<UsageTopResource[]>> {
+    const params = new URLSearchParams()
+    if (options?.period) params.set('period', options.period)
+    if (options?.limit) params.set('limit', options.limit.toString())
+    if (options?.resourceType) params.set('resource_type', options.resourceType)
+    const query = params.toString()
+    return this.request('GET', `/api/usage/top-resources${query ? `?${query}` : ''}`)
+  }
+
+  // Analytics API
+
+  async getAnalyticsOverview(period?: '7d' | '30d' | '90d'): Promise<AnalyticsOverview> {
+    const params = new URLSearchParams()
+    if (period) params.set('period', period)
+    const query = params.toString()
+    return this.request('GET', `/api/analytics/overview${query ? `?${query}` : ''}`)
+  }
+
+  async getAnalyticsAgents(period?: '7d' | '30d' | '90d'): Promise<ApiResponse<AnalyticsAgentRow[]>> {
+    const params = new URLSearchParams()
+    if (period) params.set('period', period)
+    const query = params.toString()
+    return this.request('GET', `/api/analytics/agents${query ? `?${query}` : ''}`)
+  }
+
+  async getAnalyticsModels(period?: '7d' | '30d' | '90d'): Promise<ApiResponse<AnalyticsModelRow[]>> {
+    const params = new URLSearchParams()
+    if (period) params.set('period', period)
+    const query = params.toString()
+    return this.request('GET', `/api/analytics/models${query ? `?${query}` : ''}`)
+  }
+
+  async getAnalyticsErrors(period?: '7d' | '30d'): Promise<AnalyticsErrorsResponse> {
+    const params = new URLSearchParams()
+    if (period) params.set('period', period)
+    const query = params.toString()
+    return this.request('GET', `/api/analytics/errors${query ? `?${query}` : ''}`)
+  }
+
+  // Costs API
+
+  async getCostsOverview(period?: '7d' | '30d' | '90d'): Promise<CostsOverview> {
+    const params = new URLSearchParams()
+    if (period) params.set('period', period)
+    const query = params.toString()
+    return this.request('GET', `/api/costs/overview${query ? `?${query}` : ''}`)
+  }
+
+  async getCostsByModel(period?: '7d' | '30d'): Promise<ApiResponse<CostsByModelRow[]>> {
+    const params = new URLSearchParams()
+    if (period) params.set('period', period)
+    const query = params.toString()
+    return this.request('GET', `/api/costs/by-model${query ? `?${query}` : ''}`)
+  }
+
+  // Audit / Compliance API
+
+  async queryAuditLog(filter?: AuditLogFilter): Promise<{
+    data: AuditLogEntry[]
+    total: number
+    limit: number
+    offset: number
+  }> {
+    const params = new URLSearchParams()
+    if (filter?.resourceType) params.set('resourceType', filter.resourceType)
+    if (filter?.resourceId) params.set('resourceId', filter.resourceId)
+    if (filter?.action) params.set('action', filter.action)
+    if (filter?.actorId) params.set('actorId', filter.actorId)
+    if (filter?.startDate) params.set('startDate', filter.startDate)
+    if (filter?.endDate) params.set('endDate', filter.endDate)
+    if (filter?.limit) params.set('limit', filter.limit.toString())
+    if (filter?.offset) params.set('offset', filter.offset.toString())
+    const query = params.toString()
+    return this.request('GET', `/api/compliance/audit-log${query ? `?${query}` : ''}`)
   }
 
   // Routing Config API
