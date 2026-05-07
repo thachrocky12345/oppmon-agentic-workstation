@@ -26,7 +26,7 @@ export function createLoginCommand(): Command {
       try {
         // Check if already authenticated
         if (await isAuthenticated()) {
-          console.log(chalk.yellow('Already authenticated. Use `tag logout` first to re-authenticate.'))
+          console.log(chalk.yellow('Already authenticated. Use `oppmon logout` first to re-authenticate.'))
           process.exit(EXIT_CODES.SUCCESS)
         }
 

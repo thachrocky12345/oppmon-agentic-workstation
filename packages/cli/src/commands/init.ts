@@ -292,7 +292,7 @@ async function initCommand(options: InitOptions): Promise<void> {
   // Check authentication
   if (!isAuthenticated()) {
     spinner.fail('Not authenticated')
-    console.error(chalk.red('Error: Not authenticated. Run "tag login" first.'))
+    console.error(chalk.red('Error: Not authenticated. Run "oppmon login" first.'))
     process.exit(EXIT_CODES.AUTH_REQUIRED)
   }
 
@@ -432,12 +432,12 @@ async function initCommand(options: InitOptions): Promise<void> {
     // Run sync if requested
     if (shouldRunSync) {
       console.log(chalk.dim('Running initial sync...'))
-      console.log(chalk.dim('Run "tag sync skills pull" and "tag sync mcp pull" to sync.'))
+      console.log(chalk.dim('Run "oppmon sync skills pull" and "oppmon sync mcp pull" to sync.'))
     }
 
     console.log(chalk.bold('Next steps:'))
-    console.log(chalk.dim('  tag sync skills pull   # Pull skills from remote'))
-    console.log(chalk.dim('  tag sync mcp pull      # Pull MCP servers from remote'))
+    console.log(chalk.dim('  oppmon sync skills pull   # Pull skills from remote'))
+    console.log(chalk.dim('  oppmon sync mcp pull      # Pull MCP servers from remote'))
     console.log('')
 
   } catch (error) {

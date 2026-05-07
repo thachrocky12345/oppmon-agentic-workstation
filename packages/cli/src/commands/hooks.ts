@@ -4,7 +4,7 @@
  * Install, uninstall, and check status of Claude Code hooks.
  *
  * Usage:
- *   tag hooks install     - Install event capture hook
+ *   oppmon hooks install     - Install event capture hook
  *   tag hooks uninstall   - Remove event capture hook
  *   tag hooks status      - Check hook installation status
  */
@@ -224,7 +224,7 @@ async function statusCommand(): Promise<void> {
   console.log('')
 
   if (!installed) {
-    console.log(chalk.dim('Run "tag hooks install" to install the event capture hook.'))
+    console.log(chalk.dim('Run "oppmon hooks install" to install the event capture hook.'))
   }
 }
 

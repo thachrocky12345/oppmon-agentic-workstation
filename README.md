@@ -328,4 +328,4 @@ AUTO_EMBEDDING_ENABLED=true
 
 ## License
 
-Proprietary - All rights reserved.
+[MIT](./LICENSE) © Thach Bui

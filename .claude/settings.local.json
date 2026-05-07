@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(docker stack *)",
-      "Bash(python3 -c 'import sys,json;d=json.load\\(sys.stdin\\);print\\(\"name:\",d.get\\(\"name\"\\)\\);print\\(\"bin:\",d.get\\(\"bin\"\\)\\);print\\(\"scripts:\",d.get\\(\"scripts\"\\)\\)')"
+      "Bash(python3 -c 'import sys,json;d=json.load\\(sys.stdin\\);print\\(\"name:\",d.get\\(\"name\"\\)\\);print\\(\"bin:\",d.get\\(\"bin\"\\)\\);print\\(\"scripts:\",d.get\\(\"scripts\"\\)\\)')",
+      "Bash(docker run *)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "Bash(chown -R thachbui:thachbui /home/thachbui/workstation/arkon-work-station)",
+      "Bash(rm -rf /tmp/create-oppmon-test)",
+      "Bash(chown -R thachbui:thachbui /home/thachbui/workstation/arkon-work-station/packages/create-oppmon)"
     ]
   }
 }
