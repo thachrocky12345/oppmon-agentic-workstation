@@ -18,7 +18,14 @@ async function validateOllama(
 ): Promise<ConnectionTestResult> {
   const { publicConfig, timeoutMs = DEFAULT_TIMEOUT_MS } = context;
 
-  const apiBase = (publicConfig.api_base as string) || 'http://localhost:11434';
+  // Order: explicit per-model api_base > server-wide OLLAMA_BASE_URL env > localhost.
+  // The env fallback matters for swarm deploys where Ollama runs on a LAN host
+  // (set via `docker service update --env-add OLLAMA_BASE_URL=http://...`); without
+  // it, the validator silently tests the wrong target.
+  const apiBase =
+    (publicConfig.api_base as string) ||
+    process.env.OLLAMA_BASE_URL ||
+    'http://localhost:11434';
   const model = (publicConfig.custom_model as string) || (publicConfig.model as string);
 
   if (!model) {

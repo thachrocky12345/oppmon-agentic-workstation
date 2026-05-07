@@ -7,8 +7,8 @@
  *   tag events enable      - Enable event collection
  *   tag events disable     - Disable event collection
  *   tag events status      - Show event collection status
- *   tag events flush       - Manually flush buffered events
- *   tag events clear       - Clear buffered events
+ *   oppmon events flush       - Manually flush buffered events
+ *   oppmon events clear       - Clear buffered events
  */
 
 import { Command } from 'commander'
@@ -42,11 +42,11 @@ async function enableCommand(): Promise<void> {
 
   console.log(chalk.green('✓ Event collection enabled'))
   console.log(chalk.dim('\nEvents will be buffered locally and flushed every 30 seconds.'))
-  console.log(chalk.dim('Make sure the hook is installed: tag hooks status'))
+  console.log(chalk.dim('Make sure the hook is installed: oppmon hooks status'))
 
   if (!isAuthenticated()) {
     console.log(chalk.yellow('\n⚠ Warning: Not authenticated. Events will buffer but not flush.'))
-    console.log(chalk.dim('Run "tag login" to authenticate.'))
+    console.log(chalk.dim('Run "oppmon login" to authenticate.'))
   }
 }
 
@@ -69,7 +69,7 @@ async function disableCommand(): Promise<void> {
   const bufferSize = getBufferSize()
   if (bufferSize > 0) {
     console.log(chalk.dim(`\n${bufferSize} buffered events remain.`))
-    console.log(chalk.dim('Run "tag events flush" to send them, or "tag events clear" to discard.'))
+    console.log(chalk.dim('Run "oppmon events flush" to send them, or "oppmon events clear" to discard.'))
   }
 }
 
@@ -111,12 +111,12 @@ async function statusCommand(): Promise<void> {
   // Warnings
   if (status.enabled && !status.authenticated) {
     console.log(chalk.yellow('⚠ Events are enabled but not authenticated.'))
-    console.log(chalk.dim('Run "tag login" to allow event flushing.'))
+    console.log(chalk.dim('Run "oppmon login" to allow event flushing.'))
   }
 
   if (status.bufferSize > 5000) {
     console.log(chalk.yellow(`⚠ Buffer is large (${status.bufferSize} events).`))
-    console.log(chalk.dim('Consider running "tag events flush" or "tag events clear".'))
+    console.log(chalk.dim('Consider running "oppmon events flush" or "oppmon events clear".'))
   }
 }
 
@@ -128,7 +128,7 @@ async function flushCommand(): Promise<void> {
 
   if (!isAuthenticated()) {
     spinner.fail('Not authenticated')
-    console.error(chalk.red('\nRun "tag login" first.'))
+    console.error(chalk.red('\nRun "oppmon login" first.'))
     process.exit(EXIT_CODES.AUTH_REQUIRED)
   }
 
@@ -169,7 +169,7 @@ async function clearCommand(options: { force?: boolean }): Promise<void> {
 
   if (!options.force) {
     console.log(chalk.yellow(`\nThis will discard ${bufferSize} buffered events.`))
-    console.log(chalk.dim('Use --force to confirm, or run "tag events flush" to send them first.'))
+    console.log(chalk.dim('Use --force to confirm, or run "oppmon events flush" to send them first.'))
     return
   }
 

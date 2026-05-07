@@ -383,6 +383,12 @@ export default function ChatPage() {
               continue
             }
 
+            // Stream-level errors (e.g. provider unreachable) arrive as
+            // {type: 'error', data: {message}}. They must propagate out of the
+            // reader loop. The inner try/catch below is only for JSON.parse
+            // — recording the error and throwing AFTER the catch keeps
+            // parseError from swallowing the real failure.
+            let streamErrorMessage: string | null = null
             try {
               const chunk: StreamChunk = JSON.parse(dataStr)
 
@@ -417,10 +423,14 @@ export default function ChatPage() {
                 )
               } else if (chunk.type === 'error') {
                 const errorData = chunk.data as { message?: string }
-                throw new Error(errorData.message || 'Stream error')
+                streamErrorMessage = errorData.message || 'Stream error'
               }
             } catch (parseError) {
               console.warn('Failed to parse SSE chunk:', dataStr)
+            }
+
+            if (streamErrorMessage) {
+              throw new Error(streamErrorMessage)
             }
           }
         }

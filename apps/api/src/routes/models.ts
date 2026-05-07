@@ -76,6 +76,11 @@ const listModelsQuerySchema = z.object({
   providerTemplateId: z.string().optional(),
   limit: z.coerce.number().min(1).max(100).optional(),
   offset: z.coerce.number().min(0).optional(),
+  // Surface soft-deleted (tombstoned) models so admins can resolve "stuck"
+  // unique-name slots. Server-side enforcement: only TENANT_ADMIN/SYSTEM_ADMIN
+  // are allowed to actually receive deleted rows; everyone else's request is
+  // silently coerced to includeDeleted=false.
+  includeDeleted: z.coerce.boolean().optional(),
 });
 
 const testConnectionSchema = z.object({
@@ -136,6 +141,12 @@ modelsRouter.get(
       throw ApiError.unauthorized('Authentication required');
     }
 
+    // Only admins can request soft-deleted rows. For everyone else,
+    // includeDeleted is force-disabled regardless of what they sent.
+    const isAdmin =
+      rbacCtx.role === 'TENANT_ADMIN' || rbacCtx.role === 'SYSTEM_ADMIN';
+    const includeDeleted = !!query.includeDeleted && isAdmin;
+
     const filter: ModelFilter = {
       tenantId: rbacCtx.tenantId,
       teamIds: rbacCtx.teamIds,
@@ -143,6 +154,7 @@ modelsRouter.get(
       enabled: query.enabled,
       search: query.search,
       providerTemplateId: query.providerTemplateId,
+      includeDeleted,
     };
 
     const result = await listModels(filter, {

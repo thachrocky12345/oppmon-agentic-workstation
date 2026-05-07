@@ -35,8 +35,8 @@ export class ApiError extends Error {
     return new ApiError(404, message, 'NOT_FOUND', undefined, suggestion);
   }
 
-  static conflict(message: string, suggestion?: string): ApiError {
-    return new ApiError(409, message, 'CONFLICT', undefined, suggestion);
+  static conflict(message: string, suggestion?: string, details?: unknown): ApiError {
+    return new ApiError(409, message, 'CONFLICT', details, suggestion);
   }
 
   static tooManyRequests(message = 'Too many requests', suggestion = 'Please wait a moment before trying again'): ApiError {

@@ -11,6 +11,7 @@ import {
   extractSecretFields,
 } from '@oppmon/shared';
 import { storeSecret, retrieveSecret, updateSecret, deleteSecret } from '../crypto/secret-vault.js';
+import { ApiError } from '../middleware/error-handler.js';
 
 // ============================================================================
 // Types
@@ -23,6 +24,8 @@ export interface ModelFilter {
   enabled?: boolean;
   search?: string;
   providerTemplateId?: string;
+  /** Include soft-deleted (tombstoned) models. Admin-only. */
+  includeDeleted?: boolean;
 }
 
 export interface PaginationOptions {
@@ -68,6 +71,8 @@ export interface ModelWithoutSecrets {
   lastSyncedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Soft-delete timestamp. Only populated when listing with includeDeleted=true. */
+  deletedAt?: Date | null;
 }
 
 // ============================================================================
@@ -80,11 +85,15 @@ export async function listModels(
 ): Promise<{ models: ModelWithoutSecrets[]; total: number; limit: number; offset: number }> {
   const { limit = 20, offset = 0 } = options;
 
-  // Build where clause
+  // Build where clause. `includeDeleted` lets admins see soft-deleted records
+  // (tombstones) — useful when a unique-name slot is "stuck" because the row
+  // was soft-deleted but the unique index still covers it.
   const where: Record<string, unknown> = {
     tenantId: filter.tenantId,
-    deletedAt: null,
   };
+  if (!filter.includeDeleted) {
+    where.deletedAt = null;
+  }
 
   // Filter by scope
   if (filter.scope) {
@@ -137,12 +146,14 @@ export async function listModels(
         lastSyncedAt: true,
         createdAt: true,
         updatedAt: true,
+        deletedAt: true,
       },
     }),
     prisma.model.count({ where }),
   ]);
 
-  // Transform to ModelWithoutSecrets
+  // Transform to ModelWithoutSecrets. Only include deletedAt when admin asked
+  // for tombstones — keeps the regular list payload clean.
   const transformedModels: ModelWithoutSecrets[] = models.map((m) => ({
     id: m.id,
     tenantId: m.tenantId,
@@ -159,6 +170,7 @@ export async function listModels(
     lastSyncedAt: m.lastSyncedAt,
     createdAt: m.createdAt,
     updatedAt: m.updatedAt,
+    ...(filter.includeDeleted ? { deletedAt: m.deletedAt } : {}),
   }));
 
   return {
@@ -257,22 +269,49 @@ export async function createModel(
     secretRef = await storeSecret(tenantId, input.secretConfig);
   }
 
-  const model = await prisma.model.create({
-    data: {
-      id: createId(),
-      tenantId,
-      scope: input.scope,
-      teamId: input.teamId,
-      displayName: input.displayName,
-      providerTemplateId: input.providerTemplateId,
-      modelIdentifier: input.modelIdentifier,
-      publicConfig: input.publicConfig,
-      secretRef,
-      yamlOverride: input.yamlOverride,
-      enabled: true,
-      createdById: userId,
-    },
-  });
+  // Translate Prisma's P2002 unique-violation into a clean 409 instead of
+  // letting it bubble as a 500. The unique index is on (tenant_id, display_name)
+  // and is NOT partial — soft-deleted (deleted_at != null) rows still occupy
+  // the name. So we look up the conflicting row and surface its id + deleted
+  // state so the UI can offer restore / hard-delete / rename.
+  let model;
+  try {
+    model = await prisma.model.create({
+      data: {
+        id: createId(),
+        tenantId,
+        scope: input.scope,
+        teamId: input.teamId,
+        displayName: input.displayName,
+        providerTemplateId: input.providerTemplateId,
+        modelIdentifier: input.modelIdentifier,
+        publicConfig: input.publicConfig,
+        secretRef,
+        yamlOverride: input.yamlOverride,
+        enabled: true,
+        createdById: userId,
+      },
+    });
+  } catch (err: any) {
+    if (err?.code === 'P2002') {
+      const existing = await prisma.model.findFirst({
+        where: { tenantId, displayName: input.displayName },
+        select: { id: true, deletedAt: true, displayName: true },
+      });
+      const isTombstone = !!existing?.deletedAt;
+      const message = isTombstone
+        ? `A soft-deleted model named "${input.displayName}" still occupies this name (it has not been hard-deleted). Restore it, hard-delete it, or pick a different display name.`
+        : `A model named "${input.displayName}" already exists in this tenant. Pick a different display name or delete the existing one.`;
+      throw ApiError.conflict(message, undefined, {
+        conflict: {
+          existingId: existing?.id,
+          deletedAt: existing?.deletedAt ?? null,
+          displayName: existing?.displayName,
+        },
+      });
+    }
+    throw err;
+  }
 
   return {
     id: model.id,
