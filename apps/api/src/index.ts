@@ -114,6 +114,8 @@ app.use('/api/rag', requestAuth, ragRouter);
 app.use('/api/rag', requestAuth, ragChatRouter);
 app.use('/api/admin/rag', requestAuth, ragAdminRouter);
 app.use('/api/mcp', requestAuth, mcpRouter);
+// Alias: frontend admin pages call /api/admin/mcp; same router.
+app.use('/api/admin/mcp', requestAuth, mcpRouter);
 app.use('/api/models', requestAuth, modelsRouter);
 app.use('/api/virtual-keys', requestAuth, virtualKeysRouter);
 app.use('/api/cli', requestAuth, cliRoutingRouter);

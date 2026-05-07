@@ -24,7 +24,9 @@ services:
       - target: 3001
         published: 3001
         protocol: tcp
-        mode: host
+        # ingress so multiple replicas on old_windows can share :3001 via
+        # swarm's routing mesh. mode: host would limit us to one replica.
+        mode: ingress
     environment:
       NODE_ENV: production
       PORT: "3001"
@@ -74,7 +76,7 @@ services:
       retries: 3
       start_period: 30s
     deploy:
-      replicas: 1
+      replicas: 2
       placement:
         constraints:
           - node.hostname == old_windows
@@ -82,7 +84,9 @@ services:
         condition: any
         delay: 5s
       update_config:
-        order: stop-first
+        # start-first is safe now: ingress mode means replicas don't compete
+        # for a host port. Maintains capacity during rolling updates.
+        order: start-first
         failure_action: rollback
 
   web:
@@ -93,7 +97,8 @@ services:
       - target: 3000
         published: 80
         protocol: tcp
-        mode: host
+        # ingress for multiple replicas (see api notes above).
+        mode: ingress
     environment:
       NODE_ENV: production
       # Browser uses relative /api/* (so the UI works from any client network).
@@ -108,7 +113,7 @@ services:
       retries: 3
       start_period: 30s
     deploy:
-      replicas: 1
+      replicas: 2
       placement:
         constraints:
           - node.hostname == z800
@@ -116,7 +121,7 @@ services:
         condition: any
         delay: 5s
       update_config:
-        order: stop-first
+        order: start-first
         failure_action: rollback
 
 networks:
