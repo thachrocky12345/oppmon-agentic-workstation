@@ -146,14 +146,14 @@ export async function retrieve(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
-        AND "sourceType" = ANY(${options.sourceTypes})
+      WHERE tenant_id = ${tenantId}
+        AND source_type = ANY(${options.sourceTypes})
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}
@@ -162,14 +162,14 @@ export async function retrieve(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
-        AND "sourceId" = ANY(${options.sourceIds})
+      WHERE tenant_id = ${tenantId}
+        AND source_id = ANY(${options.sourceIds})
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}
@@ -178,13 +178,13 @@ export async function retrieve(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
+      WHERE tenant_id = ${tenantId}
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${topK}

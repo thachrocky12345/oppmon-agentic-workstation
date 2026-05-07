@@ -338,14 +338,14 @@ export async function search(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
-        AND "sourceType" = ${request.sourceType}
+      WHERE tenant_id = ${tenantId}
+        AND source_type = ${request.sourceType}
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${limit}
@@ -354,13 +354,13 @@ export async function search(
     results = await prisma.$queryRaw`
       SELECT
         id,
-        "sourceType",
-        "sourceId",
+        source_type AS "sourceType",
+        source_id AS "sourceId",
         content,
         metadata,
         1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector) AS similarity
       FROM embeddings
-      WHERE "tenantId" = ${tenantId}
+      WHERE tenant_id = ${tenantId}
         AND (1 - (embedding <=> ${toPgVector(queryEmbedding)}::vector)) >= ${threshold}
       ORDER BY embedding <=> ${toPgVector(queryEmbedding)}::vector
       LIMIT ${limit}
@@ -412,8 +412,8 @@ export async function findSimilar(
   }> = await prisma.$queryRaw`
     SELECT
       e.id,
-      e."sourceType",
-      e."sourceId",
+      e.source_type AS "sourceType",
+      e.source_id AS "sourceId",
       e.content,
       e.metadata,
       1 - (e.embedding <=> src.embedding) AS similarity
@@ -421,7 +421,7 @@ export async function findSimilar(
     CROSS JOIN (
       SELECT embedding FROM embeddings WHERE id = ${source.id}
     ) src
-    WHERE e."tenantId" = ${tenantId}
+    WHERE e.tenant_id = ${tenantId}
       AND e.id != ${source.id}
       AND (1 - (e.embedding <=> src.embedding)) >= ${threshold}
     ORDER BY e.embedding <=> src.embedding

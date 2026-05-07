@@ -376,6 +376,47 @@ const llmUsageQuerySchema = z.object({
 });
 
 /**
+ * GET /api/admin/audit?limit=20&offset=0
+ * Recent audit log entries for the current tenant.
+ */
+adminRouter.get('/audit', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 200);
+  const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0);
+
+  const [rowsResult, totalResult] = await Promise.all([
+    query(
+      `SELECT
+         a.id,
+         a.tenant_id    AS "tenantId",
+         a.resource_type AS "resourceType",
+         a.resource_id   AS "resourceId",
+         a.action,
+         a.actor_id     AS "actorId",
+         u.email        AS "actorEmail",
+         u.name         AS "actorName",
+         a.before_state AS "beforeState",
+         a.after_state  AS "afterState",
+         a.ip_address   AS "ipAddress",
+         a.user_agent   AS "userAgent",
+         a.metadata,
+         a.created_at   AS "createdAt"
+       FROM audit_logs a
+       LEFT JOIN users u ON u.id = a.actor_id
+       WHERE a.tenant_id = $1
+       ORDER BY a.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [req.tenantId, limit, offset],
+    ),
+    query(`SELECT COUNT(*)::int AS total FROM audit_logs WHERE tenant_id = $1`, [req.tenantId]),
+  ]);
+
+  res.json({
+    data: rowsResult.rows,
+    meta: { total: totalResult.rows[0]?.total ?? 0, limit, offset },
+  });
+}));
+
+/**
  * GET /api/admin/llm-usage
  * Get LLM usage statistics for the entire tenant
  */
