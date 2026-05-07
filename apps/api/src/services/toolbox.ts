@@ -224,8 +224,8 @@ export class Toolbox {
     try {
       await query(
         `INSERT INTO tool_executions (
-          "tenantId", "userId", "toolName", "input", "output",
-          "status", "durationMs", "createdAt"
+          tenant_id, user_id, tool_name, input, output,
+          status, duration_ms, created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           this.tenantId,

@@ -206,7 +206,7 @@ describe('RAG Retriever Service', () => {
 
       await retrieve(options);
 
-      expect(capturedSql!).toContain('ch."tenantId" = $2');
+      expect(capturedSql!).toContain('ch.tenant_id = $2');
       expect(capturedParams![1]).toBe('tenant-123');
     });
 
@@ -230,7 +230,7 @@ describe('RAG Retriever Service', () => {
 
       expect(capturedSql!).toContain("c.scope = 'TENANT'");
       expect(capturedSql!).toContain("c.scope = 'TEAM'");
-      expect(capturedSql!).toContain('c."teamId" = ANY($5)');
+      expect(capturedSql!).toContain('c.team_id = ANY($5)');
       expect(capturedParams![4]).toEqual(['team-1', 'team-2']);
     });
 
@@ -293,8 +293,8 @@ describe('RAG Retriever Service', () => {
 
       await retrieve(options);
 
-      expect(capturedSql!).toContain('d."deletedAt" IS NULL');
-      expect(capturedSql!).toContain('c."deletedAt" IS NULL');
+      expect(capturedSql!).toContain('d.deleted_at IS NULL');
+      expect(capturedSql!).toContain('c.deleted_at IS NULL');
     });
 
     it('only includes EXTRACTED documents', async () => {
@@ -528,7 +528,7 @@ describe('RAG Retriever Service', () => {
 
       expect(capturedSql!).toContain("scope = 'TENANT'");
       expect(capturedSql!).toContain("scope = 'TEAM'");
-      expect(capturedSql!).toContain('"teamId" = ANY($2)');
+      expect(capturedSql!).toContain('team_id = ANY($2)');
       expect(capturedParams![1]).toEqual(['team-1', 'team-2']);
     });
 
@@ -541,7 +541,7 @@ describe('RAG Retriever Service', () => {
 
       await getAccessibleCollections('tenant-1', []);
 
-      expect(capturedSql!).toContain('"deletedAt" IS NULL');
+      expect(capturedSql!).toContain('deleted_at IS NULL');
     });
 
     it('filters by tenant ID', async () => {
@@ -555,7 +555,7 @@ describe('RAG Retriever Service', () => {
 
       await getAccessibleCollections('tenant-123', []);
 
-      expect(capturedSql!).toContain('"tenantId" = $1');
+      expect(capturedSql!).toContain('tenant_id = $1');
       expect(capturedParams![0]).toBe('tenant-123');
     });
 

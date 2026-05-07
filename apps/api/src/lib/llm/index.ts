@@ -84,7 +84,14 @@ export function createLLMClient(provider: LLMProvider, registryConfig?: ModelReg
     case 'ollama':
       if (registryConfig) {
         return new OllamaClient({
-          baseUrl: registryConfig.baseUrl || 'http://localhost:11434',
+          // Per-model baseUrl wins; otherwise fall back to the server-wide
+          // OLLAMA_BASE_URL env (set on the swarm), then localhost. Without
+          // the env fallback, model records that don't carry baseUrl always
+          // hit localhost which the container can't reach.
+          baseUrl:
+            registryConfig.baseUrl ||
+            process.env.OLLAMA_BASE_URL ||
+            'http://localhost:11434',
           defaultModel: registryConfig.model,
           timeout: registryConfig.timeout || 120000,
         });
