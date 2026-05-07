@@ -17,6 +17,45 @@
 
 ---
 
+## CLI parity (for testing & headless users)
+
+The same RAG chat that the dashboard renders is exposed through the OppMon CLI. Use this for QA, scripted demos, and headless agent flows. Run all commands from the repo root.
+
+```bash
+# Auth (one-time)
+pnpm oppmon:login                       # interactive (OAuth device-code)
+# or, headless:
+set TAG_TOKEN=...                       # cmd.exe — paste token from /api/auth/login
+pnpm oppmon:login -- --headless
+
+# One-shot chat (RAG-only, strict)
+pnpm oppmon:chat "summarize the latest ADR"
+
+# Interactive REPL
+pnpm oppmon:chat
+
+# Pick provider, model, RAG collection
+pnpm oppmon:chat -- -p ollama -m llama3.2:latest -c <collectionId> "explain auth"
+
+# Enable web search fallback + tools (live data, exploratory mode)
+pnpm oppmon:chat -- --web-fallback --enable-tools "what's the current weather in Dallas?"
+
+# Disable streaming (print full response when ready)
+pnpm oppmon:chat -- --no-stream "give me a one-paragraph summary"
+```
+
+> **Don't use `pnpm dev:api login` or `pnpm dev:api chat`.** `dev:api` is the Turbo task that boots the API server and treats trailing args as additional task names — it will fail with `Could not find task 'login'`. Always use the `pnpm oppmon:*` aliases (defined in root `package.json`).
+
+The CLI hits the same endpoints as the dashboard:
+- `POST /api/rag/chat/stream` (SSE NDJSON) — streaming path
+- `POST /api/rag/chat` — non-streaming path (`--no-stream`)
+
+Citation payloads ride on the `citation` event in the SSE stream (matching the dashboard contract from TAG-204/TAG-205), so anything that works in the web UI works in the terminal.
+
+See [`docs/cli-setup-guide.md`](./cli-setup-guide.md) for full setup, troubleshooting, and a flag reference.
+
+---
+
 ## High-level data flow
 
 ### Chat flow (user-facing)

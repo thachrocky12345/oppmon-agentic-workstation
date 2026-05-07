@@ -311,7 +311,7 @@ export class ApiClient {
     body?: unknown
   ): Promise<T> {
     if (!this.token) {
-      throw new Error('Not authenticated. Run "tag login" first.')
+      throw new Error('Not authenticated. Run "oppmon login" first.')
     }
 
     const url = `${this.baseUrl}${path}`

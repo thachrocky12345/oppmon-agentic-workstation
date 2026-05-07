@@ -39,7 +39,7 @@ import { isAuthenticated } from '../lib/credentials.js'
 
 function requireAuth(): void {
   if (!isAuthenticated()) {
-    console.error(chalk.red('Error: Not authenticated. Run "tag login" first.'))
+    console.error(chalk.red('Error: Not authenticated. Run "oppmon login" first.'))
     process.exit(EXIT_CODES.AUTH_REQUIRED)
   }
 }
