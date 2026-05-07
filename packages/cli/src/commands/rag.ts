@@ -590,6 +590,242 @@ async function statusCommand(options: StatsOptions): Promise<void> {
 }
 
 // ============================================================================
+// Collections (rag-admin)
+// ============================================================================
+
+/** CUIDs start with 'c' followed by 24 alphanumerics. Anything else = name. */
+function looksLikeCuid(s: string): boolean {
+  return /^c[a-z0-9]{24,}$/i.test(s)
+}
+
+async function resolveCollectionId(idOrName: string): Promise<string> {
+  if (looksLikeCuid(idOrName)) return idOrName
+  const api = createApiClient()
+  const list = await api.listRagCollections({ limit: 200 })
+  const match = list.data.find((c) => c.name === idOrName)
+  if (!match) {
+    console.error(chalk.red(`Error: collection "${idOrName}" not found`))
+    process.exit(EXIT_CODES.ERROR)
+  }
+  return match.id
+}
+
+interface CollectionsListOptions {
+  scope?: 'TENANT' | 'TEAM'
+  limit?: string
+  offset?: string
+  json?: boolean
+}
+
+async function collectionsListCommand(options: CollectionsListOptions): Promise<void> {
+  requireAuth()
+  const spinner = ora('Fetching collections...').start()
+  try {
+    const api = createApiClient()
+    const resp = await api.listRagCollections({
+      scope: options.scope,
+      limit: options.limit ? parseInt(options.limit, 10) : 50,
+      offset: options.offset ? parseInt(options.offset, 10) : 0,
+    })
+    spinner.stop()
+
+    if (options.json) {
+      console.log(JSON.stringify(resp, null, 2))
+      return
+    }
+
+    if (resp.data.length === 0) {
+      console.log(chalk.dim('No collections found.'))
+      return
+    }
+
+    console.log(
+      chalk.bold(
+        `\n  ${'NAME'.padEnd(28)} ${'SCOPE'.padEnd(7)} ${'DOCS'.padStart(5)} ${'CHUNKS'.padStart(7)}  ID`
+      )
+    )
+    console.log(chalk.dim(`  ${'-'.repeat(28)} ${'-'.repeat(7)} ${'-'.repeat(5)} ${'-'.repeat(7)}  ${'-'.repeat(28)}`))
+    for (const c of resp.data) {
+      const docs = String(c.document_count ?? 0).padStart(5)
+      const chunks = String(c.total_chunks ?? 0).padStart(7)
+      const scope = c.scope === 'TENANT' ? chalk.magenta('TENANT ') : chalk.cyan('TEAM   ')
+      const name = (c.name || '').padEnd(28)
+      console.log(`  ${name} ${scope} ${docs} ${chunks}  ${chalk.dim(c.id)}`)
+    }
+    console.log(
+      chalk.dim(
+        `\n  ${resp.data.length} of ${resp.meta.total} collection(s)` +
+          (resp.meta.offset ? `  (offset ${resp.meta.offset})` : '')
+      )
+    )
+  } catch (error) {
+    spinner.fail('Failed to fetch collections')
+    console.error(chalk.red(`Error: ${(error as Error).message}`))
+    process.exit(EXIT_CODES.ERROR)
+  }
+}
+
+async function collectionsShowCommand(
+  idOrName: string,
+  options: { json?: boolean }
+): Promise<void> {
+  requireAuth()
+  const spinner = ora('Fetching collection...').start()
+  try {
+    const id = await resolveCollectionId(idOrName)
+    const api = createApiClient()
+    const resp = await api.getRagCollection(id)
+    spinner.stop()
+
+    if (options.json) {
+      console.log(JSON.stringify(resp.data, null, 2))
+      return
+    }
+
+    const c = resp.data as RagCollectionDetail
+    console.log(chalk.bold(`\n${c.name}`))
+    if (c.description) console.log(chalk.dim(c.description))
+    console.log()
+    console.log(`  ID:           ${chalk.dim(c.id)}`)
+    console.log(
+      `  Scope:        ${c.scope === 'TENANT' ? chalk.magenta('TENANT') : chalk.cyan('TEAM')}`
+    )
+    if (c.team_id || c.teamId) console.log(`  Team:         ${c.team_id ?? c.teamId}`)
+    if (c.created_at || c.createdAt)
+      console.log(`  Created:      ${c.created_at ?? c.createdAt}`)
+    if (c.updated_at || c.updatedAt)
+      console.log(`  Updated:      ${c.updated_at ?? c.updatedAt}`)
+
+    const docs = c.documents ?? []
+    console.log(chalk.bold(`\n  Documents (${docs.length}):`))
+    if (docs.length === 0) {
+      console.log(chalk.dim('    (none)'))
+    } else {
+      for (const d of docs) {
+        const status = formatExtractionStatus(d.extractionStatus ?? d.extraction_status)
+        const filename = d.originalFilename ?? d.original_filename ?? '?'
+        const chunks = d.chunkCount ?? d.chunk_count ?? 0
+        console.log(
+          `    ${status}  ${filename.padEnd(40)} ${String(chunks).padStart(4)} chunks  ${chalk.dim(d.id)}`
+        )
+      }
+    }
+  } catch (error) {
+    spinner.fail('Failed to fetch collection')
+    console.error(chalk.red(`Error: ${(error as Error).message}`))
+    process.exit(EXIT_CODES.ERROR)
+  }
+}
+
+interface CollectionsCreateOptions {
+  name?: string
+  description?: string
+  scope?: string
+  team?: string
+}
+
+async function collectionsCreateCommand(options: CollectionsCreateOptions): Promise<void> {
+  requireAuth()
+
+  const name = options.name?.trim()
+  if (!name) {
+    console.error(chalk.red('Error: --name is required'))
+    process.exit(EXIT_CODES.ERROR)
+  }
+  const scope = (options.scope || 'TEAM').toUpperCase() as 'TENANT' | 'TEAM'
+  if (scope !== 'TENANT' && scope !== 'TEAM') {
+    console.error(chalk.red('Error: --scope must be TENANT or TEAM'))
+    process.exit(EXIT_CODES.ERROR)
+  }
+  if (scope === 'TEAM' && !options.team) {
+    console.error(chalk.red('Error: --team <id> is required for TEAM scope'))
+    process.exit(EXIT_CODES.ERROR)
+  }
+
+  const spinner = ora(`Creating collection "${name}"...`).start()
+  try {
+    const api = createApiClient()
+    const resp = await api.createRagCollection({
+      name,
+      description: options.description,
+      scope,
+      teamId: scope === 'TEAM' ? options.team : undefined,
+    })
+    spinner.succeed(`Created collection "${name}" (${chalk.dim(resp.data.id)})`)
+  } catch (error) {
+    spinner.fail('Create failed')
+    console.error(chalk.red(`Error: ${(error as Error).message}`))
+    process.exit(EXIT_CODES.ERROR)
+  }
+}
+
+async function collectionsDeleteCommand(
+  idOrName: string,
+  options: { yes?: boolean }
+): Promise<void> {
+  requireAuth()
+
+  const id = await resolveCollectionId(idOrName)
+
+  if (!options.yes) {
+    console.error(
+      chalk.yellow(
+        `Refusing to delete without --yes. This will soft-delete the collection and all its documents.`
+      )
+    )
+    process.exit(EXIT_CODES.ERROR)
+  }
+
+  const spinner = ora(`Deleting collection ${id}...`).start()
+  try {
+    const api = createApiClient()
+    await api.deleteRagCollection(id)
+    spinner.succeed(`Deleted collection ${chalk.dim(id)}`)
+  } catch (error) {
+    spinner.fail('Delete failed')
+    console.error(chalk.red(`Error: ${(error as Error).message}`))
+    process.exit(EXIT_CODES.ERROR)
+  }
+}
+
+function formatExtractionStatus(status?: string): string {
+  switch (status) {
+    case 'EXTRACTED':
+      return chalk.green('●')
+    case 'EXTRACTING':
+    case 'PENDING':
+      return chalk.yellow('●')
+    case 'FAILED':
+      return chalk.red('●')
+    default:
+      return chalk.dim('○')
+  }
+}
+
+// Permissive shape — backend mixes camel and snake case for collection details.
+type RagCollectionDetail = {
+  id: string
+  name: string
+  description?: string | null
+  scope: 'TENANT' | 'TEAM'
+  team_id?: string | null
+  teamId?: string | null
+  created_at?: string
+  createdAt?: string
+  updated_at?: string
+  updatedAt?: string
+  documents?: Array<{
+    id: string
+    originalFilename?: string
+    original_filename?: string
+    chunkCount?: number
+    chunk_count?: number
+    extractionStatus?: string
+    extraction_status?: string
+  }>
+}
+
+// ============================================================================
 // Command Setup
 // ============================================================================
 
@@ -693,6 +929,48 @@ export function createRagCommand(): Command {
     .description('Show RAG pipeline status and configuration')
     .option('--json', 'Output as JSON')
     .action(statusCommand)
+
+  // Collections (admin)
+  const collections = new Command('collections')
+    .alias('coll')
+    .description('Manage RAG document collections (admin)')
+
+  collections
+    .command('list')
+    .alias('ls')
+    .description('List collections you can see')
+    .option('-s, --scope <scope>', 'Filter by TENANT or TEAM')
+    .option('-l, --limit <n>', 'Max rows (default 50)')
+    .option('--offset <n>', 'Offset for pagination')
+    .option('--json', 'Output as JSON')
+    .action(collectionsListCommand)
+
+  collections
+    .command('show <idOrName>')
+    .alias('get')
+    .description('Show one collection with its documents')
+    .option('--json', 'Output as JSON')
+    .action(collectionsShowCommand)
+
+  collections
+    .command('create')
+    .alias('new')
+    .description('Create a new collection (admin only)')
+    .option('-n, --name <name>', 'Collection name (required)')
+    .option('-d, --description <text>', 'Description')
+    .option('-s, --scope <scope>', 'TENANT or TEAM (default TEAM)')
+    .option('--team <teamId>', 'teamId (required when scope is TEAM)')
+    .action(collectionsCreateCommand)
+
+  collections
+    .command('delete <idOrName>')
+    .alias('rm')
+    .description('Soft-delete a collection (admin only)')
+    .option('-y, --yes', 'Skip confirmation')
+    .action(collectionsDeleteCommand)
+
+  collections.action(() => collections.outputHelp())
+  rag.addCommand(collections)
 
   // Default action
   rag.action(() => {
