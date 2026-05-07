@@ -17,6 +17,10 @@ import { createHooksCommand } from './commands/hooks.js'
 import { createEventsCommand } from './commands/events.js'
 import { createDoctorCommand } from './commands/doctor.js'
 import { createChatCommand } from './commands/chat.js'
+import { createModelsCommand } from './commands/models.js'
+import { createSkillsCommand } from './commands/skills.js'
+import { createMcpCommand } from './commands/mcp.js'
+import { createAnalyticsCommand } from './commands/analytics.js'
 import { loadTokensCache } from './lib/credentials.js'
 
 const program = new Command()
@@ -47,6 +51,10 @@ program.addCommand(createHooksCommand())
 program.addCommand(createEventsCommand())
 program.addCommand(createDoctorCommand())
 program.addCommand(createChatCommand())
+program.addCommand(createModelsCommand())
+program.addCommand(createSkillsCommand())
+program.addCommand(createMcpCommand())
+program.addCommand(createAnalyticsCommand())
 
 // Add examples to help output
 program.addHelpText('after', `
@@ -78,13 +86,61 @@ ${chalk.bold('MCP Sync:')}
   $ oppmon sync mcp pull               # Pull all remote MCP servers to local
 
 ${chalk.bold('RAG Ingestion:')}
-  $ oppmon rag ingest README.md        # Ingest a single document
-  $ oppmon rag ingest-dir ./docs       # Ingest all documents in a directory
-  $ oppmon rag search "how to auth"    # Semantic search across embeddings
-  $ oppmon rag query "explain auth"    # Full RAG query with LLM response
-  $ oppmon rag list                    # List all embeddings
-  $ oppmon rag stats                   # Show embedding statistics
-  $ oppmon rag status                  # Show RAG pipeline status
+  $ oppmon rag ingest README.md          # Ingest a single document
+  $ oppmon rag ingest-dir ./docs         # Ingest all documents in a directory
+  $ oppmon rag search "how to auth"      # Semantic search across embeddings
+  $ oppmon rag query "explain auth"      # Full RAG query with LLM response
+  $ oppmon rag list                      # List all embeddings
+  $ oppmon rag stats                     # Show embedding statistics
+  $ oppmon rag coverage                  # Skill / agent embedding coverage
+  $ oppmon rag reindex --types skill     # Re-embed all skills
+  $ oppmon rag status                    # Show RAG pipeline status
+
+${chalk.bold('RAG Collections (admin):')}
+  $ oppmon rag collections list          # List collections you can see
+  $ oppmon rag collections show <name>   # Show one collection + its documents
+  $ oppmon rag collections create -n eng-runbooks -s TEAM --team t_abc
+  $ oppmon rag collections delete <name> --yes
+
+${chalk.bold('Models Registry:')}
+  $ oppmon models list                 # List all visible models
+  $ oppmon models providers            # List available provider templates
+  $ oppmon models show <id>            # Show details for one model
+  $ oppmon models create               # Interactive wizard (prompts + test)
+  $ oppmon models test -p anthropic -s '{"apiKey":"sk-..."}'   # Test creds
+  $ oppmon models rotate <id>          # Rotate the model's secret
+  $ oppmon models toggle <id> --off    # Disable a model
+
+${chalk.bold('Skills Registry:')}
+  $ oppmon skills list                              # List all visible skills
+  $ oppmon skills show <name>                       # Show details (use --content for body)
+  $ oppmon skills create .claude/skills/foo/SKILL.md  # Create from a local file
+  $ oppmon skills update <name> SKILL.md            # Push new content (auto-versioned)
+  $ oppmon skills versions <name>                   # List version history
+  $ oppmon skills toggle <name> --off               # Disable a skill
+  $ oppmon skills lint .claude/skills/foo/SKILL.md  # Validate frontmatter locally
+  $ oppmon skills delete <name>                     # Soft-delete a skill
+
+${chalk.bold('MCP Registry:')}
+  $ oppmon mcp list                                  # List all visible MCP servers
+  $ oppmon mcp show <name>                           # Show one server (incl. command/args/env)
+  $ oppmon mcp create -n fs -c npx -a "-y @modelcontextprotocol/server-filesystem"
+  $ oppmon mcp update <name> --args "-y @some/server@latest"
+  $ oppmon mcp toggle <name> --off                   # Disable a server
+  $ oppmon mcp delete <name> --yes                   # Soft-delete a server
+
+${chalk.bold('Analytics & Audit:')}
+  $ oppmon analytics summary                         # Overview: requests, tokens, cost, top agents
+  $ oppmon analytics agents -p 30d                   # Per-agent breakdown
+  $ oppmon analytics models                          # Per-model usage breakdown
+  $ oppmon analytics errors                          # Recent errors + error rate
+  $ oppmon analytics usage                           # Privacy-first usage events stats
+  $ oppmon analytics top --type skill                # Top resources by usage (skill|mcp_server|rag_query)
+  $ oppmon analytics costs --by-model                # Cost overview, optional per-model split
+  $ oppmon analytics audit --action UPDATE --limit 50 # Query audit log
+  $ oppmon analytics settings                        # Show usage tracking settings
+  $ oppmon analytics enable                          # Enable usage event collection
+  $ oppmon analytics disable                         # Disable usage event collection
 
 ${chalk.bold('Event Collection:')}
   $ oppmon hooks install               # Install Claude Code event hook
