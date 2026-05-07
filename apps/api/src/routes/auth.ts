@@ -90,6 +90,9 @@ authRouter.post('/login', asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Generate JWT — embed token version snapshot for event-driven revocation.
+  // `issuer: 'oppmon'` MUST match the verifier in apps/web/src/middleware.ts;
+  // omitting it causes the edge middleware to reject the token and bounce the
+  // user back to /login.
   const tv = await getTokenVersion(user.id);
   const isSystem = user.tenant_id === SYSTEM_TENANT_ID;
   const token = jwt.sign(
@@ -102,7 +105,7 @@ authRouter.post('/login', asyncHandler(async (req: Request, res: Response) => {
       ...(isSystem ? { isSystem: true } : {}),
     },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN },
+    { expiresIn: JWT_EXPIRES_IN, issuer: 'oppmon' },
   );
 
   // Update updated_at timestamp
@@ -162,6 +165,7 @@ authRouter.post('/register', asyncHandler(async (req: Request, res: Response) =>
   await prisma.tokenVersion.create({ data: { userId, version: 1 } });
 
   // Generate JWT — embed initial token version (1).
+  // `issuer` must match the web edge middleware verifier.
   const token = jwt.sign(
     {
       sub: userId,
@@ -171,7 +175,7 @@ authRouter.post('/register', asyncHandler(async (req: Request, res: Response) =>
       tv: 1,
     },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN },
+    { expiresIn: JWT_EXPIRES_IN, issuer: 'oppmon' },
   );
 
   res.status(201).json({
@@ -419,7 +423,7 @@ authRouter.post('/device/token', asyncHandler(async (req: Request, res: Response
       ...(isSystem ? { isSystem: true } : {}),
     },
     JWT_SECRET,
-    { expiresIn },
+    { expiresIn, issuer: 'oppmon' },
   );
 
   // Generate refresh token
