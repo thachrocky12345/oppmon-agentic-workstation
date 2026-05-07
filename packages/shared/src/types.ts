@@ -7,10 +7,15 @@
 // ============================================================================
 
 export enum Role {
+  /** Global administrator — only valid for users in the System Tenant */
+  SYSTEM_ADMIN = "SYSTEM_ADMIN",
   TENANT_ADMIN = "TENANT_ADMIN",
   TEAM_ADMIN = "TEAM_ADMIN",
   MEMBER = "MEMBER",
 }
+
+/** Reserved tenant ID for the immutable management tenant. */
+export const SYSTEM_TENANT_ID = "system";
 
 export enum TeamRole {
   ADMIN = "ADMIN",
@@ -59,6 +64,10 @@ export interface JWTClaims {
   role: Role;
   /** Teams the user belongs to */
   teams: TeamMembership[];
+  /** Token version snapshot — must match users.token_versions.version */
+  tv: number;
+  /** True iff sub belongs to the System Tenant (global admin context) */
+  isSystem?: boolean;
   /** Token issued at (Unix timestamp) */
   iat: number;
   /** Token expiration (Unix timestamp) */

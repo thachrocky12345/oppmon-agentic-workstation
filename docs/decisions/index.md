@@ -1,8 +1,8 @@
 # Architecture Decision Records
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
-This directory contains Architecture Decision Records (ADRs) for the Arkon project.
+This directory contains Architecture Decision Records (ADRs) for the OppMon (Arkon) project.
 
 ## What is an ADR?
 
@@ -22,6 +22,10 @@ An Architecture Decision Record captures an important architectural decision mad
 | [0004](ADR-0004-pgvector-embeddings.md) | [AUTO] Vector Embeddings with pgvector | Accepted | 2026-05-05 |
 | [0005](ADR-0005-hybrid-search.md) | [AUTO] Hybrid Search with BM25 + Vector + RRF | Accepted | 2026-05-05 |
 | [0006](ADR-0006-privacy-first-usage-analytics.md) | [AUTO] Privacy-First Usage Analytics | Accepted | 2026-05-05 |
+| [0007](ADR-0007-litellm-router-proxy.md) | [AUTO] LiteLLM Router via http-proxy-middleware | Accepted | 2026-05-07 |
+| [0008](ADR-0008-agent-engine-subsystem.md) | [AUTO] Agent Engine Subsystem with Oracle Loop and Semantic Cache | Accepted | 2026-05-07 |
+| [0009](ADR-0009-guardrails-and-observability.md) | [AUTO] Guardrails and Observability Packages | Accepted | 2026-05-07 |
+| [0010](ADR-0010-document-ingestion-pipeline.md) | [AUTO] Document Ingestion Pipeline (PDF / DOCX / Multipart) | Accepted | 2026-05-07 |
 
 ## Status Definitions
 

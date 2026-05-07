@@ -1,5 +1,6 @@
-import { query } from './db.js';
 import { Request } from 'express';
+import { withTenant } from './db.js';
+import type { Prisma } from '@oppmon/database';
 
 export interface AuditEntry {
   actorType: 'user' | 'agent' | 'system' | 'cron';
@@ -12,6 +13,12 @@ export interface AuditEntry {
   oldValue?: Record<string, unknown>;
   newValue?: Record<string, unknown>;
   ipAddress?: string;
+  /**
+   * Tenant ID for the audit row. SHOULD always come from req.user.tenantId at
+   * the middleware layer — never trust client input. The new audit_logs
+   * BEFORE INSERT trigger enforces that this matches app.current_tenant, so
+   * mis-scoped writes will raise rather than silently land in the wrong row.
+   */
   tenantId?: string;
 }
 
@@ -26,17 +33,18 @@ function toAuditAction(action: string): 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' 
   return 'READ';
 }
 
-const cuid = () => 'aud_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
 /**
  * Log an audit event. Fire-and-forget — never throws.
- * Writes to audit_logs (the Prisma-managed table). Skips silently when the
- * NOT-NULL actor_id or tenant_id are missing (system-level events without a
- * user are not persisted; in-process logs only).
+ *
+ * Writes via withTenant() so the audit_logs row is inserted inside a
+ * transaction with `app.current_tenant` set. RLS + the BEFORE INSERT trigger
+ * both verify that the persisted tenant_id matches the session context — the
+ * caller can't accidentally (or maliciously) write to another tenant's audit.
+ *
+ * Skips silently when actor_id or tenant_id are missing (the columns are
+ * NOT NULL with FKs to users/tenants).
  */
 export function logAudit(entry: AuditEntry): void {
-  // audit_logs.actor_id and tenant_id are NOT NULL with FKs to users/tenants.
-  // Without both, we can't write a valid row — log to console and bail.
   if (!entry.actorId || !entry.tenantId) {
     console.log('[audit] (skipped, no actor/tenant)', entry.action, entry.targetType, entry.targetId);
     return;
@@ -49,22 +57,22 @@ export function logAudit(entry: AuditEntry): void {
     ...(entry.action !== toAuditAction(entry.action) ? { rawAction: entry.action } : {}),
   };
 
-  query(
-    `INSERT INTO audit_logs
-     (id, tenant_id, resource_type, resource_id, action, actor_id, before_state, after_state, ip_address, metadata, created_at)
-     VALUES ($1, $2, $3, $4, $5::"AuditAction", $6, $7, $8, $9, $10, NOW())`,
-    [
-      cuid(),
-      entry.tenantId,
-      entry.targetType ?? 'unknown',
-      entry.targetId ?? 'unknown',
-      toAuditAction(entry.action),
-      entry.actorId,
-      entry.oldValue ? JSON.stringify(entry.oldValue) : null,
-      entry.newValue ? JSON.stringify(entry.newValue) : null,
-      entry.ipAddress ?? null,
-      JSON.stringify(metadata),
-    ],
+  // Capture into locals so the closure doesn't reference mutable entry.
+  const tenantId = entry.tenantId;
+  const data = {
+    tenantId,
+    resourceType: entry.targetType ?? 'unknown',
+    resourceId: entry.targetId ?? 'unknown',
+    action: toAuditAction(entry.action),
+    actorId: entry.actorId,
+    beforeState: (entry.oldValue ?? null) as Prisma.InputJsonValue | null,
+    afterState: (entry.newValue ?? null) as Prisma.InputJsonValue | null,
+    ipAddress: entry.ipAddress ?? null,
+    metadata: metadata as Prisma.InputJsonValue,
+  };
+
+  withTenant(tenantId, (tx) =>
+    tx.auditLog.create({ data: data as Prisma.AuditLogUncheckedCreateInput }),
   ).catch((err) => {
     console.error('[audit] Failed to log audit event:', err);
   });

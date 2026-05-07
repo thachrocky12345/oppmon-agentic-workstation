@@ -25,7 +25,7 @@ BEGIN;
 -- 1. work_items — the core record
 -- ============================================================
 CREATE TABLE IF NOT EXISTS work_items (
-  id                BIGSERIAL PRIMARY KEY,
+  id                TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   tenant_id         TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
 
   -- content
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS work_items (
 
   -- organization
   tags              TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-  depends_on        BIGINT[] NOT NULL DEFAULT ARRAY[]::BIGINT[],  -- work_items.id references (soft — no FK on arrays)
+  depends_on        TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],  -- work_items.id references (soft — no FK on arrays)
 
   -- lifecycle
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -101,8 +101,8 @@ CREATE TRIGGER trg_work_items_touch_updated_at
 -- delegation dispatch/result, outcome, status flip) gets one row here. UI renders
 -- a chronological timeline in the Work Item detail panel.
 CREATE TABLE IF NOT EXISTS work_item_plan_log (
-  id                    BIGSERIAL PRIMARY KEY,
-  work_item_id          BIGINT NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+  id                    TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  work_item_id          TEXT NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
   ts                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   author                TEXT NOT NULL REFERENCES agent_identities(slug),
   kind                  TEXT NOT NULL
@@ -124,8 +124,8 @@ CREATE INDEX IF NOT EXISTS idx_wipl_delegation ON work_item_plan_log(linked_dele
 -- 3. work_item_postmortems — failure capture (one per failed WI)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS work_item_postmortems (
-  id                    BIGSERIAL PRIMARY KEY,
-  work_item_id          BIGINT NOT NULL UNIQUE REFERENCES work_items(id) ON DELETE CASCADE,
+  id                    TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  work_item_id          TEXT NOT NULL UNIQUE REFERENCES work_items(id) ON DELETE CASCADE,
   ts                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   author                TEXT NOT NULL REFERENCES agent_identities(slug),
   what_happened         TEXT NOT NULL,

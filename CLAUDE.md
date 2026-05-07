@@ -11,11 +11,17 @@ This file provides context for Claude Code when working in this repository.
 This directory contains the original monorepo code and is **FOR REFERENCE ONLY**. Use it to understand patterns, copy implementations, or check how features work — but **NEVER edit files in this directory**.
 
 **All code changes must go to:**
-- `apps/api/` — Express API server (@arkon/api)
-- `apps/web/` — Next.js frontend (@arkon/web)
-- `packages/cli/` — CLI tool for AI Gateway management (@arkon/cli)
-- `packages/database/` — Prisma schema and client (@arkon/database)
-- `packages/shared/` — Shared TypeScript types (@arkon/shared)
+- `apps/api/` — Express API server (@oppmon/api)
+- `apps/web/` — Next.js frontend (@oppmon/web)
+- `apps/router/` — LiteLLM proxy router (@oppmon/router)
+- `packages/cli/` — CLI tool for AI Gateway management (@oppmon/cli)
+- `packages/database/` — Prisma schema and client (@oppmon/database)
+- `packages/shared/` — Shared TypeScript types (@oppmon/shared)
+- `packages/agent-engine/` — Reusable agent execution primitives (@arkon/agent-engine)
+- `packages/guardrails/` — Safety / policy enforcement (@arkon/guardrails)
+- `packages/observability/` — Tracing, metrics, latency (@arkon/observability)
+- `packages/skill-framework/` — Skill definition framework (@arkon/skill-framework)
+- `packages/integration-tests/` — Cross-package integration tests (@arkon/integration-tests)
 - `packages/engine-core/` — Rust high-performance utilities
 
 ---
@@ -83,7 +89,7 @@ Whenever `/init` is run:
 ## Known Dependencies
 <!-- Claude auto-updates this section on every /init — do not edit manually -->
 
-**Last synced:** 2026-05-06 (init sync)
+**Last synced:** 2026-05-07 (init sync)
 
 ### Reference Only (arkon-reference-only/) — DO NOT MODIFY
 | Package | Version | Category |
@@ -109,7 +115,7 @@ Whenever `/init` is run:
 | @playwright/test | ^1.58.2 | E2E Testing |
 | @axe-core/playwright | ^4.11.1 | A11y Testing |
 
-### Frontend (apps/web — @arkon/web)
+### Frontend (apps/web — @oppmon/web)
 | Package | Version | Category |
 |---------|---------|----------|
 | next | ^15.0.0 | Framework |
@@ -125,20 +131,26 @@ Whenever `/init` is run:
 | clsx | ^2.1.1 | Utilities |
 | tailwind-merge | ^2.5.0 | Utilities |
 | class-variance-authority | ^0.7.0 | Utilities |
+| react-markdown | ^10.1.0 | Markdown Rendering |
+| remark-gfm | ^4.0.1 | Markdown (GFM) |
+| jose | ^5.2.0 | JWT verify (middleware) |
+| zod | ^3.23.0 | Validation |
 | tailwindcss | ^3.4.0 | Styling |
+| @tailwindcss/typography | ^0.5.19 | Styling |
 | typescript | ^5.6.0 | DevTools |
 | vitest | ^2.0.0 | Testing |
 | @playwright/test | ^1.47.0 | E2E Testing |
 
-### Backend (apps/api — @arkon/api)
+### Backend (apps/api — @oppmon/api)
 | Package | Version | Category |
 |---------|---------|----------|
 | express | ^4.21.0 | Framework |
 | pg | ^8.20.0 | Database |
-| @prisma/client | ^5.22.0 | ORM (via @arkon/database) |
+| @prisma/client | ^5.22.0 | ORM (via @oppmon/database) |
 | jsonwebtoken | ^9.0.2 | Auth |
 | bcryptjs | ^3.0.3 | Auth |
 | arctic | ^2.1.0 | OAuth |
+| cookie-parser | ^1.4.6 | Auth/Sessions |
 | @anthropic-ai/sdk | ^0.39.0 | LLM |
 | openai | ^4.77.0 | LLM/Embeddings |
 | zod | ^3.23.0 | Validation |
@@ -153,20 +165,40 @@ Whenever `/init` is run:
 | marked | ^13.0.3 | Markdown |
 | dompurify | ^3.3.2 | HTML Sanitization |
 | jsdom | ^24.1.0 | DOM |
+| busboy | ^1.6.0 | Multipart Uploads |
+| pdf-parse | ^2.4.5 | Document Ingestion |
+| mammoth | ^1.12.0 | Document Ingestion (DOCX) |
+| mustache | ^4.2.0 | Templating |
+| tweetnacl | ^1.0.3 | Crypto |
+| dockerode | ^4.0.0 | Docker SDK (LiteLLM orchestration) |
+| dotenv | ^16.4.5 | Config |
 | @paralleldrive/cuid2 | ^2.2.2 | ID Generation |
 | typescript | ^5.6.0 | DevTools |
 | tsx | ^4.19.0 | DevTools |
 | vitest | ^2.0.0 | Testing |
 | supertest | ^7.0.0 | Testing |
 
-### Database (packages/database — @arkon/database)
+### Router (apps/router — @oppmon/router)
+| Package | Version | Category |
+|---------|---------|----------|
+| express | ^4.21.0 | Framework |
+| http-proxy-middleware | ^3.0.0 | Reverse Proxy |
+| @oppmon/database | workspace:* | ORM |
+| @oppmon/shared | workspace:* | Types |
+| bcryptjs | ^3.0.3 | Auth |
+| cors | ^2.8.5 | Security |
+| helmet | ^7.1.0 | Security |
+| pino | ^9.2.0 | Logging |
+| dotenv | ^16.4.5 | Config |
+
+### Database (packages/database — @oppmon/database)
 | Package | Version | Category |
 |---------|---------|----------|
 | @prisma/client | ^5.22.0 | ORM |
 | prisma | ^5.22.0 | ORM |
 | bcryptjs | ^3.0.3 | Auth |
 
-### CLI (packages/cli — @arkon/cli)
+### CLI (packages/cli — @oppmon/cli)
 | Package | Version | Category |
 |---------|---------|----------|
 | commander | ^12.1.0 | CLI Framework |
@@ -175,6 +207,19 @@ Whenever `/init` is run:
 | keytar | ^7.9.0 | Credential Storage |
 | open | ^10.1.0 | Open URLs |
 | conf | ^13.0.0 | Config Storage |
+
+### Agent / Skill / Safety Packages
+| Package | Version | Category |
+|---------|---------|----------|
+| @arkon/agent-engine | workspace | Agent execution primitives (oracle loop, replay, risk, tools) |
+| @arkon/guardrails | workspace | Constitution, scope, filter, audit guardrails |
+| @arkon/observability | workspace | Tracing, metrics, latency (Langfuse/prom-client peers) |
+| @arkon/skill-framework | workspace | YAML frontmatter skill registry + workflow runner |
+| @arkon/integration-tests | workspace | Cross-package integration & smoke tests |
+| zod | ^3.23.0 | Schema validation (shared across all) |
+| yaml | ^2.4.5 | Skill frontmatter parsing |
+| chokidar | ^3.6.0 | Skill registry file watching |
+| glob | ^10.3.10 | Skill discovery |
 
 ### Monorepo (root)
 | Package | Version | Category |
@@ -240,41 +285,67 @@ arkon-workstation/
 │   └── (original monorepo)     # Reference code only, never edit
 │
 ├── apps/
-│   ├── api/                    # ✅ Express API server (@arkon/api)
+│   ├── api/                    # ✅ Express API server (@oppmon/api)
 │   │   ├── src/
 │   │   │   ├── routes/         # API route handlers
 │   │   │   ├── services/       # Business logic services
-│   │   │   ├── lib/            # Database, JWT, OAuth, LLM, RAG
+│   │   │   ├── lib/            # db, jwt, oauth, llm, rag, search, embedding, storage, crypto
 │   │   │   ├── middleware/     # Express middleware
+│   │   │   ├── validators/     # Provider connection validators
+│   │   │   ├── agent/          # Oracle loop, memory, semantic cache, toolbox, pipelines
 │   │   │   └── index.ts        # Entry point
-│   │   ├── scripts/            # Migrations, seeds
+│   │   ├── scripts/            # Migrations, seeds, smoke tests
 │   │   └── package.json
 │   │
-│   └── web/                    # ✅ Next.js frontend (@arkon/web)
+│   ├── router/                 # ✅ LiteLLM proxy router (@oppmon/router)
+│   │   ├── src/
+│   │   │   ├── index.ts        # Express bootstrap
+│   │   │   └── proxy.ts        # http-proxy-middleware wiring
+│   │   └── package.json
+│   │
+│   └── web/                    # ✅ Next.js frontend (@oppmon/web)
 │       ├── src/
-│       │   ├── app/            # App Router pages
-│       │   └── lib/            # Utilities, API client
+│       │   ├── app/            # App Router pages (incl. (dashboard) group)
+│       │   ├── components/     # Reusable components
+│       │   ├── schemas/        # Zod schemas
+│       │   ├── lib/            # Utilities, API client
+│       │   └── middleware.ts   # Auth middleware (jose)
 │       └── package.json
 │
 ├── packages/
-│   ├── cli/                    # ✅ CLI tool (@arkon/cli)
+│   ├── cli/                    # ✅ CLI tool (@oppmon/cli)
 │   │   ├── src/
 │   │   │   ├── commands/       # CLI commands
 │   │   │   ├── lib/            # CLI utilities
 │   │   │   └── index.ts        # Entry point
 │   │   └── package.json
 │   │
-│   ├── database/               # ✅ Prisma schema (@arkon/database)
+│   ├── database/               # ✅ Prisma schema (@oppmon/database)
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma   # Database schema
 │   │   │   └── seed.ts         # Seed data
 │   │   └── package.json
 │   │
-│   ├── shared/                 # ✅ Shared types (@arkon/shared)
+│   ├── shared/                 # ✅ Shared types (@oppmon/shared)
 │   │   ├── src/
 │   │   │   ├── types.ts        # JWTClaims, Role, etc.
+│   │   │   ├── providers/      # Provider templates
 │   │   │   └── constants.ts    # Shared constants
 │   │   └── package.json
+│   │
+│   ├── agent-engine/           # ✅ Agent primitives (@arkon/agent-engine)
+│   │   └── src/                # wire, replay, risk, tools, types
+│   │
+│   ├── guardrails/             # ✅ Safety/policy (@arkon/guardrails)
+│   │   └── src/                # constitution, scope, filter, audit, tools
+│   │
+│   ├── observability/          # ✅ Tracing/metrics (@arkon/observability)
+│   │   └── src/                # tracing, metrics, latency, langfuse
+│   │
+│   ├── skill-framework/        # ✅ Skill registry (@arkon/skill-framework)
+│   │   └── src/                # parser, frontmatter, registry, workflow
+│   │
+│   ├── integration-tests/      # ✅ Cross-package tests (@arkon/integration-tests)
 │   │
 │   ├── engine-core/            # ✅ Rust utilities
 │   │   ├── crates/
@@ -377,11 +448,26 @@ arkon-workstation/
 | OAuth | `oauth.ts` | Arctic OAuth helpers |
 | RBAC | `rbac.ts` | RBAC utilities |
 | Audit | `audit.ts` | Audit logging |
-| Secret Vault | `crypto/secret-vault.ts` | XChaCha20-Poly1305 encryption |
+| Storage | `storage/local-disk.ts` | Pluggable file storage (local-disk impl) |
 | RAG | `rag/` | RAG context builder |
 | Embedding | `embedding/` | OpenAI embeddings |
 | Search | `search/` | Hybrid search (BM25 + vector + RRF) |
 | LLM | `llm/` | Multi-provider LLM clients |
+
+### Backend Crypto (apps/api/src/crypto/)
+| Module | Location | Purpose |
+|--------|----------|---------|
+| Secret Vault | `secret-vault.ts` | XChaCha20-Poly1305 encryption (tweetnacl) |
+
+### Backend Agent Subsystem (apps/api/src/agent/)
+| Module | Location | Purpose |
+|--------|----------|---------|
+| Oracle Loop | `oracle-loop.ts` | Iterative reasoning + tool dispatch |
+| Memory Manager | `memory-manager.ts` + `memory-types.ts` | Short/long-term agent memory |
+| Semantic Cache | `semantic-cache.ts` | Embedding-keyed prompt/result cache |
+| Toolbox | `toolbox.ts` + `tools/` | Tool registry & execution |
+| Domain Pipelines | `domain-pipelines.ts` | Domain-specific orchestration |
+| Advanced RAG | `advanced-rag.ts` | Multi-stage RAG inside agent loop |
 
 ### Backend Validators (apps/api/src/validators/)
 | Module | Location | Purpose |
@@ -428,10 +514,15 @@ arkon-workstation/
 ### Shared Packages
 | Package | Location | Purpose |
 |---------|----------|---------|
-| @arkon/cli | `packages/cli/` | CLI tool for AI Gateway management |
-| @arkon/database | `packages/database/` | Prisma schema with multi-tenancy |
-| @arkon/shared | `packages/shared/` | JWTClaims, Role, TeamMembership types, Provider templates |
-| @arkon/tsconfig | `packages/tsconfig/` | Base TypeScript configs |
+| @oppmon/cli | `packages/cli/` | CLI tool for AI Gateway management (`tag` command) |
+| @oppmon/database | `packages/database/` | Prisma schema with multi-tenancy |
+| @oppmon/shared | `packages/shared/` | JWTClaims, Role, TeamMembership types, Provider templates |
+| @oppmon/tsconfig | `packages/tsconfig/` | Base TypeScript configs |
+| @arkon/agent-engine | `packages/agent-engine/` | Wire format, replay, risk classification, tool types |
+| @arkon/guardrails | `packages/guardrails/` | Constitution, scope, filter, audit |
+| @arkon/observability | `packages/observability/` | Tracing, metrics, latency, Langfuse |
+| @arkon/skill-framework | `packages/skill-framework/` | YAML frontmatter, registry, workflow |
+| @arkon/integration-tests | `packages/integration-tests/` | Cross-package smoke + integration tests |
 | engine-core | `packages/engine-core/` | Rust: Envelope<T>, Error, SHA-256 |
 
 ### Reference Only: arkon-reference-only/src/ — DO NOT MODIFY
@@ -611,14 +702,19 @@ pnpm lint              # Lint all
 ### Environment Files
 | File | Purpose |
 |------|---------|
-| `arkon-backend/.env` | Backend config |
-| `arkon-frontend/.env.local` | Frontend config |
+| `apps/api/.env` | Backend config |
+| `apps/web/.env.local` | Frontend config |
+| `apps/router/.env` | Router proxy config |
 | `.env` (root) | Docker Compose overrides |
 
 ### Important Files
 | File | Purpose |
 |------|---------|
-| `docker-compose.yml` | Dev stack definition |
-| `arkon-backend/src/index.ts` | Backend entry |
-| `arkon-frontend/app/layout.tsx` | Frontend root layout |
+| `docker-compose.yml` | Dev stack definition (db, api, web, router, redis, prisma-studio) |
+| `docker-stack.yml` | Production Docker Swarm stack |
+| `apps/api/src/index.ts` | Backend entry |
+| `apps/router/src/index.ts` | Router entry |
+| `apps/web/src/app/layout.tsx` | Frontend root layout |
+| `apps/web/src/middleware.ts` | Frontend auth middleware |
+| `packages/database/prisma/schema.prisma` | Database schema |
 | `docs/architecture.md` | Architecture overview |

@@ -1,10 +1,10 @@
 # Data Model
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
 ## Overview
 
-This diagram shows the entity-relationship model for the Arkon platform as defined in `packages/database/prisma/schema.prisma`. The schema supports multi-tenancy, OAuth, skills registry, LLM sessions, and vector embeddings.
+This diagram shows the entity-relationship model for the OppMon (Arkon) platform as defined in `packages/database/prisma/schema.prisma`. The schema supports multi-tenancy, OAuth, skills registry, LLM sessions, vector embeddings, MCP servers, virtual keys, model routing state, and audit logging. All columns use `snake_case` mapped from `camelCase` Prisma fields via `@map()`.
 
 ```mermaid
 erDiagram

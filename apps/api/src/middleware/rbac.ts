@@ -44,6 +44,9 @@ export interface RBACResult {
 // ============================================================================
 
 const ROLE_HIERARCHY: Record<Role, number> = {
+  // SYSTEM_ADMIN is only valid for users belonging to the System Tenant.
+  // The `requireRole`/`requireSystemTenant` helpers enforce that constraint.
+  SYSTEM_ADMIN: 4,
   TENANT_ADMIN: 3,
   TEAM_ADMIN: 2,
   MEMBER: 1,
@@ -64,6 +67,14 @@ const PERMISSION_MATRIX: Record<
   Role,
   Record<Permission, (ctx: RBACContext, resource: ResourceContext) => boolean>
 > = {
+  // System Tenant users get blanket access at the RBAC layer; tenant scoping
+  // is handled at the RLS layer via app.current_tenant = 'system'.
+  SYSTEM_ADMIN: {
+    create: () => true,
+    read: () => true,
+    update: () => true,
+    delete: () => true,
+  },
   TENANT_ADMIN: {
     create: () => true,
     read: () => true,
@@ -283,7 +294,11 @@ export function rbac(options: RBACOptions) {
 }
 
 /**
- * Simple role check middleware (no resource context needed)
+ * Simple role check middleware (no resource context needed).
+ *
+ * Extra invariant: SYSTEM_ADMIN is only honored when `req.user.isSystem` is
+ * true (i.e. the user belongs to the System Tenant). A SYSTEM_ADMIN role on
+ * a non-system user is treated as a misconfiguration and rejected.
  */
 export function requireRole(...allowedRoles: Role[]) {
   return async (
@@ -305,6 +320,39 @@ export function requireRole(...allowedRoles: Role[]) {
       return;
     }
 
+    if (userRole === "SYSTEM_ADMIN" && !req.user.isSystem) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "SYSTEM_ADMIN role requires System Tenant membership",
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Gate routes to System Tenant users only. Use in combination with
+ * `requireRole('SYSTEM_ADMIN')` for global-admin endpoints.
+ */
+export function requireSystemTenant() {
+  return (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): void => {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    if (!req.user.isSystem) {
+      res.status(403).json({
+        error: "Forbidden",
+        message: "System Tenant membership required",
+      });
+      return;
+    }
     next();
   };
 }

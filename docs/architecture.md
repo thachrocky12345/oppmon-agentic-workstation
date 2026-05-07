@@ -1,6 +1,6 @@
-# Arkon Architecture
+# OppMon (Arkon) Architecture
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
 ## Important: Repository Structure
 
@@ -8,13 +8,19 @@ This is a **pnpm + Turborepo monorepo** with the following structure:
 
 | Directory | Status | Purpose |
 |-----------|--------|---------|
-| `apps/api/` | **ACTIVE** | Express API server (@arkon/api) |
-| `apps/web/` | **ACTIVE** | Next.js frontend (@arkon/web) |
-| `packages/database/` | **ACTIVE** | Prisma schema and client (@arkon/database) |
-| `packages/shared/` | **ACTIVE** | Shared TypeScript types (@arkon/shared) |
-| `packages/tsconfig/` | **ACTIVE** | Shared TypeScript configs (@arkon/tsconfig) |
+| `apps/api/` | **ACTIVE** | Express API server (@oppmon/api) |
+| `apps/router/` | **ACTIVE** | LiteLLM proxy router (@oppmon/router) |
+| `apps/web/` | **ACTIVE** | Next.js frontend (@oppmon/web) |
+| `packages/database/` | **ACTIVE** | Prisma schema and client (@oppmon/database) |
+| `packages/shared/` | **ACTIVE** | Shared TypeScript types (@oppmon/shared) |
+| `packages/cli/` | **ACTIVE** | CLI tool for AI Gateway management (@oppmon/cli) |
+| `packages/agent-engine/` | **ACTIVE** | Agent execution primitives (@arkon/agent-engine) |
+| `packages/guardrails/` | **ACTIVE** | Safety / policy enforcement (@arkon/guardrails) |
+| `packages/observability/` | **ACTIVE** | Tracing, metrics, latency (@arkon/observability) |
+| `packages/skill-framework/` | **ACTIVE** | Skill registry and workflow (@arkon/skill-framework) |
+| `packages/integration-tests/` | **ACTIVE** | Cross-package integration tests (@arkon/integration-tests) |
+| `packages/tsconfig/` | **ACTIVE** | Shared TypeScript configs (@oppmon/tsconfig) |
 | `packages/engine-core/` | **ACTIVE** | Rust workspace for high-performance utilities |
-| `packages/cli/` | **ACTIVE** | CLI tool for AI Gateway management (@arkon/cli) |
 | `arkon-reference-only/` | **READ-ONLY** | Original monorepo — reference only, never modify |
 
 ## Overview
@@ -122,13 +128,20 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **Usage**: Privacy-first usage analytics (tenant-level aggregation)
 - **Models**: Multi-provider model configuration with secrets vault
 - **Virtual Keys**: API key management for CLI/SDK access
-- **Routing**: LiteLLM-based model routing orchestration
+- **Routing**: LiteLLM-based model routing orchestration (`@oppmon/router` proxy)
+- **Document Ingestion**: PDF (pdf-parse), DOCX (mammoth), multipart streaming (busboy)
+- **Agent Subsystem**: Oracle loop, semantic cache, memory manager, toolbox, domain pipelines
 
 ### Shared Packages
-- **@arkon/cli**: CLI tool for AI Gateway management (tag command)
-- **@arkon/database**: Prisma schema with multi-tenancy, pgvector support
-- **@arkon/shared**: TypeScript types (JWTClaims, Role, TeamMembership)
-- **@arkon/tsconfig**: Base TypeScript configurations
+- **@oppmon/cli**: CLI tool for AI Gateway management (`tag` command)
+- **@oppmon/database**: Prisma schema with multi-tenancy, pgvector support
+- **@oppmon/shared**: TypeScript types (JWTClaims, Role, TeamMembership), provider templates
+- **@oppmon/tsconfig**: Base TypeScript configurations
+- **@arkon/agent-engine**: Agent execution primitives (wire format, replay, risk, tools)
+- **@arkon/guardrails**: Constitution, scope, filter, audit guardrails
+- **@arkon/observability**: Tracing, metrics, latency (Langfuse + prom-client peers)
+- **@arkon/skill-framework**: YAML frontmatter skill registry and workflow runner
+- **@arkon/integration-tests**: Cross-package smoke + integration tests
 - **engine-core**: Rust workspace for high-performance utilities
 
 ## Multi-Tenancy Model

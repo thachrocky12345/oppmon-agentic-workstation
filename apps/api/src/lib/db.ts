@@ -1,5 +1,9 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { pino } from 'pino';
+import { prisma } from '@oppmon/database';
+import type { Prisma } from '@oppmon/database';
+
+export const SYSTEM_TENANT_ID = 'system';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -67,6 +71,58 @@ export async function transaction<T>(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Run a Prisma transaction with `app.current_tenant` set so RLS policies
+ * scope every query to the caller's tenant. Use the SYSTEM_TENANT_ID
+ * constant for global-admin operations that need to span tenants.
+ *
+ * @example
+ * const skills = await withTenant(req.user.tenantId, (tx) =>
+ *   tx.skill.findMany({ where: { deletedAt: null } })
+ * );
+ */
+export async function withTenant<T>(
+  tenantId: string,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  if (!tenantId) {
+    throw new Error('withTenant: tenantId is required');
+  }
+  return prisma.$transaction(async (tx) => {
+    // set_config is parameter-safe; never concatenate tenantId into raw SQL.
+    // The third arg (true) makes the setting transaction-local.
+    await tx.$executeRaw`SELECT set_config('app.current_tenant', ${tenantId}, true)`;
+    return fn(tx);
+  });
+}
+
+/**
+ * Same idea as withTenant but for raw pg pool queries. Holds a single client
+ * across the SET + caller queries so the GUC sticks. Caller is responsible
+ * for managing transaction boundaries inside the callback if needed.
+ */
+export async function withTenantPg<T>(
+  tenantId: string,
+  callback: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  if (!tenantId) {
+    throw new Error('withTenantPg: tenantId is required');
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT set_config('app.current_tenant', $1, true)`, [tenantId]);
     const result = await callback(client);
     await client.query('COMMIT');
     return result;

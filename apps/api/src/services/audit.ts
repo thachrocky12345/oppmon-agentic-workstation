@@ -10,9 +10,10 @@
  * Audit logs are append-only and should never be updated or deleted.
  */
 
-import { prisma, Prisma } from "@oppmon/database";
+import { Prisma } from "@oppmon/database";
 import type { AuditAction } from "@oppmon/database";
 import { AuthenticatedRequest } from "../middleware/request-auth.js";
+import { withTenant } from "../lib/db.js";
 
 // ============================================================================
 // Types
@@ -43,24 +44,31 @@ export interface AuditContext {
 // ============================================================================
 
 /**
- * Log an audit entry
+ * Log an audit entry.
+ *
+ * Inserts via withTenant() so RLS + the audit_logs BEFORE INSERT trigger both
+ * verify that `tenantId` on the row matches `app.current_tenant`. Any caller
+ * passing a tenantId that doesn't match its session context will get an
+ * exception (caught here so audit failures never break the parent operation).
  */
 export async function logAudit(entry: AuditEntry): Promise<void> {
   try {
-    await prisma.auditLog.create({
-      data: {
-        tenantId: entry.tenantId,
-        resourceType: entry.resourceType,
-        resourceId: entry.resourceId,
-        action: entry.action,
-        actorId: entry.actorId,
-        beforeState: entry.beforeState as Prisma.InputJsonValue | undefined,
-        afterState: entry.afterState as Prisma.InputJsonValue | undefined,
-        ipAddress: entry.ipAddress,
-        userAgent: entry.userAgent,
-        metadata: entry.metadata as Prisma.InputJsonValue | undefined,
-      },
-    });
+    await withTenant(entry.tenantId, (tx) =>
+      tx.auditLog.create({
+        data: {
+          tenantId: entry.tenantId,
+          resourceType: entry.resourceType,
+          resourceId: entry.resourceId,
+          action: entry.action,
+          actorId: entry.actorId,
+          beforeState: entry.beforeState as Prisma.InputJsonValue | undefined,
+          afterState: entry.afterState as Prisma.InputJsonValue | undefined,
+          ipAddress: entry.ipAddress,
+          userAgent: entry.userAgent,
+          metadata: entry.metadata as Prisma.InputJsonValue | undefined,
+        },
+      }),
+    );
   } catch (error) {
     // Log to console but don't fail the operation
     console.error("[Audit] Failed to write audit log:", error);
@@ -199,7 +207,9 @@ export interface AuditLogFilter {
 }
 
 /**
- * Query audit logs with filters
+ * Query audit logs with filters. Runs inside a withTenant() transaction so
+ * RLS scopes results to the requested tenant when the caller is the
+ * non-superuser app role.
  */
 export async function queryAuditLogs(filter: AuditLogFilter) {
   const where: Record<string, unknown> = {
@@ -217,26 +227,27 @@ export async function queryAuditLogs(filter: AuditLogFilter) {
     if (filter.endDate) (where.createdAt as Record<string, unknown>).lte = filter.endDate;
   }
 
-  const [logs, total] = await Promise.all([
-    prisma.auditLog.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: filter.limit ?? 50,
-      skip: filter.offset ?? 0,
-      include: {
-        actor: {
-          select: { id: true, email: true, name: true },
+  return withTenant(filter.tenantId, async (tx) => {
+    const [logs, total] = await Promise.all([
+      tx.auditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: filter.limit ?? 50,
+        skip: filter.offset ?? 0,
+        include: {
+          actor: {
+            select: { id: true, email: true, name: true },
+          },
         },
-      },
-    }),
-    prisma.auditLog.count({ where }),
-  ]);
-
-  return { logs, total };
+      }),
+      tx.auditLog.count({ where }),
+    ]);
+    return { logs, total };
+  });
 }
 
 /**
- * Get audit log for a specific resource
+ * Get audit log for a specific resource (RLS-scoped).
  */
 export async function getResourceAuditLog(
   tenantId: string,
@@ -244,18 +255,20 @@ export async function getResourceAuditLog(
   resourceId: string,
   limit = 50
 ) {
-  return prisma.auditLog.findMany({
-    where: {
-      tenantId,
-      resourceType,
-      resourceId,
-    },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    include: {
-      actor: {
-        select: { id: true, email: true, name: true },
+  return withTenant(tenantId, (tx) =>
+    tx.auditLog.findMany({
+      where: {
+        tenantId,
+        resourceType,
+        resourceId,
       },
-    },
-  });
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        actor: {
+          select: { id: true, email: true, name: true },
+        },
+      },
+    }),
+  );
 }

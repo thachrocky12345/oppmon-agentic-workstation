@@ -1,24 +1,24 @@
 # Architecture Diagrams
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
-This directory contains Mermaid architecture diagrams for the Arkon project.
+This directory contains Mermaid architecture diagrams for the OppMon (Arkon) project.
 
 ## Diagrams
 
 | File | Description | Last Updated |
 |------|-------------|--------------|
-| [architecture.md](architecture.md) | System component overview with LLM/RAG services | 2026-05-06 (init sync) |
-| [dependencies.md](dependencies.md) | Package dependency graph (monorepo structure) | 2026-05-06 (init sync) |
-| [data-model.md](data-model.md) | Entity relationship diagram (Prisma schema) | 2026-05-06 (init sync) |
-| [deployment.md](deployment.md) | Docker Compose deployment architecture | 2026-05-06 (init sync) |
+| [architecture.md](architecture.md) | System component overview with LLM/RAG services | 2026-05-07 (init sync) |
+| [dependencies.md](dependencies.md) | Package dependency graph (monorepo structure) | 2026-05-07 (init sync) |
+| [data-model.md](data-model.md) | Entity relationship diagram (Prisma schema) | 2026-05-07 (init sync) |
+| [deployment.md](deployment.md) | Docker Compose deployment architecture | 2026-05-07 (init sync) |
 
 ## Quick Links
 
-- **System Architecture**: How components connect (frontend, API, database, LLM providers, CLI)
-- **Dependencies**: What packages each app uses (pnpm + Turborepo monorepo, including CLI)
+- **System Architecture**: How components connect (frontend, API, router, database, LLM providers, agent subsystem, guardrails, CLI)
+- **Dependencies**: Package graph for the monorepo including router app, agent-engine, guardrails, observability, skill-framework
 - **Data Model**: Database schema with multi-tenancy, skills, LLM sessions, embeddings, MCP servers, usage analytics, models, virtual keys, routing state
-- **Deployment**: Docker services, ports, volumes, and profiles
+- **Deployment**: Docker services (oppmon-*), ports, volumes, and profiles + production Swarm stack
 
 ## Usage
 
