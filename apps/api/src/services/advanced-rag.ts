@@ -326,7 +326,7 @@ async function singleVectorSearch(
     teamFilter = `
       AND (
         c.scope = 'TENANT'
-        OR (c.scope = 'TEAM' AND c."teamId" = ANY($5))
+        OR (c.scope = 'TEAM' AND c.team_id = ANY($5))
       )
     `;
   } else {
@@ -342,23 +342,23 @@ async function singleVectorSearch(
   const sql = `
     SELECT
       ch.id as "chunkId",
-      ch."documentId",
-      d."originalFilename" as "documentFilename",
-      d."originalFilename" as "documentTitle",
+      ch.document_id as "documentId",
+      d.original_filename as "documentFilename",
+      d.original_filename as "documentTitle",
       ch.content as "chunkText",
-      ch."chunkIndex",
-      ch."pageNumber",
+      ch.chunk_index as "chunkIndex",
+      ch.page_number as "pageNumber",
       c.id as "collectionId",
       c.name as "collectionName",
       ch.embedding::text as "embeddingStr",
       1 - (ch.embedding <=> $1::vector) as score
     FROM rag_chunks ch
-    JOIN rag_documents d ON d.id = ch."documentId"
-    JOIN rag_collections c ON c.id = d."collectionId"
-    WHERE ch."tenantId" = $2
-      AND d."deletedAt" IS NULL
-      AND c."deletedAt" IS NULL
-      AND d."extractionStatus" = 'EXTRACTED'
+    JOIN rag_documents d ON d.id = ch.document_id
+    JOIN rag_collections c ON c.id = d.collection_id
+    WHERE ch.tenant_id = $2
+      AND d.deleted_at IS NULL
+      AND c.deleted_at IS NULL
+      AND d.extraction_status = 'EXTRACTED'
       AND 1 - (ch.embedding <=> $1::vector) >= $3
       ${teamFilter}
       ${collectionFilter}
@@ -612,7 +612,7 @@ export async function scanForDuplicates(
 
   if (collectionId) {
     params.push(collectionId);
-    collectionFilter = `AND d."collectionId" = $3`;
+    collectionFilter = `AND d.collection_id = $3`;
   }
 
   // Find pairs of chunks with high similarity
@@ -625,10 +625,10 @@ export async function scanForDuplicates(
         c2.content as text_2,
         1 - (c1.embedding <=> c2.embedding) as similarity
       FROM rag_chunks c1
-      JOIN rag_chunks c2 ON c1.id < c2.id AND c1."tenantId" = c2."tenantId"
-      JOIN rag_documents d ON d.id = c1."documentId"
-      WHERE c1."tenantId" = $1
-        AND d."deletedAt" IS NULL
+      JOIN rag_chunks c2 ON c1.id < c2.id AND c1.tenant_id = c2.tenant_id
+      JOIN rag_documents d ON d.id = c1.document_id
+      WHERE c1.tenant_id = $1
+        AND d.deleted_at IS NULL
         AND 1 - (c1.embedding <=> c2.embedding) >= $2
         ${collectionFilter}
       ORDER BY similarity DESC
@@ -657,7 +657,7 @@ export async function checkDocumentDuplicate(
 ): Promise<{ isDuplicate: boolean; existingDocId?: string }> {
   const result = await query(
     `SELECT id FROM rag_documents
-     WHERE "tenantId" = $1 AND "fileSha256" = $2 AND "deletedAt" IS NULL
+     WHERE tenant_id = $1 AND file_sha256 = $2 AND deleted_at IS NULL
      LIMIT 1`,
     [tenantId, contentHash]
   );

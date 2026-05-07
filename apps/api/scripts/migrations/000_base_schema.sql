@@ -5,6 +5,9 @@
 -- Enable extensions
 -- ═══════════════════════════════════════════════════════════════════════
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+-- gen_random_uuid() lives in pgcrypto on PG 12 and is built-in on PG 13+.
+-- Loading the extension keeps the DEFAULT below safe across versions.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Core: agents, events, sessions, daily_stats
@@ -23,7 +26,7 @@ CREATE TABLE IF NOT EXISTS agents (
 );
 
 CREATE TABLE IF NOT EXISTS events (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL,
   direction TEXT,
@@ -42,7 +45,7 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS sessions (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   session_key TEXT,
   channel_id TEXT,
@@ -53,7 +56,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE TABLE IF NOT EXISTS daily_stats (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   day DATE NOT NULL,
   messages_received INTEGER DEFAULT 0,
@@ -72,7 +75,7 @@ CREATE TABLE IF NOT EXISTS daily_stats (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS agent_baselines (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   computed_at TIMESTAMPTZ,
   avg_hourly_events NUMERIC,
@@ -81,7 +84,7 @@ CREATE TABLE IF NOT EXISTS agent_baselines (
 );
 
 CREATE TABLE IF NOT EXISTS anomaly_alerts (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   anomaly_type TEXT NOT NULL,
   level TEXT DEFAULT 'medium',
@@ -97,7 +100,7 @@ CREATE TABLE IF NOT EXISTS anomaly_alerts (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS approvals (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   title TEXT,
   content TEXT,
@@ -119,7 +122,7 @@ CREATE TABLE IF NOT EXISTS approvals (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS workflows (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   name TEXT NOT NULL,
   description TEXT,
   definition JSONB DEFAULT '{"nodes":[],"edges":[]}',
@@ -135,8 +138,8 @@ CREATE TABLE IF NOT EXISTS workflows (
 );
 
 CREATE TABLE IF NOT EXISTS workflow_runs (
-  id SERIAL PRIMARY KEY,
-  workflow_id INTEGER REFERENCES workflows(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
   status TEXT DEFAULT 'running',
   triggered_by TEXT DEFAULT 'manual',
   tenant_id TEXT DEFAULT 'default',
@@ -176,7 +179,7 @@ CREATE TABLE IF NOT EXISTS cron_jobs (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS tasks (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
@@ -193,7 +196,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 
 CREATE TABLE IF NOT EXISTS tool_calls (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   tool_name TEXT NOT NULL,
   input JSONB,
@@ -205,7 +208,7 @@ CREATE TABLE IF NOT EXISTS tool_calls (
 );
 
 CREATE TABLE IF NOT EXISTS subagent_runs (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   run_label TEXT,
   model TEXT,
@@ -228,7 +231,7 @@ CREATE TABLE IF NOT EXISTS subagent_runs (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS budget_limits (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   scope_type TEXT NOT NULL,
   scope_id TEXT NOT NULL,
   daily_limit_usd NUMERIC,
@@ -245,7 +248,7 @@ CREATE TABLE IF NOT EXISTS budget_limits (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS documents (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   title TEXT,
   category TEXT,
@@ -264,7 +267,7 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE INDEX IF NOT EXISTS idx_documents_search ON documents USING gin(search_vector);
 
 CREATE TABLE IF NOT EXISTS calendar_items (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   title TEXT,
   description TEXT,
@@ -273,8 +276,8 @@ CREATE TABLE IF NOT EXISTS calendar_items (
   duration_minutes INTEGER,
   status TEXT DEFAULT 'scheduled',
   target_channel TEXT,
-  linked_approval_id INTEGER REFERENCES approvals(id),
-  linked_task_id INTEGER REFERENCES tasks(id),
+  linked_approval_id TEXT REFERENCES approvals(id),
+  linked_task_id TEXT REFERENCES tasks(id),
   color TEXT,
   recurring TEXT,
   metadata JSONB,
@@ -287,7 +290,7 @@ CREATE TABLE IF NOT EXISTS calendar_items (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS intake_submissions (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   full_name TEXT,
   email TEXT,
   client_label TEXT,
@@ -303,7 +306,7 @@ CREATE TABLE IF NOT EXISTS intake_submissions (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS mcp_servers (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   name TEXT NOT NULL,
   url TEXT,
   host TEXT,
@@ -321,16 +324,16 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
 );
 
 CREATE TABLE IF NOT EXISTS mcp_server_agents (
-  id SERIAL PRIMARY KEY,
-  mcp_server_id INTEGER REFERENCES mcp_servers(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  mcp_server_id TEXT REFERENCES mcp_servers(id) ON DELETE CASCADE,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   granted_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS mcp_proxy_logs (
-  id SERIAL PRIMARY KEY,
-  server_id INTEGER,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  server_id TEXT,
   server_name TEXT,
   agent_id TEXT,
   method TEXT,
@@ -349,7 +352,7 @@ CREATE TABLE IF NOT EXISTS mcp_proxy_logs (
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS audit_log (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   actor TEXT,
   action TEXT NOT NULL,
   resource_type TEXT,
@@ -367,7 +370,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at DESC);
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS benchmark_runs (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   model_id TEXT,
   model_provider TEXT DEFAULT 'unknown',
   prompt_hash TEXT,
@@ -385,7 +388,7 @@ CREATE TABLE IF NOT EXISTS benchmark_runs (
 );
 
 CREATE TABLE IF NOT EXISTS model_pricing (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   provider TEXT NOT NULL,
   model_id TEXT NOT NULL,
   display_name TEXT,
@@ -440,7 +443,7 @@ SELECT create_hypertable('node_metrics', 'time', if_not_exists => TRUE);
 -- ═══════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS quick_commands (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
   command TEXT NOT NULL,
   response TEXT,

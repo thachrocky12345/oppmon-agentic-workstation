@@ -6,7 +6,10 @@
  */
 
 import jwt from "jsonwebtoken";
-import type { JWTClaims, TeamMembership, Role, TeamRole } from "@oppmon/shared";
+import { SYSTEM_TENANT_ID } from "@oppmon/shared";
+import type { JWTClaims, TeamMembership, Role } from "@oppmon/shared";
+import type { TeamRole } from "@oppmon/shared";
+import { getTokenVersion } from "./token-version.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "development-secret-change-in-production";
@@ -14,23 +17,65 @@ const JWT_EXPIRES_IN: jwt.SignOptions["expiresIn"] = (process.env.JWT_EXPIRES_IN
 const JWT_ISSUER = "oppmon";
 
 /**
- * Sign a JWT with user and team context
+ * Sign a JWT with user and team context.
+ *
+ * Embeds the user's current token version (`tv`) so event-driven revocation
+ * can reject this token after a role/team/password change.
+ *
+ * Pass `tv` explicitly to avoid an extra DB roundtrip when the caller already
+ * has the value (e.g. immediately after `bumpTokenVersion`). Otherwise, this
+ * function reads it via the cached `getTokenVersion` helper.
  */
-export function signToken(payload: {
+export async function signToken(payload: {
   userId: string;
   email: string;
   tenantId: string;
   role: Role;
   teams: TeamMembership[];
-}): string {
+  /** Explicit token version — read from DB if omitted. */
+  tv?: number;
+}): Promise<string> {
+  const tv = payload.tv ?? (await getTokenVersion(payload.userId));
+  const isSystem = payload.tenantId === SYSTEM_TENANT_ID;
+
   const claims: Omit<JWTClaims, "iat" | "exp"> = {
     sub: payload.userId,
     email: payload.email,
     tenantId: payload.tenantId,
     role: payload.role,
     teams: payload.teams,
+    tv,
+    ...(isSystem ? { isSystem: true } : {}),
   };
 
+  return jwt.sign(claims, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN,
+    issuer: JWT_ISSUER,
+  });
+}
+
+/**
+ * Synchronous variant for legacy call sites. Caller MUST pass tv explicitly;
+ * this never reads the DB. Prefer `signToken` for new code.
+ */
+export function signTokenSync(payload: {
+  userId: string;
+  email: string;
+  tenantId: string;
+  role: Role;
+  teams: TeamMembership[];
+  tv: number;
+}): string {
+  const isSystem = payload.tenantId === SYSTEM_TENANT_ID;
+  const claims: Omit<JWTClaims, "iat" | "exp"> = {
+    sub: payload.userId,
+    email: payload.email,
+    tenantId: payload.tenantId,
+    role: payload.role,
+    teams: payload.teams,
+    tv: payload.tv,
+    ...(isSystem ? { isSystem: true } : {}),
+  };
   return jwt.sign(claims, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
     issuer: JWT_ISSUER,

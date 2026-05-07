@@ -2,7 +2,7 @@
 -- Driven by ArkonOS /settings/youtube-kb UI; consumed by Dell G5 pull_transcripts.py
 
 CREATE TABLE IF NOT EXISTS youtube_channels (
-    id               SERIAL PRIMARY KEY,
+    id               TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     name             VARCHAR(255) NOT NULL,
     url              VARCHAR(500) NOT NULL,
     collection_name  VARCHAR(255) NOT NULL UNIQUE,

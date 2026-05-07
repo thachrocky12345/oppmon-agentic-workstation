@@ -5,8 +5,8 @@
 $frontendPath = $PSScriptRoot
 $oldIP = "136.34.106.116"
 $newIP = "136.34.106.116"
-$oldPort = "arkon"
-$newPort = "oppmon"
+$oldPort = "arkon-workstation"
+$newPort = "oppmon-agentic-workstation"
 
 # Files to update
 $filesToUpdate = @(

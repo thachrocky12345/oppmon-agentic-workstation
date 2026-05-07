@@ -250,10 +250,10 @@ export class Toolbox {
   async getExecutionHistory(limit: number = 20): Promise<ToolExecutionLog[]> {
     try {
       const result = await query(
-        `SELECT "toolName", "input", "output", "status", "durationMs", "createdAt"
+        `SELECT tool_name AS "toolName", input, output, status, duration_ms AS "durationMs", created_at AS "createdAt"
          FROM tool_executions
-         WHERE "tenantId" = $1 AND "userId" = $2
-         ORDER BY "createdAt" DESC
+         WHERE tenant_id = $1 AND user_id = $2
+         ORDER BY created_at DESC
          LIMIT $3`,
         [this.tenantId, this.userId, limit]
       );
@@ -463,11 +463,11 @@ export class Toolbox {
             COUNT(DISTINCT c.id) as collection_count,
             COUNT(DISTINCT d.id) as document_count,
             COUNT(ch.id) as chunk_count,
-            COALESCE(SUM(d."sizeBytes"), 0) as total_bytes
+            COALESCE(SUM(d.size_bytes), 0) as total_bytes
           FROM rag_collections c
-          LEFT JOIN rag_documents d ON d."collectionId" = c.id AND d."deletedAt" IS NULL
-          LEFT JOIN rag_chunks ch ON ch."documentId" = d.id
-          WHERE c."tenantId" = $1 AND c."deletedAt" IS NULL
+          LEFT JOIN rag_documents d ON d.collection_id = c.id AND d.deleted_at IS NULL
+          LEFT JOIN rag_chunks ch ON ch.document_id = d.id
+          WHERE c.tenant_id = $1 AND c.deleted_at IS NULL
         `;
         const sqlParams: unknown[] = [this.tenantId];
 

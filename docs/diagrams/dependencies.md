@@ -1,227 +1,149 @@
 # Dependency Graph
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
 ## Overview
 
-This diagram shows the major dependencies used by the Arkon platform across all packages in the pnpm + Turborepo monorepo.
+This diagram shows the major dependencies used by the OppMon (Arkon) platform across all packages in the pnpm + Turborepo monorepo. New since last init: `apps/router`, the agent/skill/safety/observability packages, document ingestion deps, and frontend markdown rendering.
 
 ```mermaid
 graph TB
-    subgraph Monorepo["arkon-workstation (pnpm + Turborepo)"]
+    subgraph Monorepo["oppmon-workstation (pnpm + Turborepo)"]
         subgraph Apps["apps/"]
-            Web["@arkon/web<br/>(Next.js Frontend)"]
-            API["@arkon/api<br/>(Express Backend)"]
+            Web["@oppmon/web<br/>(Next.js Frontend)"]
+            API["@oppmon/api<br/>(Express Backend)"]
+            RouterApp["@oppmon/router<br/>(LiteLLM Proxy)"]
         end
 
         subgraph Packages["packages/"]
-            Database["@arkon/database<br/>(Prisma)"]
-            Shared["@arkon/shared<br/>(Types)"]
-            TSConfig["@arkon/tsconfig"]
-            EngineCore["engine-core<br/>(Rust)"]
-            CLI["@arkon/cli<br/>(CLI Tool)"]
+            Database["@oppmon/database<br/>(Prisma)"]
+            Shared["@oppmon/shared<br/>(Types)"]
+            TSConfig["@oppmon/tsconfig"]
+            CLI["@oppmon/cli<br/>(tag command)"]
+            AgentEng["@arkon/agent-engine"]
+            Guardrails["@arkon/guardrails"]
+            Obs["@arkon/observability"]
+            SkillFW["@arkon/skill-framework"]
+            IT["@arkon/integration-tests"]
+            EngineCore["engine-core (Rust)"]
         end
     end
 
-    subgraph WebFramework["Web Framework"]
-        next["next 15.0"]
-        react["react 19.0"]
-        reactdom["react-dom 19.0"]
-        express["express 4.21"]
+    subgraph WebDeps["Frontend Dependencies"]
+        Next["next ^15"]
+        React["react ^19"]
+        Radix["@radix-ui/*"]
+        Xyflow["@xyflow/react ^12"]
+        Recharts["recharts ^2.12"]
+        Framer["framer-motion ^11"]
+        Lucide["lucide-react"]
+        CMDK["cmdk"]
+        Sonner["sonner"]
+        Tailwind["tailwindcss ^3.4"]
+        Markdown["react-markdown + remark-gfm"]
+        Jose["jose ^5.2"]
+        Zod1["zod"]
     end
 
-    subgraph UI["UI Components"]
-        radix["@radix-ui/*"]
-        tailwind["tailwindcss 3.4"]
-        framer["framer-motion 11.0"]
-        lucide["lucide-react"]
-        recharts["recharts 2.12"]
-        xyflow["@xyflow/react 12.10"]
-        cmdk["cmdk 1.1"]
-        sonner["sonner 1.5"]
-        clsx["clsx + tailwind-merge"]
+    subgraph APIDeps["Backend Dependencies"]
+        Express["express ^4.21"]
+        PG["pg ^8.20"]
+        Prisma["@prisma/client ^5.22"]
+        Anthropic["@anthropic-ai/sdk"]
+        OpenAI["openai"]
+        Arctic["arctic ^2.1"]
+        JWT["jsonwebtoken"]
+        Bcrypt["bcryptjs"]
+        Zod2["zod"]
+        WS["ws ^8.20"]
+        WebPush["web-push"]
+        Helmet["helmet / cors / compression"]
+        Pino["pino / morgan"]
+        Cookie["cookie-parser"]
+        Busboy["busboy"]
+        PdfParse["pdf-parse"]
+        Mammoth["mammoth"]
+        Mustache["mustache"]
+        Tweetnacl["tweetnacl"]
+        Dockerode["dockerode"]
+        Marked["marked / dompurify / jsdom"]
     end
 
-    subgraph DatabaseStack["Database"]
-        prisma["@prisma/client 5.22"]
-        pg["pg 8.20"]
-        timescale["TimescaleDB"]
-        pgvector["pgvector"]
+    subgraph RouterDeps["Router Dependencies"]
+        ExpressR["express ^4.21"]
+        Proxy["http-proxy-middleware ^3"]
+        HelmetR["helmet / cors"]
+        PinoR["pino"]
     end
 
-    subgraph Auth["Authentication"]
-        jwt["jsonwebtoken 9.0"]
-        bcrypt["bcryptjs 3.0"]
-        arctic["arctic 2.1"]
-    end
-
-    subgraph LLM["LLM & AI"]
-        anthropic["@anthropic-ai/sdk"]
-        openai["openai 4.77"]
-    end
-
-    subgraph Security["Security"]
-        helmet["helmet 7.1"]
-        cors["cors 2.8"]
-        compression["compression 1.7"]
-    end
-
-    subgraph Validation["Validation"]
-        zod["zod 3.23"]
-    end
-
-    subgraph Realtime["Real-time"]
-        ws["ws 8.20"]
-        webpush["web-push 3.6"]
-    end
-
-    subgraph Logging["Logging"]
-        pino["pino 9.2"]
-        pinopretty["pino-pretty 11.2"]
-        morgan["morgan 1.10"]
-    end
-
-    subgraph Content["Content Processing"]
-        marked["marked 13.0"]
-        dompurify["dompurify 3.3"]
-        jsdom["jsdom 24.1"]
-    end
-
-    subgraph Testing["Testing"]
-        vitest["vitest 2.0"]
-        playwright["@playwright/test 1.47"]
-        supertest["supertest 7.0"]
-    end
-
-    subgraph DevTools["Dev Tools"]
-        typescript["typescript 5.6"]
-        tsx["tsx 4.19"]
-        eslint["eslint 9.0"]
-        turbo["turbo 2.0"]
+    subgraph DBDeps["Database Dependencies"]
+        PrismaCLI["prisma ^5.22"]
+        BcryptDB["bcryptjs"]
     end
 
     subgraph CLIDeps["CLI Dependencies"]
-        commander["commander 12.1"]
-        chalk["chalk 5.3"]
-        ora["ora 8.0"]
-        keytar["keytar 7.9"]
-        open["open 10.1"]
-        conf["conf 13.0"]
+        Commander["commander ^12"]
+        Chalk["chalk ^5"]
+        Ora["ora"]
+        Keytar["keytar"]
+        OpenLib["open"]
+        Conf["conf"]
     end
 
-    subgraph Rust["Rust Crates"]
-        sha2["sha2"]
-        serde["serde"]
-        napi_rs["napi-rs"]
+    subgraph SkillDeps["Skill Framework Deps"]
+        YAML["yaml ^2.4"]
+        Glob["glob ^10"]
+        Chokidar["chokidar ^3"]
     end
 
-    %% Web dependencies
-    Web --> next
-    Web --> react
-    Web --> reactdom
-    Web --> radix
-    Web --> tailwind
-    Web --> framer
-    Web --> lucide
-    Web --> recharts
-    Web --> xyflow
-    Web --> cmdk
-    Web --> sonner
-    Web --> clsx
-    Web --> vitest
-    Web --> playwright
-    Web --> typescript
+    subgraph ObsDeps["Observability Peer Deps"]
+        Langfuse["langfuse (peer)"]
+        Prom["prom-client (peer)"]
+    end
+
     Web --> Shared
-
-    %% API dependencies
-    API --> express
-    API --> jwt
-    API --> bcrypt
-    API --> arctic
-    API --> anthropic
-    API --> openai
-    API --> helmet
-    API --> cors
-    API --> compression
-    API --> zod
-    API --> ws
-    API --> webpush
-    API --> pino
-    API --> morgan
-    API --> marked
-    API --> dompurify
-    API --> jsdom
-    API --> vitest
-    API --> supertest
-    API --> tsx
-    API --> typescript
+    Web --> WebDeps
     API --> Database
     API --> Shared
-
-    %% Database package
-    Database --> prisma
-    prisma --> pg
-    pg --> timescale
-    pg --> pgvector
-
-    %% Engine core
-    EngineCore --> sha2
-    EngineCore --> serde
-    EngineCore --> napi_rs
-
-    %% CLI dependencies
-    CLI --> commander
-    CLI --> chalk
-    CLI --> ora
-    CLI --> keytar
-    CLI --> open
-    CLI --> conf
+    API --> APIDeps
+    API --> AgentEng
+    API --> Guardrails
+    API --> Obs
+    API --> SkillFW
+    RouterApp --> Database
+    RouterApp --> Shared
+    RouterApp --> RouterDeps
+    Database --> DBDeps
     CLI --> Shared
-    CLI --> typescript
-
-    %% Monorepo tools
-    Monorepo --> turbo
+    CLI --> CLIDeps
+    SkillFW --> SkillDeps
+    Obs --> ObsDeps
+    IT --> AgentEng
+    IT --> Guardrails
+    IT --> Obs
+    IT --> SkillFW
 ```
 
-## Dependency Categories
+## Categories
 
-### Production Dependencies
-
-| Category | Frontend (@arkon/web) | Backend (@arkon/api) |
-|----------|----------------------|---------------------|
-| **Framework** | Next.js 15, React 19 | Express 4.21 |
-| **Database** | - | Prisma 5.22, pg 8.20 |
-| **Auth** | - | jsonwebtoken, bcryptjs, arctic |
-| **LLM** | - | @anthropic-ai/sdk, openai |
-| **Security** | - | helmet, cors, compression |
-| **Validation** | - | zod |
-| **Real-time** | - | ws, web-push |
-| **UI** | Radix, Tailwind, Framer Motion | - |
-| **Visualization** | Recharts, React Flow | - |
-| **Logging** | - | pino, morgan |
-
-### Development Dependencies
-
-| Category | Frontend (@arkon/web) | Backend (@arkon/api) |
-|----------|----------------------|---------------------|
-| **Testing** | Vitest, Playwright | Vitest, Supertest |
-| **Build** | TypeScript 5.6 | TypeScript 5.6, tsx |
-| **Linting** | ESLint 9.0 | ESLint 9.0 |
-
-### Monorepo Tools
-
-| Tool | Version | Purpose |
-|------|---------|---------|
-| pnpm | ^9.0.0 | Package manager |
-| Turborepo | ^2.0.0 | Build orchestration |
-| TypeScript | ^5.6.0 | Type checking |
-
-### Shared Packages
-
-| Package | Dependencies | Consumers |
-|---------|-------------|-----------|
-| @arkon/cli | commander, chalk, ora, keytar, open, conf | CLI users |
-| @arkon/database | Prisma, bcryptjs | @arkon/api |
-| @arkon/shared | (none) | @arkon/api, @arkon/web, @arkon/cli |
-| @arkon/tsconfig | (none) | All packages |
-| engine-core | Rust crates | @arkon/api (planned) |
+| Category | Packages |
+|----------|----------|
+| Web Framework | next, react, react-dom |
+| API Framework | express |
+| Reverse Proxy | http-proxy-middleware |
+| Database | pg, prisma, @prisma/client |
+| Auth | jsonwebtoken, bcryptjs, arctic, jose, cookie-parser |
+| LLM | @anthropic-ai/sdk, openai (Cerebras + Ollama via REST) |
+| UI | @radix-ui/*, tailwindcss, framer-motion, lucide-react |
+| Markdown | react-markdown, remark-gfm, marked, dompurify, jsdom |
+| Visualization | @xyflow/react, recharts |
+| Real-time | ws, web-push |
+| Validation | zod |
+| Logging | pino, pino-pretty, morgan |
+| Document Ingestion | busboy, pdf-parse, mammoth, mustache |
+| Crypto | tweetnacl |
+| Container Mgmt | dockerode |
+| Testing | vitest, @playwright/test, supertest |
+| Skill Framework | yaml, glob, chokidar |
+| Observability (peer) | langfuse, prom-client |
+| Build / DevTools | turbo, typescript, tsx, eslint |

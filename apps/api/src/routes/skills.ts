@@ -17,6 +17,7 @@ import { SkillScope } from "@oppmon/database";
 import { asyncHandler, ApiError } from "../middleware/error-handler.js";
 import { AuthenticatedRequest } from "../middleware/request-auth.js";
 import { rbac, buildRBACContext, RBACContext } from "../middleware/rbac.js";
+import { requireAccess } from "../middleware/access.js";
 import {
   listSkills,
   getSkill,
@@ -134,6 +135,9 @@ skillsRouter.get(
  */
 skillsRouter.get(
   "/:id",
+  // canAccess() short-circuits on owner / share / system; rbac() then layers
+  // role-based checks. Both must pass.
+  requireAccess("skill", "read"),
   rbac({
     resourceType: "skill",
     permission: "read",
@@ -209,6 +213,7 @@ skillsRouter.post(
  */
 skillsRouter.put(
   "/:id",
+  requireAccess("skill", "write"),
   rbac({
     resourceType: "skill",
     permission: "update",
@@ -251,6 +256,7 @@ skillsRouter.put(
  */
 skillsRouter.delete(
   "/:id",
+  requireAccess("skill", "admin"),
   rbac({
     resourceType: "skill",
     permission: "delete",
@@ -280,6 +286,7 @@ skillsRouter.delete(
  */
 skillsRouter.get(
   "/:id/versions",
+  requireAccess("skill", "read"),
   rbac({
     resourceType: "skill",
     permission: "read",

@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS memory_facts (
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
 
   -- lineage — soft link back to the journal entry that produced this fact (if any)
-  source_entry_id BIGINT REFERENCES work_entries(id) ON DELETE SET NULL,
+  source_entry_id TEXT REFERENCES work_entries(id) ON DELETE SET NULL,
 
   -- embedding (1536-dim, any provider via MRL truncation; provenance tracked per-row)
   embedding_provider TEXT,                     -- 'gemini' | 'openai' | 'voyage' | ...

@@ -57,7 +57,9 @@ export interface ToolCallInfo {
 }
 
 export interface ModelCredentials {
+  /** API key. Optional for keyless providers like Ollama. */
   apiKey?: string;
+  /** Override base URL (e.g. remote Ollama host). */
   baseUrl?: string;
   timeout?: number;
 }
@@ -212,8 +214,11 @@ export class RagChatService {
     ];
 
     // Step 8: Call LLM
-    const registryConfig = modelCredentials?.apiKey ? {
-      apiKey: modelCredentials.apiKey,
+    // Build registryConfig if ANY credential field is present (apiKey OR
+    // baseUrl/timeout). Keyless providers like Ollama legitimately have no
+    // apiKey but still need baseUrl from the registry to reach a remote host.
+    const registryConfig = modelCredentials ? {
+      apiKey: modelCredentials.apiKey ?? '',
       model,
       baseUrl: modelCredentials.baseUrl,
       timeout: modelCredentials.timeout,
@@ -324,9 +329,11 @@ export class RagChatService {
       ...messagesWithContext.map(m => ({ role: m.role, content: m.content })),
     ];
 
-    // Step 7: Call LLM with streaming (or fall back to non-streaming)
-    const registryConfig = modelCredentials?.apiKey ? {
-      apiKey: modelCredentials.apiKey,
+    // Step 7: Call LLM with streaming (or fall back to non-streaming).
+    // See note in chat() above: keyless providers (Ollama) need this gate to
+    // be permissive about missing apiKey so baseUrl propagates.
+    const registryConfig = modelCredentials ? {
+      apiKey: modelCredentials.apiKey ?? '',
       model,
       baseUrl: modelCredentials.baseUrl,
       timeout: modelCredentials.timeout,

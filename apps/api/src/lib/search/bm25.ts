@@ -31,8 +31,8 @@ export async function bm25Search(
       FROM skills,
            plainto_tsquery('english', $1) query
       WHERE search_vector @@ query
-        AND "tenantId" = $2
-        AND "deletedAt" IS NULL
+        AND tenant_id = $2
+        AND deleted_at IS NULL
     `);
   }
 
@@ -43,8 +43,8 @@ export async function bm25Search(
       FROM mcp_servers,
            plainto_tsquery('english', $1) query
       WHERE search_vector @@ query
-        AND "tenantId" = $2
-        AND "deletedAt" IS NULL
+        AND tenant_id = $2
+        AND deleted_at IS NULL
     `);
   }
 
@@ -55,7 +55,7 @@ export async function bm25Search(
       FROM agents,
            plainto_tsquery('english', $1) query
       WHERE search_vector @@ query
-        AND "tenantId" = $2
+        AND tenant_id = $2
     `);
   }
 
@@ -66,7 +66,7 @@ export async function bm25Search(
       FROM workflows,
            plainto_tsquery('english', $1) query
       WHERE search_vector @@ query
-        AND "tenantId" = $2
+        AND tenant_id = $2
     `);
   }
 
@@ -78,7 +78,7 @@ export async function bm25Search(
     WITH all_results AS (
       ${queries.join(' UNION ALL ')}
     )
-    SELECT id, "sourceType", "sourceId", score
+    SELECT id, source_type, source_id, score
     FROM all_results
     WHERE score >= $3
     ORDER BY score DESC
@@ -109,8 +109,8 @@ export async function bm25SearchSingle(
   topK: number = 100
 ): Promise<Array<{ id: string; score: number }>> {
   const tableConfig: Record<string, { table: string; deletedFilter: string }> = {
-    skill: { table: 'skills', deletedFilter: 'AND "deletedAt" IS NULL' },
-    mcp_server: { table: 'mcp_servers', deletedFilter: 'AND "deletedAt" IS NULL' },
+    skill: { table: 'skills', deletedFilter: 'AND deleted_at IS NULL' },
+    mcp_server: { table: 'mcp_servers', deletedFilter: 'AND deleted_at IS NULL' },
     agent: { table: 'agents', deletedFilter: '' },
     workflow: { table: 'workflows', deletedFilter: '' },
   };
@@ -123,7 +123,7 @@ export async function bm25SearchSingle(
     FROM ${table},
          plainto_tsquery('english', $1) query
     WHERE search_vector @@ query
-      AND "tenantId" = $2
+      AND tenant_id = $2
       ${deletedFilter}
     ORDER BY score DESC
     LIMIT $3
@@ -162,8 +162,8 @@ export async function bm25SearchWithExpansion(
       FROM skills,
            websearch_to_tsquery('english', $1) query
       WHERE search_vector @@ query
-        AND "tenantId" = $2
-        AND "deletedAt" IS NULL
+        AND tenant_id = $2
+        AND deleted_at IS NULL
     `);
   }
 
@@ -174,8 +174,8 @@ export async function bm25SearchWithExpansion(
       FROM mcp_servers,
            websearch_to_tsquery('english', $1) query
       WHERE search_vector @@ query
-        AND "tenantId" = $2
-        AND "deletedAt" IS NULL
+        AND tenant_id = $2
+        AND deleted_at IS NULL
     `);
   }
 
@@ -187,7 +187,7 @@ export async function bm25SearchWithExpansion(
     WITH all_results AS (
       ${sourceFilters.join(' UNION ALL ')}
     )
-    SELECT id, "sourceType", "sourceId", score
+    SELECT id, source_type, source_id, score
     FROM all_results
     WHERE score >= ${BM25_MIN_SCORE}
     ORDER BY score DESC

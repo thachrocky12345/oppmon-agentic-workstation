@@ -1,10 +1,10 @@
 # Data Flow
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (init sync)
 
 ## Overview
 
-This diagram shows how data enters the Arkon system, gets validated, processed, stored, and returned to clients. The system supports traditional CRUD operations, real-time event streaming, LLM interactions, and semantic search via embeddings.
+This diagram shows how data enters the OppMon (Arkon) system, gets validated, processed, stored, and returned to clients. The system supports traditional CRUD, real-time event streaming, LLM interactions (direct and via the LiteLLM router), agent oracle loops with semantic caching, document ingestion (PDF/DOCX), and semantic search via embeddings.
 
 ## Data Entry Points
 
@@ -254,6 +254,72 @@ flowchart TD
     K -->|Relational| L[PostgreSQL]
     K -->|Time-series| M[TimescaleDB]
     K -->|Vector| N[pgvector]
+```
+
+## Document Ingestion Flow (PDF / DOCX → Embeddings)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant API as RAG Admin Route
+    participant BB as busboy (multipart)
+    participant Parse as pdf-parse / mammoth
+    participant Store as lib/storage/local-disk
+    participant Chunk as Chunker
+    participant Embed as Embedding Service
+    participant PGV as pgvector
+
+    C->>API: POST /api/rag/admin (multipart/form-data)
+    API->>BB: stream parse fields + files
+    BB-->>API: file stream(s)
+    API->>Store: persist to oppmon-documents volume
+    par per file
+        API->>Parse: extract text (pdf-parse or mammoth)
+        Parse-->>API: plaintext
+        API->>Chunk: split into chunks
+        Chunk->>Embed: generateEmbedding(chunk)
+        Embed->>PGV: INSERT vector + metadata
+    end
+    API-->>C: 201 Created (doc id, chunk count)
+```
+
+## Agent Oracle Loop Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant Rt as Route (chat/agent)
+    participant Or as Oracle Loop
+    participant SC as Semantic Cache
+    participant MM as Memory Manager
+    participant TB as Toolbox
+    participant G as Guardrails
+    participant LLM as LLM Provider
+
+    C->>Rt: POST /api/rag/chat | /api/llm/chat
+    Rt->>Or: run(prompt, context)
+    Or->>SC: lookup(embedding(prompt))
+    alt Cache hit
+        SC-->>Or: cached completion
+    else Cache miss
+        Or->>MM: load short/long term memory
+        loop until done or max iterations
+            Or->>G: scope + constitution + filter check
+            G-->>Or: allow / deny
+            Or->>LLM: completion (Anthropic / Cerebras / Ollama)
+            LLM-->>Or: tokens / tool call
+            opt tool call
+                Or->>TB: execute(tool, args)
+                TB-->>Or: tool result
+            end
+        end
+        Or->>SC: store(embedding(prompt), final)
+        Or->>MM: persist memory deltas
+    end
+    Or-->>Rt: final message
+    Rt-->>C: 200 OK
 ```
 
 ## Hybrid Search Flow (BM25 + Vector + RRF)

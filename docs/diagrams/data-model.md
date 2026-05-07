@@ -1,463 +1,1034 @@
 # Data Model
 
-**Last Updated:** 2026-05-06 (init sync)
+**Last Updated:** 2026-05-07 (post migration ID-cutover & consolidation)
 
 ## Overview
 
-This diagram shows the entity-relationship model for the Arkon platform as defined in `packages/database/prisma/schema.prisma`. The schema supports multi-tenancy, OAuth, skills registry, LLM sessions, and vector embeddings.
+The OppMon (Arkon) database is a hybrid Prisma-managed + raw-SQL schema running
+on PostgreSQL 15 with two extensions: **TimescaleDB** (time-series) and
+**pgvector** (semantic search).
+
+- **Prisma owns** the core multi-tenant tables (Tenant, User, Team, Agent,
+  etc.) defined in `packages/database/prisma/schema.prisma` and applied via
+  `prisma db push`.
+- **Raw SQL migrations** under `apps/api/scripts/migrations/` add features
+  Prisma can't model: pgvector columns, TimescaleDB hypertables, RLS
+  policies, triggers, full-text search, the journal/memory subsystems, and
+  RAG. The migration runner is `apps/api/scripts/migrate.ts` (sorts `*.sql`
+  files alphabetically, tracks state in `_migrations`).
+- **All IDs are TEXT/cuid.** Legacy `SERIAL/INTEGER` ids were converted to
+  `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text` during the 2026-05-09
+  cutover. See [WIP-2026-05-09 cutover doc](../decisions/WIP-2026-05-09-migration-id-cutover.md).
+- **Column naming:** snake_case in Postgres; Prisma fields are camelCase
+  with `@map()`. See [database-conventions.md](../database-conventions.md).
+
+There are ~80 tables grouped into 11 logical domains. The high-level domain
+map is shown first; per-domain ERDs follow; a full table inventory closes
+the document.
+
+---
+
+## Domain Map
+
+```mermaid
+flowchart LR
+  IDENT[Identity &<br/>Tenancy]
+  AGENT[Agent Runtime &<br/>Events]
+  LLM[LLM Sessions &<br/>Routing]
+  MCP[MCP Servers]
+  RAG[RAG Documents]
+  MEM[Memory<br/>Subsystem]
+  JOURNAL[Journal &<br/>Work Tracking]
+  WF[Workflows &<br/>Skills]
+  AUDIT[Audit &<br/>Usage]
+  NOTIF[Notifications]
+  INFRA[Infrastructure &<br/>Cost]
+  SEC[Security &<br/>Rate Limit]
+
+  IDENT --> AGENT
+  IDENT --> LLM
+  IDENT --> RAG
+  IDENT --> MEM
+  IDENT --> JOURNAL
+  IDENT --> WF
+  IDENT --> AUDIT
+  IDENT --> NOTIF
+  IDENT --> SEC
+  AGENT --> MEM
+  AGENT --> JOURNAL
+  LLM --> MCP
+  RAG --> MEM
+  WF --> AGENT
+  AUDIT --> INFRA
+```
+
+---
+
+## 1. Identity & Tenancy
+
+The root of the multi-tenant model. Every tenant-scoped table FKs to
+`tenants(id)` with `ON DELETE CASCADE`.
 
 ```mermaid
 erDiagram
-    TENANT ||--o{ USER : has
-    TENANT ||--o{ TEAM : has
-    TENANT ||--o{ AGENT : owns
-    TENANT ||--o{ SKILL : owns
-    TENANT ||--o{ AUDIT_LOG : tracks
-    TENANT ||--o{ LLM_SESSION : owns
-    TENANT ||--o{ EMBEDDING : stores
-    TENANT ||--o{ MCP_SERVER : registers
-    TENANT ||--|| TENANT_SETTINGS : has
-    TENANT ||--o{ USAGE_EVENT : tracks
-    TENANT ||--o{ MODEL : configures
-    TENANT ||--o{ MODEL_SECRET : stores
-    TENANT ||--o{ VIRTUAL_KEY : issues
-    TENANT ||--|| TENANT_ROUTING_STATE : has
+    TENANTS ||--o{ USERS : has
+    TENANTS ||--o{ TEAMS : has
+    TENANTS ||--o| TENANT_SETTINGS : "1-to-1"
+    TENANTS ||--o| TENANT_ROUTING_STATES : "1-to-1 LiteLLM"
+    USERS ||--o{ USER_SESSIONS : has
+    USERS ||--o{ OAUTH_ACCOUNTS : has
+    USERS ||--o{ TEAM_MEMBERS : "belongs to"
+    USERS ||--o{ API_KEYS : owns
+    USERS ||--o{ MAGIC_LINK_TOKENS : "auth via"
+    USERS ||--o| TOKEN_VERSIONS : "rotation counter"
+    TEAMS ||--o{ TEAM_MEMBERS : has
+    USERS ||--o{ RESOURCE_SHARES : "grants/receives"
 
-    TEAM ||--o{ TEAM_MEMBER : has
-    TEAM ||--o{ AGENT : "optionally owns"
-    TEAM ||--o{ SKILL : "optionally owns"
-    TEAM ||--o{ MCP_SERVER : "optionally owns"
-    TEAM ||--o{ MODEL : "optionally owns"
-
-    USER ||--o{ USER_SESSION : has
-    USER ||--o{ TEAM_MEMBER : belongs_to
-    USER ||--o{ OAUTH_ACCOUNT : has
-    USER ||--o{ NOTIFICATION : receives
-    USER ||--o{ INCIDENT_UPDATE : creates
-    USER ||--o{ SKILL : creates
-    USER ||--o{ SKILL_VERSION : creates
-    USER ||--o{ AUDIT_LOG : "actor in"
-    USER ||--o{ LLM_SESSION : owns
-    USER ||--o{ MODEL : creates
-    USER ||--o{ VIRTUAL_KEY : owns
-
-    MODEL ||--o| MODEL_SECRET : "uses"
-
-    AGENT ||--o{ EVENT : generates
-    AGENT ||--o{ INCIDENT : triggers
-
-    INCIDENT ||--o{ INCIDENT_UPDATE : has
-
-    WORKFLOW ||--o{ WORKFLOW_RUN : executes
-
-    SKILL ||--o{ SKILL_VERSION : "has versions"
-
-    LLM_SESSION ||--o{ LLM_MESSAGE : contains
-
-    TENANT {
-        string id PK
-        string name
-        string slug UK
-        boolean isActive
-        datetime createdAt
-        datetime updatedAt
+    TENANTS {
+        text id PK
+        text name
+        text slug UK
+        text plan "defensive add"
+        text domain "defensive add"
+        jsonb metadata "defensive add"
+        jsonb settings "defensive add"
+        boolean is_active
+        text fallback_default_model_id
+        timestamptz created_at
+        timestamptz updated_at
     }
-
-    TEAM {
-        string id PK
-        string name
-        string tenantId FK
-        datetime createdAt
-        datetime updatedAt
+    USERS {
+        text id PK
+        text email UK
+        text password_hash "nullable"
+        text name "Prisma"
+        text display_name "legacy add"
+        text role "Role enum"
+        text tenant_id FK
+        boolean is_active
+        timestamptz last_login_at "legacy add"
     }
-
-    USER {
-        string id PK
-        string email UK
-        string passwordHash
-        string name
-        enum role "TENANT_ADMIN|TEAM_ADMIN|MEMBER"
-        string tenantId FK
-        boolean isActive
-        datetime createdAt
-        datetime updatedAt
+    USER_SESSIONS {
+        text id PK
+        text user_id FK
+        text token UK "Prisma"
+        text token_hash "legacy add"
+        timestamptz expires_at
     }
-
-    USER_SESSION {
-        string id PK
-        string userId FK
-        string token UK
-        datetime expiresAt
-        datetime createdAt
-        string userAgent
-        string ipAddress
+    TEAMS {
+        text id PK
+        text tenant_id FK
+        text name
+        text default_model_id
     }
-
-    OAUTH_ACCOUNT {
-        string id PK
-        string userId FK
-        enum provider "GITHUB|GOOGLE"
-        string providerAccountId
-        string accessToken
-        string refreshToken
-        datetime expiresAt
-        datetime createdAt
-        datetime updatedAt
+    TEAM_MEMBERS {
+        text user_id FK
+        text team_id FK
+        text role "ADMIN | MEMBER"
     }
-
-    TEAM_MEMBER {
-        string id PK
-        string userId FK
-        string teamId FK
-        enum role "ADMIN|MEMBER"
-        datetime createdAt
+    OAUTH_ACCOUNTS {
+        text user_id FK
+        text provider "GITHUB | GOOGLE"
+        text provider_account_id
     }
-
-    AGENT {
-        string id PK
-        string name
-        string description
-        enum status "ACTIVE|INACTIVE|ERROR|PENDING"
-        string tenantId FK
-        string teamId FK
-        json config
-        datetime lastSeen
-        datetime createdAt
-        datetime updatedAt
+    API_KEYS {
+        text id PK
+        text user_id FK
+        text key_hash
     }
-
-    EVENT {
-        string id PK
-        string agentId FK
-        string eventType
-        json payload
-        string severity
-        datetime timestamp
+    MAGIC_LINK_TOKENS {
+        text id PK
+        text user_id FK
+        text token_hash
+        timestamptz expires_at
     }
-
-    INCIDENT {
-        string id PK
-        string agentId FK
-        string title
-        string description
-        enum severity "LOW|MEDIUM|HIGH|CRITICAL"
-        enum status "OPEN|INVESTIGATING|RESOLVED|CLOSED"
-        datetime createdAt
-        datetime resolvedAt
-    }
-
-    INCIDENT_UPDATE {
-        string id PK
-        string incidentId FK
-        string userId FK
-        string message
-        datetime createdAt
-    }
-
-    NOTIFICATION {
-        string id PK
-        string userId FK
-        string type
-        string title
-        string message
-        boolean isRead
-        datetime createdAt
-    }
-
-    WORKFLOW {
-        string id PK
-        string name
-        string description
-        string tenantId
-        json definition
-        boolean isActive
-        datetime createdAt
-        datetime updatedAt
-    }
-
-    WORKFLOW_RUN {
-        string id PK
-        string workflowId FK
-        string status
-        json context
-        datetime startedAt
-        datetime completedAt
-    }
-
-    SKILL {
-        string id PK
-        string tenantId FK
-        string teamId FK
-        string name
-        string description
+    TOKEN_VERSIONS {
+        text user_id PK
         int version
-        string content
-        string sha256
-        enum scope "TENANT|TEAM"
-        string createdById FK
-        datetime createdAt
-        datetime updatedAt
-        datetime deletedAt
     }
-
-    SKILL_VERSION {
-        string id PK
-        string skillId FK
-        int version
-        string content
-        string sha256
-        string createdById FK
-        datetime createdAt
+    RESOURCE_SHARES {
+        text id PK
+        text grantor_id FK
+        text grantee_user_id FK
+        text grantee_team_id FK
     }
+```
 
-    AUDIT_LOG {
-        string id PK
-        string tenantId FK
-        string resourceType
-        string resourceId
-        enum action "CREATE|READ|UPDATE|DELETE|DENIED"
-        string actorId FK
-        json beforeState
-        json afterState
-        string ipAddress
-        string userAgent
-        json metadata
-        datetime createdAt
+**Special tenants:** `default` (seeded in `001_create_tenants.sql`),
+`transformate` (seeded in `017_journal.sql`), `system` (seeded in
+`2026-05-08_rls_and_rbac.sql` for SYSTEM_ADMIN ops).
+
+---
+
+## 2. Agent Runtime & Events
+
+Time-series-heavy; `events` is a TimescaleDB hypertable.
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ AGENTS : owns
+    TEAMS ||--o{ AGENTS : "optionally owns"
+    AGENTS ||--o{ EVENTS : generates
+    AGENTS ||--o{ TOOL_CALLS : invokes
+    AGENTS ||--o{ INCIDENTS : triggers
+    AGENTS ||--o{ DAILY_STATS : aggregates
+    AGENTS ||--o{ SESSIONS : "groups events"
+    AGENTS ||--o{ MCP_SERVER_AGENTS : "runtime tools"
+    AGENTS ||--o{ AGENT_BASELINES : "anomaly base"
+    INCIDENTS ||--o{ INCIDENT_UPDATES : has
+
+    AGENTS {
+        text id PK
+        text tenant_id FK
+        text team_id FK
+        text name
+        text status "ACTIVE|INACTIVE|PENDING|ERROR"
+        text framework
+        text default_provider "from 015"
+        text default_model_id "from 015"
+        jsonb config
     }
-
-    LLM_SESSION {
-        string id PK
-        string tenantId FK
-        string userId FK
-        string title
-        string provider
-        datetime createdAt
-        datetime updatedAt
+    EVENTS {
+        text id PK
+        text agent_id FK
+        text event_type
+        int input_tokens "from 011"
+        int output_tokens "from 011"
+        text threat_level
+        timestamptz timestamp "hypertable key"
     }
-
-    LLM_MESSAGE {
-        string id PK
-        string sessionId FK
-        string provider
-        string model
-        string role
-        string content
-        int inputTokens
-        int outputTokens
-        datetime createdAt
+    TOOL_CALLS {
+        text id PK
+        text agent_id FK
+        text tool_name
+        jsonb input
+        jsonb output
+        int duration_ms
     }
-
-    EMBEDDING {
-        string id PK
-        string tenantId FK
-        string sourceType
-        string sourceId
-        string content
-        string contentHash
-        string provider
-        string model
-        int dimensions
-        json metadata
-        datetime createdAt
-        datetime updatedAt
+    DAILY_STATS {
+        text id PK
+        text agent_id FK
+        text tenant_id FK
+        date day
+        int input_tokens
+        int output_tokens
+        numeric estimated_cost_usd
     }
+    SESSIONS {
+        text id PK
+        text agent_id FK
+        text tenant_id FK
+    }
+    INCIDENTS {
+        text id PK
+        text agent_id FK
+        text severity "LOW|MEDIUM|HIGH|CRITICAL"
+        text status "OPEN|INVESTIGATING|RESOLVED|CLOSED"
+    }
+    AGENT_BASELINES {
+        text agent_id FK
+        text metric
+        numeric baseline_value
+    }
+```
 
-    MCP_SERVER {
-        string id PK
-        string tenantId FK
-        string teamId FK
-        string name UK
-        string description
-        string command
-        array args
-        json env
-        string version
-        string sha256
-        enum scope "TENANT|TEAM"
+---
+
+## 3. LLM Sessions, Routing & MCP
+
+Tenant-scoped LLM sessions plus the LiteLLM-backed routing config and MCP
+server registry.
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ LLM_SESSIONS : owns
+    TENANTS ||--o{ MODELS : configures
+    TENANTS ||--o{ MODEL_SECRETS : stores
+    TENANTS ||--o{ VIRTUAL_KEYS : issues
+    TENANTS ||--o| TENANT_ROUTING_STATES : "LiteLLM container"
+    TENANTS ||--o{ MCP_SERVERS : registers
+    USERS ||--o{ LLM_SESSIONS : owns
+    USERS ||--o{ VIRTUAL_KEYS : owns
+    USERS ||--o{ MODELS : creates
+    LLM_SESSIONS ||--o{ LLM_MESSAGES : contains
+    MODELS ||--o| MODEL_SECRETS : "encrypted creds"
+    MCP_SERVERS ||--o{ MCP_SERVER_AGENTS : "exposes to"
+    MCP_SERVERS ||--o{ MCP_PROXY_LOGS : "proxied via"
+
+    LLM_SESSIONS {
+        text id PK
+        text tenant_id FK
+        text user_id FK
+        text provider
+    }
+    LLM_MESSAGES {
+        text id PK
+        text session_id FK
+        text role
+        text content
+        int input_tokens
+        int output_tokens
+    }
+    MODELS {
+        text id PK
+        text tenant_id FK
+        text team_id FK
+        text display_name
+        text provider_template_id
+        text model_identifier
+        text secret_ref FK
+    }
+    MODEL_SECRETS {
+        text id PK
+        text tenant_id FK
+        bytea encrypted_payload "XChaCha20-Poly1305"
+        bytea nonce
+    }
+    VIRTUAL_KEYS {
+        text id PK
+        text tenant_id FK
+        text user_id FK
+        varchar key_prefix UK
+        text key_hash
+    }
+    TENANT_ROUTING_STATES {
+        text tenant_id PK
+        text litellm_container_name
+        text status "PROVISIONING|RUNNING|DEGRADED|FAILED|STOPPED"
+        int restart_count
+    }
+    MODEL_PRICING {
+        text id PK
+        text provider
+        text model_id
+        text pricing_type "per_token|subscription"
+        numeric cost_per_1k_input
+        numeric cost_per_1k_output
+        numeric cached_input_discount_pct
+        numeric cache_creation_multiplier
+        numeric monthly_cost_usd
+        boolean is_free
+        date effective_from
+        date effective_until
+    }
+    MCP_SERVERS {
+        text id PK
+        text tenant_id FK
+        text team_id FK
+        text command
+        text[] args
+        jsonb env
+    }
+    MCP_SERVER_AGENTS {
+        text mcp_server_id FK
+        text agent_id FK
+    }
+    MCP_PROXY_LOGS {
+        text id PK
+        text server_id FK
+        timestamptz created_at
+    }
+```
+
+`model_pricing` is a global rate-card table (no tenant_id). Seeded with 63
+rows (Anthropic 11, OpenAI 21, Cerebras 10, Ollama 21) by
+`2026-05-09_seed_model_pricing.sql`.
+
+---
+
+## 4. Memory Subsystem
+
+Two parallel memory designs coexist:
+
+- **memory_facts** (`018_memory_v2.sql`) — pgvector 1536-dim, MRL-truncated,
+  per-(tenant, agent) fact store with HNSW or IVFFlat index based on
+  pgvector version.
+- **8-table memory bank** (`024_prisma_schema_alignment.sql`) — pgvector
+  1024-dim (BGE-M3), one table per memory type.
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ MEMORY_FACTS : stores
+    AGENT_IDENTITIES ||--o{ MEMORY_FACTS : owns
+    WORK_ENTRIES ||--o{ MEMORY_FACTS : "lineage"
+    MEMORY_FACTS ||--o{ MEMORY_RETRIEVAL_EVENTS : "feedback"
+
+    TENANTS ||--o{ CONVERSATIONAL_MEMORY : has
+    TENANTS ||--o{ SEMANTIC_MEMORY : has
+    TENANTS ||--o{ WORKFLOW_MEMORY : has
+    TENANTS ||--o{ TOOLBOX_MEMORY : has
+    TENANTS ||--o{ ENTITY_MEMORY : has
+    TENANTS ||--o{ SUMMARY_MEMORY : has
+    TENANTS ||--o{ PERSONA_MEMORY : has
+    TENANTS ||--o{ TOOL_LOG_MEMORY : has
+
+    MEMORY_FACTS {
+        uuid id PK
+        text tenant_id FK
+        text owner_agent FK
+        text kind
+        text body
+        text source_entry_id FK
+        vector embedding "1536"
+        boolean pinned
+        double decay_score
+    }
+    MEMORY_RETRIEVAL_EVENTS {
+        text id PK
+        text turn_id
+        text fact_id FK
+        int relevance_score
+    }
+    SEMANTIC_MEMORY {
+        text id PK
+        text tenant_id
+        text content
+        vector embedding "1024 BGE-M3"
+    }
+    WORKFLOW_MEMORY {
+        text id PK
+        text tenant_id
+        vector embedding "1024"
+    }
+    TOOLBOX_MEMORY {
+        text id PK
+        text tool_name
+        text augmented_description
+        vector embedding "1024"
+    }
+    ENTITY_MEMORY {
+        text id PK
+        text entity_type
+        text entity_name
+        vector embedding "1024"
+    }
+    SUMMARY_MEMORY {
+        text id PK
+        text thread_id
+        int original_message_count
+        vector embedding "1024"
+    }
+    PERSONA_MEMORY {
+        text id PK
+        text name
+        jsonb traits
+        vector embedding "1024"
+    }
+    CONVERSATIONAL_MEMORY {
+        text id PK
+        text thread_id
+        text role
+        text content
+    }
+    TOOL_LOG_MEMORY {
+        text id PK
+        text thread_id
+        text tool_name
+        jsonb input
+        jsonb output
+    }
+```
+
+**Note:** Prisma cannot model `vector(N)` columns. The `embedding` columns
+on these tables are added defensively in `024_prisma_schema_alignment.sql`
+right before the HNSW index creation block (consolidation 2026-05-09).
+
+---
+
+## 5. RAG (Retrieval-Augmented Generation)
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ RAG_COLLECTIONS : owns
+    TEAMS ||--o{ RAG_COLLECTIONS : "scoped"
+    USERS ||--o{ RAG_COLLECTIONS : creates
+    RAG_COLLECTIONS ||--o{ RAG_DOCUMENTS : contains
+    RAG_DOCUMENTS ||--o{ RAG_CHUNKS : "split into"
+    TENANTS ||--o{ EMBEDDINGS : "generic store"
+    TENANTS ||--o{ DOCUMENTS : "raw text"
+
+    RAG_COLLECTIONS {
+        text id PK
+        text tenant_id FK
+        text team_id FK
+        text scope "TENANT | TEAM"
+        text name
+    }
+    RAG_DOCUMENTS {
+        text id PK
+        text collection_id FK
+        text original_filename
+        text mime_type
+        text file_path
+        text file_sha256
+        text extraction_status "PENDING|EXTRACTING|READY|FAILED"
+    }
+    RAG_CHUNKS {
+        text id PK
+        text document_id FK
+        int chunk_index
+        text content
+        int token_count
+        vector embedding "1536"
+    }
+    EMBEDDINGS {
+        text id PK
+        text tenant_id FK
+        text source_type
+        text source_id
+        text content_hash
+        vector embedding "1536"
+    }
+```
+
+Both `rag_chunks.embedding` and `embeddings.embedding` are added
+defensively in `024_prisma_schema_alignment.sql`. The `documents` table is
+a generic raw-text store separate from the RAG pipeline.
+
+---
+
+## 6. Journal & Work Tracking
+
+The Warden + governed-agent unified work tracker introduced in
+`017_journal.sql` plus the work-items system from `020_work_items.sql`.
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ AGENT_IDENTITIES : has
+    TENANTS ||--o{ WORK_ENTRIES : owns
+    TENANTS ||--o{ WARDEN_SESSIONS : has
+    TENANTS ||--o{ JOURNAL_REMINDERS : has
+    TENANTS ||--o{ WORK_ITEMS : owns
+    AGENT_IDENTITIES ||--o{ WORK_ENTRIES : "owns by slug"
+    AGENT_IDENTITIES ||--o{ WARDEN_MESSAGES : "authored by"
+    WORK_ENTRIES ||--o{ WORK_ENTRIES : "parent_id self-ref"
+    WORK_ENTRIES ||--o{ JOURNAL_REMINDERS : reminds
+    WARDEN_SESSIONS ||--o{ WARDEN_MESSAGES : contains
+    WORK_ITEMS ||--o{ WORK_ITEMS : "parent self-ref"
+    WORK_ITEMS ||--o{ WORK_ITEM_PLAN_LOG : "planning history"
+    WORK_ITEMS ||--o{ WORK_ITEM_POSTMORTEMS : "outcomes"
+    WORK_ITEMS ||--o{ SUBAGENT_RUNS : "delegated to"
+
+    AGENT_IDENTITIES {
+        text slug PK
+        text tenant_id FK
+        text display_name
+        text role "governor | agent"
+        text emoji
+        text model
+        text home_server
+    }
+    WORK_ENTRIES {
+        text id PK
+        text tenant_id FK
+        text owner_agent FK
+        text parent_id FK
+        text category "task|log|decision|insight|question|blocker|ship|note"
+        text status "todo|in_progress|done|blocked|cancelled|log"
+        smallint priority
+        text title
+        text body_md
+        text[] tags
+        tsvector search_vector
+        timestamptz occurred_at
+    }
+    WARDEN_SESSIONS {
+        text id PK
+        text tenant_id FK
+        text surface "arkon-chat|arkon-pwa|discord|claude-code-*|cron"
+        text session_lock_owner
+    }
+    WARDEN_MESSAGES {
+        text id PK
+        text session_id FK
+        text author_agent FK
+        text role "user|assistant|tool|system"
+        int tokens_in
+        int tokens_out
+        numeric cost_usd
+    }
+    JOURNAL_REMINDERS {
+        text id PK
+        text entry_id FK
+        timestamptz fire_at
+        text channel "discord|email|arkon-banner|lumina-wa"
+    }
+    WORK_ITEMS {
+        text id PK
+        text tenant_id FK
+        text parent_id FK
+        text[] depends_on
+        text status
+    }
+    WORK_ITEM_PLAN_LOG {
+        text id PK
+        text work_item_id FK
+    }
+    WORK_ITEM_POSTMORTEMS {
+        text id PK
+        text work_item_id FK
+    }
+    SUBAGENT_RUNS {
+        text id PK
+        text work_item_id FK
+    }
+```
+
+`agent_identities` is seeded with 8 agents for the `transformate` tenant:
+warden, brynn, lumina, sentinel, scout, codesmith, hermes, opus-desktop.
+
+---
+
+## 7. Workflows, Skills & Tasks
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ WORKFLOWS : owns
+    TENANTS ||--o{ SKILLS : owns
+    TEAMS ||--o{ SKILLS : "optionally owns"
+    USERS ||--o{ SKILLS : creates
+    USERS ||--o{ SKILL_VERSIONS : creates
+    WORKFLOWS ||--o{ WORKFLOW_RUNS : executes
+    SKILLS ||--o{ SKILL_VERSIONS : "has versions"
+    TENANTS ||--o{ TASKS : has
+    TENANTS ||--o{ APPROVALS : "human-in-loop"
+    TENANTS ||--o{ CRON_JOBS : schedules
+    TENANTS ||--o{ INTAKE_SUBMISSIONS : "external input"
+    TENANTS ||--o{ QUICK_COMMANDS : "saved actions"
+    TENANTS ||--o{ CALENDAR_ITEMS : has
+
+    WORKFLOWS {
+        text id PK
+        text tenant_id
+        jsonb definition
+        boolean is_active
+    }
+    WORKFLOW_RUNS {
+        text id PK
+        text workflow_id FK
+        text status
+        jsonb context
+    }
+    SKILLS {
+        text id PK
+        text tenant_id FK
+        text team_id FK
+        text scope "TENANT|TEAM"
         boolean enabled
-        datetime createdAt
-        datetime updatedAt
-        datetime deletedAt
+        text content
+        text sha256
+        int version
     }
-
-    TENANT_SETTINGS {
-        string id PK
-        string tenantId UK
-        boolean eventsEnabled
-        datetime createdAt
-        datetime updatedAt
+    SKILL_VERSIONS {
+        text id PK
+        text skill_id FK
+        int version
     }
+    APPROVALS {
+        text id PK
+        text tenant_id
+        text status
+    }
+    CALENDAR_ITEMS {
+        text id PK
+        text tenant_id
+        text linked_approval_id FK
+        text linked_task_id FK
+    }
+```
 
-    USAGE_EVENT {
-        string id PK
-        string tenantId FK
-        string resourceType
-        string resourceId
-        string action
-        datetime bucketTimestamp
+---
+
+## 8. Audit, Usage & Pricing
+
+Three coexisting audit/usage tables for different fidelity levels:
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ AUDIT_LOGS : "Prisma-managed"
+    TENANTS ||--o{ AUDIT_LOG : "v1 legacy"
+    AUDIT_LOG_V2 }o--|| TENANTS : "v2 event-sourced"
+    TENANTS ||--o{ USAGE_EVENTS : "privacy-first analytics"
+    USERS ||--o{ AUDIT_LOGS : "actor in"
+    MODEL_PRICING ||--o{ PRICING_AUDIT_LOG : "rate changes"
+
+    AUDIT_LOGS {
+        text id PK
+        text tenant_id FK
+        text resource_type
+        text resource_id
+        text action "CREATE|READ|UPDATE|DELETE|DENIED"
+        text actor_id FK
+        jsonb before_state
+        jsonb after_state
+    }
+    AUDIT_LOG_V2 {
+        text id PK
+        text tenant_id
+        text actor_type "user|agent|system|cron"
+        text actor_id
+        text action
+        text target_type
+        text target_id
+        jsonb metadata
+        jsonb old_value
+        jsonb new_value
+    }
+    USAGE_EVENTS {
+        text id PK
+        text tenant_id
+        text resource_type
+        text resource_id
+        text action
+        timestamptz bucket_timestamp
         int count
-        json metadata
-        datetime createdAt
     }
+    PRICING_AUDIT_LOG {
+        text id PK
+        text model_pricing_id FK
+        jsonb before_state
+        jsonb after_state
+    }
+```
 
-    MODEL {
-        string id PK
-        string tenantId FK
-        enum scope "TENANT|TEAM"
-        string teamId FK
-        string displayName UK
-        string providerTemplateId
-        string modelIdentifier
-        json publicConfig
-        string secretRef FK
-        string yamlOverride
+`audit_log_v2` is append-only — `REVOKE UPDATE, DELETE` is conditionally
+applied to the `mcadmin` role (production only) and a BEFORE INSERT
+trigger enforces tenant_id integrity (`2026-05-08_rls_and_rbac.sql`).
+
+---
+
+## 9. Notifications
+
+Two parallel notification stacks:
+
+- **`notifications` (Prisma)**: per-user, simple `is_read` flag.
+- **`notifications` (legacy raw SQL)**: per-tenant, severity, body, link,
+  `read` flag. The same table — columns are added defensively to
+  reconcile both shapes.
+
+```mermaid
+erDiagram
+    USERS ||--o{ NOTIFICATIONS : receives
+    TENANTS ||--o{ NOTIFICATION_PREFERENCES : configures
+    USERS ||--o{ PUSH_SUBSCRIPTIONS : owns
+
+    NOTIFICATIONS {
+        text id PK
+        text user_id FK "Prisma"
+        text tenant_id "legacy"
+        text type
+        text severity "info|warning|critical"
+        text title
+        text body
+        text link
+        boolean is_read
+        boolean read "legacy alias"
+    }
+    NOTIFICATION_PREFERENCES {
+        text id PK
+        text tenant_id
+        text channel "email|slack|telegram|discord|webhook"
         boolean enabled
-        string createdById FK
-        datetime lastSyncedAt
-        datetime createdAt
-        datetime updatedAt
-        datetime deletedAt
+        jsonb config
     }
-
-    MODEL_SECRET {
-        string id PK
-        string tenantId FK
-        bytes encryptedPayload
-        bytes nonce
-        int version
-        datetime createdAt
-    }
-
-    VIRTUAL_KEY {
-        string id PK
-        string tenantId FK
-        string userId FK
-        string keyPrefix UK
-        string keyHash
-        string label
-        boolean enabled
-        datetime expiresAt
-        datetime lastUsedAt
-        datetime createdAt
-        datetime revokedAt
-    }
-
-    TENANT_ROUTING_STATE {
-        string tenantId PK
-        string litellmContainerName
-        string masterKeySecretRef
-        enum status "PROVISIONING|RUNNING|DEGRADED|FAILED|STOPPED"
-        datetime lastHealthCheckAt
-        string lastError
-        int restartCount
-        datetime createdAt
-        datetime updatedAt
+    PUSH_SUBSCRIPTIONS {
+        text id PK
+        text user_id FK
+        text endpoint
+        text p256dh
+        text auth
     }
 ```
 
-## Multi-Tenancy Model
+---
 
+## 10. Infrastructure, Cost & Tracing
+
+```mermaid
+erDiagram
+    INFRA_NODES ||--o{ NODE_METRICS : "TimescaleDB hypertable"
+    TENANTS ||--o{ TRACES : "OpenTelemetry"
+    TRACES ||--o{ SPANS : contains
+    INFRA_COSTS ||--o{ COST_RECONCILIATION : "reconcile"
+    BUDGET_LIMITS ||--o{ TENANTS : "per tenant"
+    ANOMALY_ALERTS }o--o{ AGENTS : "via baseline"
+
+    INFRA_NODES {
+        text id PK
+        text name
+        text ip
+        text role "primary|secondary"
+    }
+    NODE_METRICS {
+        bigserial id "internal"
+        text node_id FK
+        text metric
+        numeric value
+        timestamptz timestamp "hypertable key"
+    }
+    TRACES {
+        bigserial id "internal"
+        text trace_id
+        text tenant_id
+        timestamptz start_time "hypertable key"
+    }
+    SPANS {
+        bigserial id "internal"
+        text trace_id
+        text span_id
+        text parent_span_id
+    }
+    INFRA_COSTS {
+        text id PK
+        text name
+        text category "server|service|api_subscription|domain|other"
+        numeric monthly_cost_usd
+        jsonb tenant_allocations
+    }
+    BUDGET_LIMITS {
+        text id PK
+        text tenant_id
+        numeric limit_usd
+    }
+    ANOMALY_ALERTS {
+        text id PK
+        text agent_id FK
+        text metric
+    }
 ```
-Tenant
-  ├── Users (role: TENANT_ADMIN | TEAM_ADMIN | MEMBER)
-  │     └── OAuthAccounts (GITHUB, GOOGLE)
-  │     └── UserSessions
-  │     └── Notifications
-  ├── Teams
-  │     └── TeamMembers (role: ADMIN | MEMBER)
-  ├── Agents
-  │     └── Events (time-series)
-  │     └── Incidents → IncidentUpdates
-  ├── Workflows → WorkflowRuns
-  ├── Skills → SkillVersions
-  ├── AuditLogs
-  ├── LlmSessions → LlmMessages
-  ├── Embeddings (pgvector)
-  ├── McpServers
-  ├── TenantSettings (privacy controls)
-  ├── UsageEvents (privacy-first analytics)
-  ├── Models → ModelSecrets (encrypted provider credentials)
-  ├── VirtualKeys (CLI/SDK API key management)
-  └── TenantRoutingState (LiteLLM orchestration status)
+
+`node_metrics`, `traces`, `spans` keep `BIGSERIAL` internal `id` (TimescaleDB
+hypertable counter — no FK target).
+
+---
+
+## 11. Security & Rate Limit
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ RATE_LIMIT_WINDOWS : enforces
+    TENANTS ||--o{ BENCHMARK_RUNS : tracks
+    AGENTS ||--o{ AGENT_BASELINES : "anomaly base"
+
+    RATE_LIMIT_WINDOWS {
+        text id PK
+        text tenant_id
+        text bucket_key
+        timestamptz window_start
+        int request_count
+    }
+    BENCHMARK_RUNS {
+        text id PK
+        text tenant_id
+        timestamptz started_at
+    }
 ```
+
+Plus RLS policies (`2026-05-08_rls_and_rbac.sql`) on every tenant-scoped
+table, the `oppmon_app` `NOSUPERUSER NOBYPASSRLS` DB role, and a BEFORE
+INSERT audit_logs trigger for defense-in-depth.
+
+---
+
+## Full Table Inventory
+
+| # | Table | Source | Purpose |
+|---|---|---|---|
+| 1 | `tenants` | Prisma + 001 | Multi-tenant root |
+| 2 | `users` | Prisma + 006 | Operator accounts |
+| 3 | `user_sessions` | Prisma + 006 | JWT/session store |
+| 4 | `oauth_accounts` | Prisma | GitHub/Google OAuth |
+| 5 | `teams` | Prisma | Sub-tenant grouping |
+| 6 | `team_members` | Prisma | User↔Team M2M |
+| 7 | `tenant_settings` | Prisma | Per-tenant flags |
+| 8 | `tenant_routing_states` | Prisma | LiteLLM container status |
+| 9 | `token_versions` | Prisma multitenant_redesign | JWT rotation counter |
+| 10 | `resource_shares` | Prisma multitenant_redesign | Cross-user resource grants |
+| 11 | `api_keys` | 010 | API key auth |
+| 12 | `magic_link_tokens` | 010 | Passwordless email auth |
+| 13 | `agents` | Prisma + 015 | Registered agents |
+| 14 | `events` | Prisma + 011 | Time-series events (hypertable) |
+| 15 | `tool_calls` | 024 | Per-tool invocations |
+| 16 | `daily_stats` | 011 + 024 | Daily aggregates |
+| 17 | `sessions` | 001 | Agent conversation sessions |
+| 18 | `incidents` | Prisma | Incident records |
+| 19 | `incident_updates` | Prisma | Incident comments |
+| 20 | `agent_baselines` | base_schema | Anomaly baselines |
+| 21 | `agent_identities` | 017 | Warden agent registry |
+| 22 | `mcp_servers` | Prisma + 024 | MCP server registry |
+| 23 | `mcp_server_agents` | base_schema | MCP↔Agent M2M |
+| 24 | `mcp_proxy_logs` | base_schema | MCP request log |
+| 25 | `models` | Prisma | Per-tenant model config |
+| 26 | `model_secrets` | Prisma | Encrypted provider creds |
+| 27 | `model_pricing` | base_schema + 015 + 022 + 2026-05-09 | Global rate cards |
+| 28 | `pricing_audit_log` | base_schema | model_pricing change log |
+| 29 | `virtual_keys` | Prisma | API gateway keys |
+| 30 | `llm_sessions` | Prisma | LLM chat sessions |
+| 31 | `llm_messages` | Prisma | LLM chat messages |
+| 32 | `embeddings` | Prisma + 024 | Generic vector store (1536) |
+| 33 | `documents` | base_schema | Raw doc storage |
+| 34 | `rag_collections` | 024 | RAG collection grouping |
+| 35 | `rag_documents` | 024 | RAG-indexed documents |
+| 36 | `rag_chunks` | 024 + 003 | RAG chunked content (1536) |
+| 37 | `memory_facts` | 018 | Long-term agent memory (1536, MRL) |
+| 38 | `memory_retrieval_events` | 023 | Memory relevance feedback |
+| 39 | `conversational_memory` | 024 | Per-thread chat memory |
+| 40 | `semantic_memory` | 024 | Tenant semantic memory (1024) |
+| 41 | `workflow_memory` | 024 | Workflow exec memory (1024) |
+| 42 | `toolbox_memory` | 024 | Tool description memory (1024) |
+| 43 | `entity_memory` | 024 | Entity extraction memory (1024) |
+| 44 | `summary_memory` | 024 | Conversation summaries (1024) |
+| 45 | `persona_memory` | 024 | Per-persona memory (1024) |
+| 46 | `tool_log_memory` | 024 | Tool exec audit (memory layer) |
+| 47 | `work_entries` | 017 | Unified work tracker |
+| 48 | `warden_sessions` | 017 | Warden conv. continuity |
+| 49 | `warden_messages` | 017 | Warden session messages |
+| 50 | `journal_reminders` | 017 | Reminder scheduler |
+| 51 | `work_items` | 020 | Work-item tickets |
+| 52 | `work_item_plan_log` | 020 | Plan revision history |
+| 53 | `work_item_postmortems` | 020 | Outcome write-ups |
+| 54 | `subagent_runs` | 020 | Delegated subagent runs |
+| 55 | `tasks` | base_schema | Generic tasks |
+| 56 | `approvals` | base_schema | Human-in-loop approvals |
+| 57 | `cron_jobs` | base_schema | Scheduled jobs |
+| 58 | `intake_submissions` | base_schema | External form intake |
+| 59 | `quick_commands` | base_schema | Saved command palette |
+| 60 | `calendar_items` | base_schema | Calendar entries |
+| 61 | `workflows` | Prisma | Workflow definitions |
+| 62 | `workflow_runs` | Prisma | Workflow exec records |
+| 63 | `skills` | Prisma | Skill registry |
+| 64 | `skill_versions` | Prisma | Skill version history |
+| 65 | `audit_logs` | Prisma + 2026-05-08 | Resource audit log |
+| 66 | `audit_log` | base_schema | Legacy v1 audit |
+| 67 | `audit_log_v2` | 007 | Append-only event-sourced audit |
+| 68 | `usage_events` | Prisma | Privacy-first usage analytics |
+| 69 | `notifications` | Prisma + 004 | User+tenant notifications |
+| 70 | `notification_preferences` | 004 | Per-channel notification config |
+| 71 | `push_subscriptions` | 005 | Web push subscriptions |
+| 72 | `infra_nodes` | base_schema | Server/node registry |
+| 73 | `node_metrics` | base_schema | Node telemetry (hypertable) |
+| 74 | `infra_costs` | 013 | Infrastructure cost tracker |
+| 75 | `cost_reconciliation` | 014 | Cost vs invoice reconciliation |
+| 76 | `budget_limits` | base_schema | Per-tenant spend caps |
+| 77 | `traces` | 009 | OTel traces (hypertable) |
+| 78 | `spans` | 009 | OTel spans (hypertable) |
+| 79 | `anomaly_alerts` | base_schema | Anomaly alert records |
+| 80 | `rate_limit_windows` | 008 | Token-bucket rate limit state |
+| 81 | `benchmark_runs` | base_schema | Performance benchmarks |
+| 82 | `_migrations` | migrate.ts | Migration runner state |
+
+(82 tables — `youtube_channels` was created in 016 and dropped in 021,
+not counted.)
+
+---
+
+## Migration Consolidation Patterns (2026-05-09)
+
+The migration cutover converted ALL `SERIAL`/`INTEGER` ids to
+`TEXT`/`gen_random_uuid()::text` and made every legacy migration
+idempotent against a Prisma `db push`-managed live DB. The full handoff
+lives in
+[`docs/decisions/WIP-2026-05-09-migration-id-cutover.md`](../decisions/WIP-2026-05-09-migration-id-cutover.md).
+
+### Error → Fix lookup
+
+When `pnpm --filter @oppmon/api migrate` fails, match the error to one of
+these patterns:
+
+| Error shape | Root cause | Fix |
+|---|---|---|
+| `column "X" does not exist` | Prisma's `db push` made a partial table; raw SQL `CREATE TABLE IF NOT EXISTS` no-op'd | Add `ALTER TABLE Y ADD COLUMN IF NOT EXISTS X <type>` after the CREATE block |
+| `null value in column "X"` | Prisma column has no DB default but is NOT NULL | Add the column to the INSERT explicitly (e.g. `NOW()` for `updated_at`, explicit `slug`) |
+| `duplicate key value violates unique constraint` | `ON CONFLICT (id) DO NOTHING` only catches PK conflicts; another column has a unique conflict | Switch to `INSERT ... SELECT ... WHERE NOT EXISTS (... WHERE id = '...' OR slug = '...')` |
+| `incompatible types: integer and text` on FK | Legacy migration declared `INTEGER REFERENCES` but Prisma made the parent's id TEXT | Convert to `TEXT REFERENCES` |
+| `relation "X" already exists` | Bare `CREATE TABLE X` | Switch to `CREATE TABLE IF NOT EXISTS X` |
+| `role "X" does not exist` | Hardcoded prod-only DB role in `GRANT/REVOKE` | Wrap in `DO $$ IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'X') THEN EXECUTE '...'; END IF; END $$` |
+| `<column>_id_seq does not exist` | Sequence GRANT/trigger references a SERIAL that's now TEXT | Drop the sequence-related statement |
+| `violates foreign key constraint ..._tenant_id_fkey` | Seed references a tenant that isn't seeded yet | Defensively `INSERT ... SELECT ... WHERE NOT EXISTS` for the missing tenant |
+| `syntax error at or near "\"` | psql meta-command (`\set`, `\if`) in a `.sql` file | File is meant for psql CLI, not the migration runner — rename to `.psql.skip` |
+| `column "embedding" does not exist` | Prisma can't model `vector(N)`; column was never created | `ALTER TABLE Y ADD COLUMN IF NOT EXISTS embedding vector(N)` before the HNSW index |
+
+### Hypertable internal IDs
+
+`node_metrics`, `traces`, `spans` deliberately keep `id BIGSERIAL` — they
+are TimescaleDB hypertable internal counters with no FK targets, so they
+don't need to be cuid'd.
+
+---
+
+## Operational Quick-Reference
+
+**Run migrations:**
+```bash
+pnpm --filter @oppmon/api migrate
+```
+
+**Verify model_pricing seed:**
+```sql
+SELECT provider, COUNT(*) FROM model_pricing GROUP BY provider;
+-- expected: anthropic=11, cerebras=10, ollama=21, openai=21
+```
+
+**Inspect a column's existence (used in defensive blocks):**
+```sql
+SELECT 1 FROM information_schema.columns
+ WHERE table_schema = current_schema()
+   AND table_name = '<table>'
+   AND column_name = '<column>';
+```
+
+**Inspect a role's existence:**
+```sql
+SELECT 1 FROM pg_roles WHERE rolname = '<role>';
+```
+
+**Re-run a single migration (force):**
+```bash
+# Edit _migrations to remove the row, then:
+pnpm --filter @oppmon/api migrate
+```
+
+**Stamp a migration as already-applied (escape hatch):**
+```sql
+INSERT INTO _migrations (name) VALUES ('<filename without .sql>')
+ON CONFLICT (name) DO NOTHING;
+```
+See `apps/api/scripts/stamp_legacy_migrations.sql` for the bulk version.
+
+---
 
 ## PostgreSQL Extensions
 
-The database uses three PostgreSQL extensions:
+| Extension | Purpose | Version |
+|-----------|---------|---------|
+| **TimescaleDB** | Time-series optimization for `events`, `node_metrics`, `traces`, `spans`, `work_entries` (optional) | 2.x |
+| **pgvector** | Vector embeddings on 9+ tables (1024-dim BGE-M3 + 1536-dim OpenAI/Gemini/MRL) | ≥0.5.0 (HNSW); falls back to IVFFlat if older |
+| **pgcrypto** | `gen_random_uuid()` for cuid-style TEXT primary keys | built-in |
+| **uuid-ossp** | Legacy UUID generation (kept for compatibility) | built-in |
 
-| Extension | Purpose |
-|-----------|---------|
-| **TimescaleDB** | Time-series optimization for Events table |
-| **pgvector** | Vector embeddings for semantic search |
-| **uuid-ossp** | UUID generation (via Prisma CUID) |
-
-## Time-Series Data (TimescaleDB)
-
-The `events` table is configured as a TimescaleDB hypertable:
-
-```sql
--- Hypertable configuration
-SELECT create_hypertable('events', 'timestamp');
-
--- Retention policy (example: 90 days)
-SELECT add_retention_policy('events', INTERVAL '90 days');
-
--- Continuous aggregate for hourly stats
-CREATE MATERIALIZED VIEW event_hourly
-WITH (timescaledb.continuous) AS
-SELECT
-    time_bucket('1 hour', timestamp) AS bucket,
-    "agentId",
-    "eventType",
-    COUNT(*) as count
-FROM events
-GROUP BY bucket, "agentId", "eventType";
-```
-
-## Vector Embeddings (pgvector)
-
-The `embeddings` table stores vector representations:
-
-```sql
--- Add vector column (done via migration)
-ALTER TABLE embeddings ADD COLUMN embedding vector(1536);
-
--- Create HNSW index for fast similarity search
-CREATE INDEX ON embeddings
-USING hnsw (embedding vector_cosine_ops)
-WITH (m = 16, ef_construction = 64);
-
--- Semantic search query
-SELECT sourceType, sourceId, content,
-       1 - (embedding <=> $1::vector) AS similarity
-FROM embeddings
-WHERE "tenantId" = $2
-ORDER BY embedding <=> $1::vector
-LIMIT 10;
-```
+---
 
 ## Key Indexes
 
 | Table | Index | Columns |
 |-------|-------|---------|
-| events | idx_events_agent_time | (agentId, timestamp DESC) |
-| events | idx_events_type_time | (eventType, timestamp DESC) |
-| agents | idx_agents_tenant | (tenantId) |
-| agents | idx_agents_status | (status) |
+| events | idx_events_agent_created | (agent_id, created_at DESC) |
+| events | idx_events_type_timestamp | (event_type, timestamp DESC) |
+| agents | idx_agents_tenant | (tenant_id) |
+| agents | idx_agents_default_model | (default_provider, default_model_id) |
+| daily_stats | idx_daily_stats_tenant | (tenant_id) |
+| sessions | idx_sessions_tenant | (tenant_id) |
 | users | idx_users_email | (email) |
-| users | idx_users_tenant | (tenantId) |
-| incidents | idx_incidents_status | (status, createdAt DESC) |
-| skills | idx_skills_tenant | (tenantId) |
-| skills | idx_skills_scope | (scope) |
-| audit_logs | idx_audit_tenant_type | (tenantId, resourceType, createdAt DESC) |
-| embeddings | idx_embeddings_source | (tenantId, sourceType, sourceId) |
-| mcp_servers | idx_mcp_servers_tenant | (tenantId) |
-| mcp_servers | idx_mcp_servers_scope | (scope) |
-| tenant_settings | idx_tenant_settings_tenant | (tenantId) |
-| usage_events | idx_usage_events_tenant_bucket | (tenantId, bucketTimestamp) |
-| usage_events | idx_usage_events_resource | (tenantId, resourceType) |
-| models | idx_models_tenant_enabled | (tenantId, enabled, deletedAt) |
-| models | idx_models_team | (teamId) |
-| model_secrets | idx_model_secrets_tenant | (tenantId) |
-| virtual_keys | idx_virtual_keys_prefix | (keyPrefix) |
-| virtual_keys | idx_virtual_keys_user | (userId, enabled) |
+| users | idx_users_tenant | (tenant_id) |
+| notifications | idx_notifications_tenant_read | (tenant_id, read, created_at DESC) |
+| memory_facts | idx_memory_facts_embedding_hnsw | HNSW(embedding vector_cosine_ops) |
+| memory_facts | idx_memory_facts_body_fts | GIN(to_tsvector('english', body)) |
+| memory_facts | idx_memory_facts_pinned | (tenant_id, owner_agent) WHERE pinned |
+| rag_chunks | idx_rag_chunks_vector | HNSW(embedding) |
+| embeddings | idx_embeddings_vector | HNSW(embedding) |
+| work_entries | idx_work_entries_search | GIN(search_vector) |
+| work_entries | idx_work_entries_tags | GIN(tags) |
+| audit_logs | idx_audit_logs_tenant_type_created | (tenant_id, resource_type, created_at DESC) |
+| usage_events | idx_usage_events_tenant_bucket | (tenant_id, bucket_timestamp) |
+| virtual_keys | idx_virtual_keys_prefix | (key_prefix) |
+| model_pricing | idx_model_pricing_provider_model | (provider, model_id) |

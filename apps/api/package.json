@@ -15,6 +15,7 @@
     "smoke:week2": "tsx scripts/smoke-week2.ts",
     "smoke:week3": "tsx scripts/smoke-week3.ts",
     "smoke:week5": "tsx scripts/smoke-week5.ts",
+    "smoke:rls": "tsx scripts/smoke-rls.ts",
     "smoke": "tsx scripts/smoke-week1.ts && tsx scripts/smoke-week2.ts && tsx scripts/smoke-week3.ts && tsx scripts/smoke-week5.ts",
     "test:auth": "tsx scripts/test-auth-integration.ts",
     "test:ai": "tsx scripts/test-ai.ts",

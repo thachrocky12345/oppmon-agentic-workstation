@@ -338,23 +338,24 @@ usageRouter.get('/settings', requireRole('TENANT_ADMIN'), asyncHandler(async (re
  */
 usageRouter.put('/settings', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const tenant_id = req.tenantId!
-  const { events_enabled } = req.body
+  // Accept either camelCase (frontend convention) or snake_case (legacy).
+  const events_enabled = req.body?.eventsEnabled ?? req.body?.events_enabled
 
   if (typeof events_enabled !== 'boolean') {
-    throw ApiError.badRequest('events_enabled must be a boolean')
+    throw ApiError.badRequest('eventsEnabled must be a boolean')
   }
 
   await query(
-    `INSERT INTO tenant_settings ("id", "tenant_id", "events_enabled", "created_at", "updated_at")
+    `INSERT INTO tenant_settings (id, tenant_id, events_enabled, created_at, updated_at)
      VALUES (gen_random_uuid(), $1, $2, NOW(), NOW())
-     ON CONFLICT ("tenant_id")
-     DO UPDATE SET "events_enabled" = $2, "updated_at" = NOW()`,
+     ON CONFLICT (tenant_id)
+     DO UPDATE SET events_enabled = $2, updated_at = NOW()`,
     [tenant_id, events_enabled]
   )
 
   res.json({
     data: {
-      events_enabled,
+      eventsEnabled: events_enabled,
     },
   })
 }))

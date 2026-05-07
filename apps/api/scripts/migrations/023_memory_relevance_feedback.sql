@@ -64,8 +64,8 @@ END $$;
 -- while its events still exist; we keep the events for audit/postmortem
 -- and the cron tolerates orphan fact_ids (LEFT JOIN, skip).
 CREATE TABLE IF NOT EXISTS memory_retrieval_events (
-  id BIGSERIAL PRIMARY KEY,
-  turn_id BIGINT,                              -- warden_messages.id (assistant row); nullable so we can record retrievals from non-message contexts
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  turn_id TEXT,                                -- warden_messages.id (assistant row); nullable so we can record retrievals from non-message contexts
   fact_id UUID NOT NULL,                       -- memory_facts.id (no FK on purpose, see above)
   was_cited BOOLEAN NOT NULL DEFAULT FALSE,
   retrieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -86,7 +86,7 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'warden_bridge') THEN
     EXECUTE 'GRANT SELECT, INSERT ON memory_retrieval_events TO warden_bridge';
-    EXECUTE 'GRANT USAGE, SELECT ON SEQUENCE memory_retrieval_events_id_seq TO warden_bridge';
+    -- No sequence grant: id is now TEXT (gen_random_uuid()), no SERIAL sequence exists.
   END IF;
 END $$;
 

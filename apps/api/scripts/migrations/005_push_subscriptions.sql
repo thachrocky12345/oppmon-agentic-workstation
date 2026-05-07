@@ -1,6 +1,6 @@
 -- Push notification subscriptions for web push (PWA)
 CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id SERIAL PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   endpoint TEXT NOT NULL UNIQUE,
   keys_p256dh TEXT NOT NULL,
