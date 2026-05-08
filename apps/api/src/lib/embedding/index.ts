@@ -210,3 +210,43 @@ export function getEmbeddingMetadata(provider: EmbeddingProvider) {
     timestamp: new Date().toISOString(),
   };
 }
+
+/**
+ * Caller-defined version label used to disambiguate same-(provider,model)
+ * embeddings that were generated under different prompt/normalization
+ * conventions. Bump via env when starting a re-embedding migration so the
+ * new rows live alongside the old ones until cutover.
+ *
+ * Persisted as the `embedding_version` column on every vector-bearing
+ * table (see 2026-05-10_embedding_versioning.sql).
+ */
+export const EMBEDDING_VERSION = process.env.EMBEDDING_VERSION || 'v1';
+
+/**
+ * Provenance columns to write on every vector insert. Pair with the
+ * `embedding` column in the same INSERT.
+ *
+ * @example
+ * const { provider, model, version, dim } = getEmbeddingProvenance();
+ * await client.query(
+ *   `INSERT INTO embeddings
+ *      (id, tenant_id, embedding, embedding_provider, embedding_model,
+ *       embedding_version, embedding_dim)
+ *    VALUES ($1, $2, $3::vector, $4, $5, $6, $7)`,
+ *   [id, tenantId, embeddingLiteral, provider, model, version, dim],
+ * );
+ */
+export function getEmbeddingProvenance(provider?: EmbeddingProvider): {
+  provider: EmbeddingProvider;
+  model: string;
+  version: string;
+  dim: number;
+} {
+  const p = provider ?? getDefaultEmbeddingProvider();
+  return {
+    provider: p,
+    model: getDefaultEmbeddingModel(p),
+    version: EMBEDDING_VERSION,
+    dim: getDefaultEmbeddingDimensions(p),
+  };
+}

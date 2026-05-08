@@ -1,6 +1,6 @@
 # Data Model
 
-**Last Updated:** 2026-05-07 (post migration ID-cutover & consolidation)
+**Last Updated:** 2026-05-10 (post schema improvement plan: audit/memory/notifications consolidation, outbox + idempotency + soft-delete + embedding versioning, TimescaleDB tuning)
 
 ## Overview
 
@@ -832,93 +832,98 @@ INSERT audit_logs trigger for defense-in-depth.
 
 ## Full Table Inventory
 
-| # | Table | Source | Purpose |
-|---|---|---|---|
-| 1 | `tenants` | Prisma + 001 | Multi-tenant root |
-| 2 | `users` | Prisma + 006 | Operator accounts |
-| 3 | `user_sessions` | Prisma + 006 | JWT/session store |
-| 4 | `oauth_accounts` | Prisma | GitHub/Google OAuth |
-| 5 | `teams` | Prisma | Sub-tenant grouping |
-| 6 | `team_members` | Prisma | User↔Team M2M |
-| 7 | `tenant_settings` | Prisma | Per-tenant flags |
-| 8 | `tenant_routing_states` | Prisma | LiteLLM container status |
-| 9 | `token_versions` | Prisma multitenant_redesign | JWT rotation counter |
-| 10 | `resource_shares` | Prisma multitenant_redesign | Cross-user resource grants |
-| 11 | `api_keys` | 010 | API key auth |
-| 12 | `magic_link_tokens` | 010 | Passwordless email auth |
-| 13 | `agents` | Prisma + 015 | Registered agents |
-| 14 | `events` | Prisma + 011 | Time-series events (hypertable) |
-| 15 | `tool_calls` | 024 | Per-tool invocations |
-| 16 | `daily_stats` | 011 + 024 | Daily aggregates |
-| 17 | `sessions` | 001 | Agent conversation sessions |
-| 18 | `incidents` | Prisma | Incident records |
-| 19 | `incident_updates` | Prisma | Incident comments |
-| 20 | `agent_baselines` | base_schema | Anomaly baselines |
-| 21 | `agent_identities` | 017 | Warden agent registry |
-| 22 | `mcp_servers` | Prisma + 024 | MCP server registry |
-| 23 | `mcp_server_agents` | base_schema | MCP↔Agent M2M |
-| 24 | `mcp_proxy_logs` | base_schema | MCP request log |
-| 25 | `models` | Prisma | Per-tenant model config |
-| 26 | `model_secrets` | Prisma | Encrypted provider creds |
-| 27 | `model_pricing` | base_schema + 015 + 022 + 2026-05-09 | Global rate cards |
-| 28 | `pricing_audit_log` | base_schema | model_pricing change log |
-| 29 | `virtual_keys` | Prisma | API gateway keys |
-| 30 | `llm_sessions` | Prisma | LLM chat sessions |
-| 31 | `llm_messages` | Prisma | LLM chat messages |
-| 32 | `embeddings` | Prisma + 024 | Generic vector store (1536) |
-| 33 | `documents` | base_schema | Raw doc storage |
-| 34 | `rag_collections` | 024 | RAG collection grouping |
-| 35 | `rag_documents` | 024 | RAG-indexed documents |
-| 36 | `rag_chunks` | 024 + 003 | RAG chunked content (1536) |
-| 37 | `memory_facts` | 018 | Long-term agent memory (1536, MRL) |
-| 38 | `memory_retrieval_events` | 023 | Memory relevance feedback |
-| 39 | `conversational_memory` | 024 | Per-thread chat memory |
-| 40 | `semantic_memory` | 024 | Tenant semantic memory (1024) |
-| 41 | `workflow_memory` | 024 | Workflow exec memory (1024) |
-| 42 | `toolbox_memory` | 024 | Tool description memory (1024) |
-| 43 | `entity_memory` | 024 | Entity extraction memory (1024) |
-| 44 | `summary_memory` | 024 | Conversation summaries (1024) |
-| 45 | `persona_memory` | 024 | Per-persona memory (1024) |
-| 46 | `tool_log_memory` | 024 | Tool exec audit (memory layer) |
-| 47 | `work_entries` | 017 | Unified work tracker |
-| 48 | `warden_sessions` | 017 | Warden conv. continuity |
-| 49 | `warden_messages` | 017 | Warden session messages |
-| 50 | `journal_reminders` | 017 | Reminder scheduler |
-| 51 | `work_items` | 020 | Work-item tickets |
-| 52 | `work_item_plan_log` | 020 | Plan revision history |
-| 53 | `work_item_postmortems` | 020 | Outcome write-ups |
-| 54 | `subagent_runs` | 020 | Delegated subagent runs |
-| 55 | `tasks` | base_schema | Generic tasks |
-| 56 | `approvals` | base_schema | Human-in-loop approvals |
-| 57 | `cron_jobs` | base_schema | Scheduled jobs |
-| 58 | `intake_submissions` | base_schema | External form intake |
-| 59 | `quick_commands` | base_schema | Saved command palette |
-| 60 | `calendar_items` | base_schema | Calendar entries |
-| 61 | `workflows` | Prisma | Workflow definitions |
-| 62 | `workflow_runs` | Prisma | Workflow exec records |
-| 63 | `skills` | Prisma | Skill registry |
-| 64 | `skill_versions` | Prisma | Skill version history |
-| 65 | `audit_logs` | Prisma + 2026-05-08 | Resource audit log |
-| 66 | `audit_log` | base_schema | Legacy v1 audit |
-| 67 | `audit_log_v2` | 007 | Append-only event-sourced audit |
-| 68 | `usage_events` | Prisma | Privacy-first usage analytics |
-| 69 | `notifications` | Prisma + 004 | User+tenant notifications |
-| 70 | `notification_preferences` | 004 | Per-channel notification config |
-| 71 | `push_subscriptions` | 005 | Web push subscriptions |
-| 72 | `infra_nodes` | base_schema | Server/node registry |
-| 73 | `node_metrics` | base_schema | Node telemetry (hypertable) |
-| 74 | `infra_costs` | 013 | Infrastructure cost tracker |
-| 75 | `cost_reconciliation` | 014 | Cost vs invoice reconciliation |
-| 76 | `budget_limits` | base_schema | Per-tenant spend caps |
-| 77 | `traces` | 009 | OTel traces (hypertable) |
-| 78 | `spans` | 009 | OTel spans (hypertable) |
-| 79 | `anomaly_alerts` | base_schema | Anomaly alert records |
-| 80 | `rate_limit_windows` | 008 | Token-bucket rate limit state |
-| 81 | `benchmark_runs` | base_schema | Performance benchmarks |
-| 82 | `_migrations` | migrate.ts | Migration runner state |
+**Expected scale legend:** `small` ≤10k rows, `medium` ≤1M, `large` ≤100M, `hypertable` = TimescaleDB-partitioned (effectively unbounded but with retention/compression).
 
-(82 tables — `youtube_channels` was created in 016 and dropped in 021,
-not counted.)
+| # | Table | Source | Purpose | Expected scale |
+|---|---|---|---|---|
+| 1 | `tenants` | Prisma + 001 | Multi-tenant root | small |
+| 2 | `users` | Prisma + 006 | Operator accounts | small |
+| 3 | `user_sessions` | Prisma + 006 | JWT/session store | medium |
+| 4 | `oauth_accounts` | Prisma | GitHub/Google OAuth | small |
+| 5 | `teams` | Prisma | Sub-tenant grouping | small |
+| 6 | `team_members` | Prisma | User↔Team M2M | small |
+| 7 | `tenant_settings` | Prisma | Per-tenant flags | small |
+| 8 | `tenant_routing_states` | Prisma | LiteLLM container status | small |
+| 9 | `token_versions` | Prisma multitenant_redesign | JWT rotation counter | small |
+| 10 | `resource_shares` | Prisma multitenant_redesign | Cross-user resource grants | small |
+| 11 | `api_keys` | 010 | API key auth | small |
+| 12 | `magic_link_tokens` | 010 | Passwordless email auth | small |
+| 13 | `agents` | Prisma + 015 | Registered agents | medium |
+| 14 | `events` | Prisma + 011 | Time-series events | **hypertable** (since 2026-05-10) |
+| 15 | `tool_calls` | 024 | Per-tool invocations | **hypertable** (since 2026-05-10) |
+| 16 | `daily_stats` | 011 + 024 | Daily aggregates (deprecated by `daily_stats_cagg`) | medium |
+| 17 | `sessions` | 001 | Agent conversation sessions | medium |
+| 18 | `incidents` | Prisma | Incident records | medium |
+| 19 | `incident_updates` | Prisma | Incident comments | medium |
+| 20 | `agent_baselines` | base_schema | Anomaly baselines | small |
+| 21 | `agent_identities` | 017 | Warden agent registry | small |
+| 22 | `mcp_servers` | Prisma + 024 | MCP server registry | small |
+| 23 | `mcp_server_agents` | base_schema | MCP↔Agent M2M | small |
+| 24 | `mcp_proxy_logs` | base_schema | MCP request log | **hypertable** (since 2026-05-10) |
+| 25 | `models` | Prisma | Per-tenant model config | small |
+| 26 | `model_secrets` | Prisma | Encrypted provider creds | small |
+| 27 | `model_pricing` | base_schema + 015 + 022 + 2026-05-09 | Global rate cards | small |
+| 28 | `pricing_audit_log` | base_schema | model_pricing change log | medium |
+| 29 | `virtual_keys` | Prisma | API gateway keys | small |
+| 30 | `llm_sessions` | Prisma | LLM chat sessions | medium |
+| 31 | `llm_messages` | Prisma | LLM chat messages | **hypertable** (since 2026-05-10) |
+| 32 | `embeddings` | Prisma + 024 | Generic vector store (1536) | large |
+| 33 | `documents` | base_schema | Raw doc storage | medium |
+| 34 | `rag_collections` | 024 | RAG collection grouping | small |
+| 35 | `rag_documents` | 024 | RAG-indexed documents | medium |
+| 36 | `rag_chunks` | 024 + 003 | RAG chunked content (1536) | large |
+| 37 | `memory_facts` | 018 | Long-term agent memory (1536, MRL) — canonical store | large |
+| 38 | `memory_retrieval_events` | 023 | Memory relevance feedback | medium |
+| 39 | `conversational_memory` | 024 | Per-thread chat memory | medium |
+| 40 | ~~`semantic_memory`~~ | 024 | **Dropped 2026-05-10** — folded into `memory_facts(kind='semantic')` | — |
+| 41 | ~~`workflow_memory`~~ | 024 | **Dropped 2026-05-10** — folded into `memory_facts(kind='workflow')` | — |
+| 42 | ~~`toolbox_memory`~~ | 024 | **Dropped 2026-05-10** — folded into `memory_facts(kind='toolbox')` | — |
+| 43 | ~~`entity_memory`~~ | 024 | **Dropped 2026-05-10** — folded into `memory_facts(kind='entity')` | — |
+| 44 | `summary_memory` | 024 | Conversation summaries (1024) | medium |
+| 45 | `persona_memory` | 024 | Per-persona memory (1024) | small |
+| 46 | `tool_log_memory` | 024 | Tool exec audit (memory layer) | medium |
+| 47 | `work_entries` | 017 | Unified work tracker | medium |
+| 48 | `warden_sessions` | 017 | Warden conv. continuity | medium |
+| 49 | `warden_messages` | 017 | Warden session messages | large |
+| 50 | `journal_reminders` | 017 | Reminder scheduler | small |
+| 51 | `work_items` | 020 | Work-item tickets | medium |
+| 52 | `work_item_plan_log` | 020 | Plan revision history | medium |
+| 53 | `work_item_postmortems` | 020 | Outcome write-ups | small |
+| 54 | `subagent_runs` | 020 | Delegated subagent runs | medium |
+| 55 | `tasks` | base_schema | Generic tasks | medium |
+| 56 | `approvals` | base_schema | Human-in-loop approvals | small |
+| 57 | `cron_jobs` | base_schema | Scheduled jobs | small |
+| 58 | `intake_submissions` | base_schema | External form intake | medium |
+| 59 | `quick_commands` | base_schema | Saved command palette | small |
+| 60 | `calendar_items` | base_schema | Calendar entries | medium |
+| 61 | `workflows` | Prisma | Workflow definitions | small |
+| 62 | `workflow_runs` | Prisma | Workflow exec records | large |
+| 63 | `skills` | Prisma | Skill registry | small |
+| 64 | `skill_versions` | Prisma | Skill version history | small |
+| 65 | `audit_logs` | Prisma + 2026-05-08 | Resource audit log (deprecated; backfilled into `audit_log_v2` 2026-05-10) | medium |
+| 66 | ~~`audit_log`~~ | base_schema | **Dropped 2026-05-10** — legacy v1, backfilled into `audit_log_v2` | — |
+| 67 | `audit_log_v2` | 007 | Append-only event-sourced audit (canonical) | large |
+| 68 | `usage_events` | Prisma | Privacy-first usage analytics | large |
+| 69 | `notifications` | Prisma + 004 + 2026-05-10 | Per-user notifications (tenant-broadcast = fanout) | large |
+| 70 | `notification_preferences` | 004 | Per-channel notification config | medium |
+| 71 | `push_subscriptions` | 005 | Web push subscriptions | medium |
+| 72 | `infra_nodes` | base_schema | Server/node registry | small |
+| 73 | `node_metrics` | base_schema | Node telemetry | **hypertable** |
+| 74 | `infra_costs` | 013 | Infrastructure cost tracker | medium |
+| 75 | `cost_reconciliation` | 014 | Cost vs invoice reconciliation | medium |
+| 76 | `budget_limits` | base_schema | Per-tenant spend caps | small |
+| 77 | `traces` | 009 | OTel traces | **hypertable** |
+| 78 | `spans` | 009 | OTel spans | **hypertable** |
+| 79 | `anomaly_alerts` | base_schema | Anomaly alert records | medium |
+| 80 | `rate_limit_windows` | 008 | Token-bucket rate limit state | **hypertable** |
+| 81 | `benchmark_runs` | base_schema | Performance benchmarks | small |
+| 82 | `_migrations` | migrate.ts | Migration runner state (now with checksum/duration/status, 2026-05-10) | small |
+| 83 | `event_outbox` | 2026-05-10 | Transactional outbox for at-least-once event publishing | large |
+| 84 | `idempotency_keys` | 2026-05-10 | Replay-protection cache for mutating endpoints | medium |
+| 85 | `tenant_archives` | 2026-05-10 | Frozen JSONB snapshot per tenant deletion (immutable) | small |
+| 86 | `tenant_deletion_audit` | 2026-05-10 | GDPR proof-of-deletion receipts (immutable) | small |
+
+**Net: 81 active tables** post-2026-05-10 consolidation (5 dropped — `audit_log`, `semantic_memory`, `workflow_memory`, `toolbox_memory`, `entity_memory`; 4 added — `event_outbox`, `idempotency_keys`, `tenant_archives`, `tenant_deletion_audit`). `youtube_channels` was created in 016 and dropped in 021, not counted.
 
 ---
 

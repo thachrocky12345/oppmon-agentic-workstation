@@ -18,9 +18,6 @@ vi.mock('@oppmon/database', () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
-    auditLog: {
-      create: vi.fn(),
-    },
   },
 }));
 

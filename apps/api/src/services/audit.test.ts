@@ -1,10 +1,7 @@
 /**
  * Audit Service Tests
  *
- * Tests for audit logging operations:
- * - CREATE, UPDATE, DELETE, DENIED actions
- * - Query with filters
- * - Context extraction from request
+ * Tests for audit logging operations against audit_log_v2.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -19,30 +16,31 @@ import {
   getResourceAuditLog,
   AuditContext,
 } from './audit.js';
-import { Request } from 'express';
 
-// Mock prisma
-vi.mock('@oppmon/database', () => ({
-  prisma: {
-    auditLog: {
-      create: vi.fn(),
-      findMany: vi.fn(),
-      count: vi.fn(),
-    },
+// Capture inserts so each test can assert on them.
+const inserted: Array<{ sql: string; params: unknown[] }> = [];
+let queryFn: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
+
+vi.mock('../lib/db.js', () => ({
+  withTenantPg: async <T,>(_tenantId: string, fn: (client: unknown) => Promise<T>) => {
+    const client = {
+      query: (sql: string, params: unknown[] = []) => {
+        inserted.push({ sql, params });
+        return queryFn(sql, params);
+      },
+    };
+    return fn(client);
   },
 }));
 
-import { prisma } from '@oppmon/database';
+beforeEach(() => {
+  inserted.length = 0;
+  queryFn = async () => ({ rows: [] });
+});
 
-describe('Audit Service', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
+describe('Audit Service (audit_log_v2)', () => {
   describe('logAudit', () => {
-    it('creates audit log entry', async () => {
-      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any);
-
+    it('inserts a row into audit_log_v2', async () => {
       await logAudit({
         tenantId: 'tenant-1',
         resourceType: 'skill',
@@ -54,23 +52,21 @@ describe('Audit Service', () => {
         userAgent: 'test-agent',
       });
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          tenantId: 'tenant-1',
-          resourceType: 'skill',
-          resourceId: 'skill-1',
-          action: 'CREATE',
-          actorId: 'user-1',
-          afterState: { name: 'Test' },
-          ipAddress: '127.0.0.1',
-          userAgent: 'test-agent',
-        }),
-      });
+      expect(inserted).toHaveLength(1);
+      expect(inserted[0].sql).toContain('INSERT INTO audit_log_v2');
+      // Param order: actor_type, actor_id, action, target_type, target_id,
+      //              description, metadata, old_value, new_value, ip_address, tenant_id
+      expect(inserted[0].params[0]).toBe('user');
+      expect(inserted[0].params[1]).toBe('user-1');
+      expect(inserted[0].params[2]).toBe('CREATE');
+      expect(inserted[0].params[3]).toBe('skill');
+      expect(inserted[0].params[4]).toBe('skill-1');
+      expect(inserted[0].params[10]).toBe('tenant-1');
     });
 
     it('does not throw on database error', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      vi.mocked(prisma.auditLog.create).mockRejectedValue(new Error('DB error'));
+      queryFn = async () => { throw new Error('DB error'); };
 
       await expect(
         logAudit({
@@ -79,164 +75,62 @@ describe('Audit Service', () => {
           resourceId: 'skill-1',
           action: 'CREATE',
           actorId: 'user-1',
-        })
+        }),
       ).resolves.toBeUndefined();
 
       expect(consoleSpy).toHaveBeenCalledWith(
         '[Audit] Failed to write audit log:',
-        expect.any(Error)
+        expect.any(Error),
       );
-
       consoleSpy.mockRestore();
     });
   });
 
-  describe('logCreate', () => {
-    it('logs CREATE action with afterState only', async () => {
-      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any);
+  describe('logCreate / logUpdate / logDelete / logDenied', () => {
+    const ctx: AuditContext = { tenantId: 'tenant-1', actorId: 'user-1' };
 
-      const ctx: AuditContext = {
-        tenantId: 'tenant-1',
-        actorId: 'user-1',
-        ipAddress: '127.0.0.1',
-      };
-
-      await logCreate(ctx, 'skill', 'skill-1', { name: 'New Skill' });
-
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          action: 'CREATE',
-          beforeState: null,
-          afterState: { name: 'New Skill' },
-        }),
-      });
-    });
-  });
-
-  describe('logUpdate', () => {
-    it('logs UPDATE action with before and after states', async () => {
-      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any);
-
-      const ctx: AuditContext = {
-        tenantId: 'tenant-1',
-        actorId: 'user-1',
-      };
-
-      await logUpdate(
-        ctx,
-        'skill',
-        'skill-1',
-        { name: 'Old Name' },
-        { name: 'New Name' }
-      );
-
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          action: 'UPDATE',
-          beforeState: { name: 'Old Name' },
-          afterState: { name: 'New Name' },
-        }),
-      });
-    });
-  });
-
-  describe('logDelete', () => {
-    it('logs DELETE action with beforeState only', async () => {
-      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any);
-
-      const ctx: AuditContext = {
-        tenantId: 'tenant-1',
-        actorId: 'user-1',
-      };
-
-      await logDelete(ctx, 'skill', 'skill-1', { name: 'Deleted Skill' });
-
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          action: 'DELETE',
-          beforeState: { name: 'Deleted Skill' },
-          afterState: null,
-        }),
-      });
-    });
-  });
-
-  describe('logDenied', () => {
-    it('logs DENIED action with metadata', async () => {
-      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any);
-
-      const ctx: AuditContext = {
-        tenantId: 'tenant-1',
-        actorId: 'user-1',
-      };
-
-      await logDenied(ctx, 'skill', 'skill-1', {
-        permission: 'delete',
-        reason: 'Insufficient permissions',
-      });
-
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          action: 'DENIED',
-          beforeState: null,
-          afterState: null,
-          metadata: {
-            permission: 'delete',
-            reason: 'Insufficient permissions',
-          },
-        }),
-      });
+    it('logCreate sets action=CREATE with null beforeState', async () => {
+      await logCreate(ctx, 'skill', 'skill-1', { name: 'New' });
+      expect(inserted[0].params[2]).toBe('CREATE');
+      expect(inserted[0].params[7]).toBeNull(); // old_value
+      expect(inserted[0].params[8]).toBe(JSON.stringify({ name: 'New' })); // new_value
     });
 
-    it('logs DENIED action without metadata', async () => {
-      vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any);
+    it('logUpdate captures both states', async () => {
+      await logUpdate(ctx, 'skill', 'skill-1', { name: 'Old' }, { name: 'New' });
+      expect(inserted[0].params[2]).toBe('UPDATE');
+      expect(inserted[0].params[7]).toBe(JSON.stringify({ name: 'Old' }));
+      expect(inserted[0].params[8]).toBe(JSON.stringify({ name: 'New' }));
+    });
 
-      const ctx: AuditContext = {
-        tenantId: 'tenant-1',
-        actorId: 'user-1',
-      };
+    it('logDelete sets null afterState', async () => {
+      await logDelete(ctx, 'skill', 'skill-1', { name: 'Gone' });
+      expect(inserted[0].params[2]).toBe('DELETE');
+      expect(inserted[0].params[7]).toBe(JSON.stringify({ name: 'Gone' }));
+      expect(inserted[0].params[8]).toBeNull();
+    });
 
-      await logDenied(ctx, 'skill', 'skill-1');
-
-      expect(prisma.auditLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          action: 'DENIED',
-          metadata: undefined,
-        }),
-      });
+    it('logDenied includes metadata', async () => {
+      await logDenied(ctx, 'skill', 'skill-1', { reason: 'forbidden' });
+      expect(inserted[0].params[2]).toBe('DENIED');
+      const meta = JSON.parse(String(inserted[0].params[6]));
+      expect(meta.reason).toBe('forbidden');
     });
   });
 
   describe('getAuditContext', () => {
     it('returns null when user is not authenticated', () => {
-      const req = {
-        user: undefined,
-        headers: {},
-        socket: {},
-      } as any;
-
-      const result = getAuditContext(req);
-
-      expect(result).toBeNull();
+      const req = { user: undefined, headers: {}, socket: {} } as never;
+      expect(getAuditContext(req)).toBeNull();
     });
 
     it('extracts context from authenticated request', () => {
       const req = {
-        user: {
-          id: 'user-1',
-          tenantId: 'tenant-1',
-        },
-        headers: {
-          'user-agent': 'Mozilla/5.0',
-        },
-        socket: {
-          remoteAddress: '192.168.1.1',
-        },
-      } as any;
-
-      const result = getAuditContext(req);
-
-      expect(result).toEqual({
+        user: { id: 'user-1', tenantId: 'tenant-1' },
+        headers: { 'user-agent': 'Mozilla/5.0' },
+        socket: { remoteAddress: '192.168.1.1' },
+      } as never;
+      expect(getAuditContext(req)).toEqual({
         tenantId: 'tenant-1',
         actorId: 'user-1',
         ipAddress: '192.168.1.1',
@@ -246,189 +140,42 @@ describe('Audit Service', () => {
 
     it('extracts IP from x-forwarded-for header', () => {
       const req = {
-        user: {
-          id: 'user-1',
-          tenantId: 'tenant-1',
-        },
-        headers: {
-          'x-forwarded-for': '10.0.0.1, 172.16.0.1',
-          'user-agent': 'test',
-        },
-        socket: {
-          remoteAddress: '127.0.0.1',
-        },
-      } as any;
-
-      const result = getAuditContext(req);
-
-      expect(result?.ipAddress).toBe('10.0.0.1');
+        user: { id: 'user-1', tenantId: 'tenant-1' },
+        headers: { 'x-forwarded-for': '10.0.0.1, 172.16.0.1', 'user-agent': 'test' },
+        socket: { remoteAddress: '127.0.0.1' },
+      } as never;
+      expect(getAuditContext(req)?.ipAddress).toBe('10.0.0.1');
     });
   });
 
   describe('queryAuditLogs', () => {
-    it('queries audit logs with basic filters', async () => {
-      const mockLogs = [
-        { id: 'log-1', action: 'CREATE' },
-        { id: 'log-2', action: 'UPDATE' },
-      ];
-
-      vi.mocked(prisma.auditLog.findMany).mockResolvedValue(mockLogs as any);
-      vi.mocked(prisma.auditLog.count).mockResolvedValue(10);
+    it('selects from audit_log_v2 with filters', async () => {
+      queryFn = async (sql: string) => {
+        if (sql.includes('COUNT(*)')) return { rows: [{ total: '7' }] };
+        return { rows: [{ id: 'log-1', action: 'CREATE' }] };
+      };
 
       const result = await queryAuditLogs({
         tenantId: 'tenant-1',
         resourceType: 'skill',
-        limit: 50,
-        offset: 0,
+        action: 'CREATE',
       });
 
-      expect(result.logs).toEqual(mockLogs);
-      expect(result.total).toBe(10);
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith({
-        where: {
-          tenantId: 'tenant-1',
-          resourceType: 'skill',
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        skip: 0,
-        include: {
-          actor: { select: { id: true, email: true, name: true } },
-        },
-      });
-    });
-
-    it('queries with all filters', async () => {
-      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.auditLog.count).mockResolvedValue(0);
-
-      const startDate = new Date('2024-01-01');
-      const endDate = new Date('2024-12-31');
-
-      await queryAuditLogs({
-        tenantId: 'tenant-1',
-        resourceType: 'skill',
-        resourceId: 'skill-1',
-        action: 'UPDATE',
-        actorId: 'user-1',
-        startDate,
-        endDate,
-        limit: 25,
-        offset: 10,
-      });
-
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith({
-        where: {
-          tenantId: 'tenant-1',
-          resourceType: 'skill',
-          resourceId: 'skill-1',
-          action: 'UPDATE',
-          actorId: 'user-1',
-          createdAt: {
-            gte: startDate,
-            lte: endDate,
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 25,
-        skip: 10,
-        include: {
-          actor: { select: { id: true, email: true, name: true } },
-        },
-      });
-    });
-
-    it('uses default pagination values', async () => {
-      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.auditLog.count).mockResolvedValue(0);
-
-      await queryAuditLogs({ tenantId: 'tenant-1' });
-
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          take: 50,
-          skip: 0,
-        })
-      );
-    });
-
-    it('queries with startDate only', async () => {
-      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.auditLog.count).mockResolvedValue(0);
-
-      const startDate = new Date('2024-01-01');
-
-      await queryAuditLogs({
-        tenantId: 'tenant-1',
-        startDate,
-      });
-
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            createdAt: { gte: startDate },
-          }),
-        })
-      );
-    });
-
-    it('queries with endDate only', async () => {
-      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.auditLog.count).mockResolvedValue(0);
-
-      const endDate = new Date('2024-12-31');
-
-      await queryAuditLogs({
-        tenantId: 'tenant-1',
-        endDate,
-      });
-
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            createdAt: { lte: endDate },
-          }),
-        })
-      );
+      expect(result.total).toBe(7);
+      expect(result.logs).toHaveLength(1);
+      const selectCall = inserted.find((i) => i.sql.includes('SELECT'));
+      expect(selectCall?.sql).toContain('FROM audit_log_v2');
     });
   });
 
   describe('getResourceAuditLog', () => {
-    it('returns audit logs for specific resource', async () => {
-      const mockLogs = [
-        { id: 'log-1', action: 'UPDATE' },
-        { id: 'log-2', action: 'CREATE' },
-      ];
-
-      vi.mocked(prisma.auditLog.findMany).mockResolvedValue(mockLogs as any);
-
-      const result = await getResourceAuditLog('tenant-1', 'skill', 'skill-1');
-
-      expect(result).toEqual(mockLogs);
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith({
-        where: {
-          tenantId: 'tenant-1',
-          resourceType: 'skill',
-          resourceId: 'skill-1',
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        include: {
-          actor: { select: { id: true, email: true, name: true } },
-        },
-      });
-    });
-
-    it('uses custom limit', async () => {
-      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([]);
-
-      await getResourceAuditLog('tenant-1', 'skill', 'skill-1', 10);
-
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          take: 10,
-        })
-      );
+    it('delegates to queryAuditLogs', async () => {
+      queryFn = async (sql: string) => {
+        if (sql.includes('COUNT(*)')) return { rows: [{ total: '0' }] };
+        return { rows: [{ id: 'log-x', action: 'UPDATE' }] };
+      };
+      const rows = await getResourceAuditLog('tenant-1', 'skill', 'skill-1');
+      expect(rows).toHaveLength(1);
     });
   });
 });

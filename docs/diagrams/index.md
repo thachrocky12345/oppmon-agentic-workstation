@@ -1,6 +1,6 @@
 # Architecture Diagrams
 
-**Last Updated:** 2026-05-07 (post migration ID-cutover consolidation)
+**Last Updated:** 2026-05-10 (post schema improvement plan)
 
 This directory contains Mermaid architecture diagrams for the OppMon (Arkon) project.
 
@@ -10,8 +10,10 @@ This directory contains Mermaid architecture diagrams for the OppMon (Arkon) pro
 |------|-------------|--------------|
 | [architecture.md](architecture.md) | System component overview with LLM/RAG services | 2026-05-07 (init sync) |
 | [dependencies.md](dependencies.md) | Package dependency graph (monorepo structure) | 2026-05-07 (init sync) |
-| [data-model.md](data-model.md) | Full DB inventory: 82 tables across 11 domains, per-domain ERDs, migration error→fix lookup, ops quick-reference | 2026-05-07 (post migration cutover) |
+| [data-model.md](data-model.md) | Full DB inventory: 82 tables across 11 domains, per-domain ERDs, migration error→fix lookup, ops quick-reference | 2026-05-10 (post consolidation) |
 | [deployment.md](deployment.md) | Docker Compose deployment architecture | 2026-05-07 (init sync) |
+| [enums.md](enums.md) | Every Prisma enum + CHECK-constraint vocabulary in the schema | 2026-05-10 |
+| [triggers-and-policies.md](triggers-and-policies.md) | Triggers, stored functions, RLS policies, DB roles | 2026-05-10 |
 
 ## Quick Links
 

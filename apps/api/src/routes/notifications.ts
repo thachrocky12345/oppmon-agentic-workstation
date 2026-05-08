@@ -10,10 +10,12 @@ export const notificationsRouter = Router();
 /**
  * Notifications Routes
  *
- * NOTE: notifications schema only has:
- *   id, user_id, type, title, message, is_read, created_at
- * There is no tenant_id, read_at, channel, or updated_at column.
- * Tenant scoping is enforced via user_id ownership.
+ * Schema (after 2026-05-10_notifications_consolidation):
+ *   id, user_id, type, severity, title, message, body, link, metadata,
+ *   is_read, created_at
+ * Per-user only — no tenant_id column. Tenant broadcasts are produced via
+ * fanout (one row per recipient) so that RLS via user_id -> users.tenant_id
+ * stays intact and per-user mark-read state is independent.
  *
  * NOTE: notification_preferences table does not exist; preferences endpoints
  * return defaults / 501 until that table is added.
@@ -36,11 +38,15 @@ notificationsRouter.get('/', asyncHandler(async (req: AuthenticatedRequest, res:
   const result = await query(`
     SELECT
       id,
-      user_id   AS "userId",
+      user_id    AS "userId",
       type,
+      severity,
       title,
       message,
-      is_read   AS "isRead",
+      body,
+      link,
+      metadata,
+      is_read    AS "isRead",
       created_at AS "createdAt"
     FROM notifications
     ${whereClause}
@@ -164,14 +170,19 @@ notificationsRouter.post('/test', requireRole('TENANT_ADMIN'), asyncHandler(asyn
 
   const id = createId();
   const result = await query(`
-    INSERT INTO notifications (id, user_id, type, title, message, is_read, created_at)
-    VALUES ($1, $2, 'test', 'Test Notification', $3, false, NOW())
+    INSERT INTO notifications
+      (id, user_id, type, severity, title, message, is_read, created_at)
+    VALUES ($1, $2, 'test', 'info', 'Test Notification', $3, false, NOW())
     RETURNING
       id,
       user_id    AS "userId",
       type,
+      severity,
       title,
       message,
+      body,
+      link,
+      metadata,
       is_read    AS "isRead",
       created_at AS "createdAt"
   `, [id, req.userId, message]);
@@ -180,4 +191,59 @@ notificationsRouter.post('/test', requireRole('TENANT_ADMIN'), asyncHandler(asyn
     message: 'Test notification sent',
     notification: result.rows[0],
   });
+}));
+
+/**
+ * POST /api/notifications/broadcast
+ * Tenant-scoped broadcast (admin only). Produces one row per recipient so
+ * each user gets their own read/unread state.
+ */
+notificationsRouter.post('/broadcast', requireRole('TENANT_ADMIN'), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { type, severity, title, message, body, link, metadata } = req.body ?? {};
+
+  if (!type || !title || !message) {
+    throw ApiError.badRequest('type, title, and message are required');
+  }
+
+  // Resolve all active users in the caller's tenant. RLS scopes this to the
+  // current tenant via the users policy.
+  const recipients = await query<{ id: string }>(
+    `SELECT id FROM users WHERE tenant_id = $1 AND is_active = true`,
+    [req.user!.tenantId],
+  );
+
+  if (recipients.rows.length === 0) {
+    res.json({ recipients: 0 });
+    return;
+  }
+
+  // Fanout — single multi-row INSERT keeps it atomic.
+  const values: string[] = [];
+  const params: unknown[] = [];
+  for (const r of recipients.rows) {
+    const idx = params.length;
+    params.push(
+      createId(),
+      r.id,
+      type,
+      severity ?? 'info',
+      title,
+      message,
+      body ?? null,
+      link ?? null,
+      JSON.stringify(metadata ?? {}),
+    );
+    values.push(
+      `($${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, $${idx + 9}::jsonb, false, NOW())`,
+    );
+  }
+
+  await query(
+    `INSERT INTO notifications
+       (id, user_id, type, severity, title, message, body, link, metadata, is_read, created_at)
+     VALUES ${values.join(', ')}`,
+    params,
+  );
+
+  res.json({ recipients: recipients.rows.length });
 }));

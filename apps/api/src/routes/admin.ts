@@ -409,6 +409,7 @@ adminRouter.get('/audit', asyncHandler(async (req: AuthenticatedRequest, res: Re
   const { actorId, action, resourceType, startDate, endDate } = req.query as Record<string, string | undefined>;
 
   // Build WHERE incrementally. tenant_id is always $1.
+  // Reads audit_log_v2 — the consolidated event-sourced audit store.
   let whereClause = 'a.tenant_id = $1';
   const params: unknown[] = [req.tenantId];
 
@@ -418,11 +419,11 @@ adminRouter.get('/audit', asyncHandler(async (req: AuthenticatedRequest, res: Re
   }
   if (action) {
     params.push(`%${action}%`);
-    whereClause += ` AND a.action::text ILIKE $${params.length}`;
+    whereClause += ` AND a.action ILIKE $${params.length}`;
   }
   if (resourceType) {
     params.push(resourceType);
-    whereClause += ` AND a.resource_type = $${params.length}`;
+    whereClause += ` AND a.target_type = $${params.length}`;
   }
   if (startDate) {
     params.push(startDate);
@@ -444,20 +445,20 @@ adminRouter.get('/audit', asyncHandler(async (req: AuthenticatedRequest, res: Re
     query(
       `SELECT
          a.id,
-         a.tenant_id    AS "tenantId",
-         a.resource_type AS "resourceType",
-         a.resource_id   AS "resourceId",
+         a.tenant_id   AS "tenantId",
+         a.target_type AS "resourceType",
+         a.target_id   AS "resourceId",
          a.action,
-         a.actor_id     AS "actorId",
-         u.email        AS "actorEmail",
-         u.name         AS "actorName",
-         a.before_state AS "beforeState",
-         a.after_state  AS "afterState",
-         a.ip_address   AS "ipAddress",
-         a.user_agent   AS "userAgent",
+         a.actor_type  AS "actorType",
+         a.actor_id    AS "actorId",
+         u.email       AS "actorEmail",
+         u.name        AS "actorName",
+         a.old_value   AS "beforeState",
+         a.new_value   AS "afterState",
+         a.ip_address  AS "ipAddress",
          a.metadata,
-         a.created_at   AS "createdAt"
-       FROM audit_logs a
+         a.created_at  AS "createdAt"
+       FROM audit_log_v2 a
        LEFT JOIN users u ON u.id = a.actor_id
        WHERE ${whereClause}
        ORDER BY a.created_at DESC
@@ -465,7 +466,7 @@ adminRouter.get('/audit', asyncHandler(async (req: AuthenticatedRequest, res: Re
       params,
     ),
     query(
-      `SELECT COUNT(*)::int AS total FROM audit_logs a WHERE ${whereClause}`,
+      `SELECT COUNT(*)::int AS total FROM audit_log_v2 a WHERE ${whereClause}`,
       countParams,
     ),
   ]);
