@@ -11,10 +11,14 @@ argument-hint: [build-api|build-web|push-web|deploy|apply-schema|smoke|logs|roll
 ## Topology cheatsheet
 
 ```
-old_windows (192.168.1.195, manager)   →   oppmon_api    :3001 host  oppmon-api:latest          (local)
+old_windows (192.168.1.195, manager)   →   oppmon_api    :3001 host  thachrocky/oppmon-api:vN   (Docker Hub)
 z800        (192.168.1.105, worker)    →   oppmon_web    :80   host  thachrocky/oppmon-web:vN   (Docker Hub)
 PostgreSQL 14 + TimescaleDB + pgvector →   on old_windows host, port 5432
 ```
+
+Both images are versioned and pushed to Docker Hub under `thachrocky/`. Always
+bump the tag on every push — never reuse `:latest` or a previous version, or
+swarm workers may serve a stale cached digest.
 
 DB user: `thachbui` / password in `apps/api/.env`. Use the **host LAN IP**
 (`192.168.1.195`) in DATABASE_URL — never `localhost` (it's the container).
@@ -32,29 +36,39 @@ DB user: `thachbui` / password in `apps/api/.env`. Use the **host LAN IP**
 
 ---
 
-## Step: build-api
+## Step: build-api + push-api
 
 ```bash
-docker build -f apps/api/Dockerfile -t oppmon-api:latest .
+# Bump the tag every push so workers actually pull
+NEXT_API_TAG=v$(($(date +%s) % 100000))   # or pick the next manual number
+
+docker build -f apps/api/Dockerfile \
+  -t oppmon-api:latest \
+  -t thachrocky/oppmon-api:$NEXT_API_TAG .
+
+docker push thachrocky/oppmon-api:$NEXT_API_TAG
 ```
 
 Notes:
-- API image stays local — it's pinned to `old_windows`. Don't push.
+- API is pushed to Docker Hub as `thachrocky/oppmon-api:vN`. Even though the service is pinned to `old_windows`, using the registry keeps tag history, makes rollback by tag possible, and matches the web flow.
 - The Dockerfile uses `pnpm` and runs the API via `tsx` (not `node dist/`) because workspace deps `@oppmon/database` and `@oppmon/shared` export raw `.ts`.
 - If you change `apps/api/docker-entrypoint.sh`, rebuild — it's `COPY`'d in.
+- Make sure the workspace-aware Dockerfile + `docker-entrypoint.sh` from `dev` are present on whatever branch you're building from. `main` historically had a stale npm-only Dockerfile that won't compile the workspace.
+
+If `docker push` is permission-blocked: ask the user to run it manually, then come back to update the stack.
 
 ## Step: build-web + push-web
 
 ```bash
 # Bump the tag every push so workers actually pull
-NEXT_TAG=v$(($(date +%s) % 100000))   # or pick the next manual number
+NEXT_WEB_TAG=v$(($(date +%s) % 100000))   # or pick the next manual number
 
 docker build -f apps/web/Dockerfile \
   --build-arg INTERNAL_API_URL=http://192.168.1.195:3001 \
   -t oppmon-web:latest \
-  -t thachrocky/oppmon-web:$NEXT_TAG .
+  -t thachrocky/oppmon-web:$NEXT_WEB_TAG .
 
-docker push thachrocky/oppmon-web:$NEXT_TAG
+docker push thachrocky/oppmon-web:$NEXT_WEB_TAG
 ```
 
 **`INTERNAL_API_URL` must be a build-arg.** Next.js evaluates `next.config.ts` rewrites at build time; setting it as a runtime env in the stack file does nothing.
@@ -64,13 +78,14 @@ If `docker push` is permission-blocked: ask the user to run it manually, then co
 ## Step: deploy
 
 ```bash
-# Edit docker-stack.yml — bump web image tag to the one you just pushed
-sed -i "s|thachrocky/oppmon-web:v[0-9]*|thachrocky/oppmon-web:$NEXT_TAG|" docker-stack.yml
+# Edit docker-stack.yml — bump image tags to the ones you just pushed
+sed -i "s|thachrocky/oppmon-api:v[0-9]*|thachrocky/oppmon-api:$NEXT_API_TAG|" docker-stack.yml
+sed -i "s|thachrocky/oppmon-web:v[0-9]*|thachrocky/oppmon-web:$NEXT_WEB_TAG|" docker-stack.yml
 
 docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
 ```
 
-`--with-registry-auth` is required so z800 can pull from Docker Hub.
+`--with-registry-auth` is required so swarm nodes can pull from Docker Hub (both `oppmon_api` on old_windows and `oppmon_web` on z800).
 
 Wait for convergence (don't sleep-poll — use a `until` loop with Bash run_in_background):
 
@@ -136,18 +151,26 @@ docker service logs --tail 200 oppmon_web
 
 ## Step: rollback
 
+Both images live on Docker Hub, so rollback is "point at the previous tag and redeploy":
+
 ```bash
 # Web → previous registry tag
 sed -i 's|thachrocky/oppmon-web:vNEW|thachrocky/oppmon-web:vPREV|' docker-stack.yml
-docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
 
-# API → rebuild from a known-good ref (no registry, no automatic rollback)
-git checkout <good-sha> -- apps/api
-docker build -f apps/api/Dockerfile -t oppmon-api:latest .
-docker service update --update-order stop-first --force oppmon_api
+# API → previous registry tag
+sed -i 's|thachrocky/oppmon-api:vNEW|thachrocky/oppmon-api:vPREV|' docker-stack.yml
+
+docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
 ```
 
-`docker service rollback` only restores the spec (env, image tag), not an overwritten `:latest`. Always tag pushed images with versions.
+List recent tags from Docker Hub if you don't remember the previous version:
+
+```bash
+curl -s "https://hub.docker.com/v2/repositories/thachrocky/oppmon-api/tags?page_size=10"  | python3 -m json.tool
+curl -s "https://hub.docker.com/v2/repositories/thachrocky/oppmon-web/tags?page_size=10"  | python3 -m json.tool
+```
+
+`docker service rollback` only restores the spec (env, image tag), not an overwritten image. Always tag pushed images with versions and never reuse a tag.
 
 ---
 
@@ -173,8 +196,7 @@ docker service update --update-order stop-first --force oppmon_api
 ## Things to NOT do
 
 - **Don't `npm install` anything.** This is a pnpm workspace — `npm` doesn't understand `workspace:*` and will fail Turborepo invocations.
-- **Don't push images named `oppmon-api`.** It's local-only and pinned via placement constraint. Pushing creates digest mismatches.
-- **Don't reuse `:latest` for web pushes.** Bump tags. Swarm caches digests on workers; a same-tag push may not trigger a real pull.
+- **Don't reuse `:latest` or any previous tag for pushes — for either api or web.** Bump the tag every time. Swarm caches digests on workers; a same-tag push may not trigger a real pull, and the service will silently keep serving the stale image.
 - **Don't use `start-first` updates with `mode: host` ports.** New task can't bind the port the old task holds. Use `stop-first`.
 - **Don't put `localhost` in DATABASE_URL** if any code might run in a container. Always `192.168.1.195`.
 - **Don't run `prisma db push --accept-data-loss` from `Bash` directly** — it'll be permission-blocked. Use the entrypoint flag.
