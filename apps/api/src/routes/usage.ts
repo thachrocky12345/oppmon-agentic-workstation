@@ -326,7 +326,7 @@ usageRouter.get('/settings', requireRole('TENANT_ADMIN'), asyncHandler(async (re
 
   res.json({
     data: {
-      events_enabled: result.rows[0]?.events_enabled ?? false,
+      eventsEnabled: result.rows[0]?.events_enabled ?? false,
     },
   })
 }))

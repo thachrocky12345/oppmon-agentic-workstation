@@ -116,12 +116,16 @@ $$;
 -- =========================================================================
 -- 2. Backfill audit_log (v1) -> audit_log_v2
 -- =========================================================================
+-- The trigger created above requires app.current_tenant to be set on every
+-- INSERT. Backfill rows span multiple tenants, so we set the GUC to 'system'
+-- (txn-local) which the trigger explicitly treats as a wildcard.
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'audit_log'
   ) THEN
+    PERFORM set_config('app.current_tenant', 'system', true);
     INSERT INTO audit_log_v2
       (id, actor_type, actor_id, action, target_type, target_id,
        description, metadata, old_value, new_value, ip_address, tenant_id, created_at)
@@ -160,6 +164,7 @@ BEGIN
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'audit_logs'
   ) THEN
+    PERFORM set_config('app.current_tenant', 'system', true);
     INSERT INTO audit_log_v2
       (id, actor_type, actor_id, action, target_type, target_id,
        description, metadata, old_value, new_value, ip_address, tenant_id, created_at)
