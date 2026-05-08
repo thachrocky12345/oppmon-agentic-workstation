@@ -1,23 +1,59 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 export default function Home() {
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((res) => {
+        if (cancelled) return
+        setIsAuthed(res.ok)
+      })
+      .catch(() => {
+        if (!cancelled) setIsAuthed(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  // Brand: when authenticated, click goes to /dashboard. When not, anchor to top of page.
+  const brandHref = isAuthed ? '/dashboard' : '/'
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
       {/* Header */}
       <header className="container mx-auto px-4 py-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">OppMon</h1>
+        <Link
+          href={brandHref}
+          className="text-2xl font-bold hover:text-gray-200 transition-colors"
+          title={isAuthed ? 'Go to Dashboard' : 'OppMon Dashboard'}
+        >
+          OppMon Dashboard
+        </Link>
         <nav className="flex items-center gap-6">
           <Link href="/docs" className="text-gray-300 hover:text-white">
             Tutorial
           </Link>
-          <Link href="/login" className="text-gray-300 hover:text-white">
-            Sign in
-          </Link>
+          {isAuthed ? (
+            <Link
+              href="/dashboard"
+              className="text-gray-300 hover:text-white"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link href="/login" className="text-gray-300 hover:text-white">
+              Sign in
+            </Link>
+          )}
           <Link
-            href="/register"
+            href={isAuthed ? '/dashboard' : '/register'}
             className="px-4 py-2 bg-green-600 rounded-lg hover:bg-green-700"
           >
-            Get Started
+            {isAuthed ? 'Open Dashboard' : 'Get Started'}
           </Link>
         </nav>
       </header>
@@ -39,10 +75,10 @@ export default function Home() {
         </p>
         <div className="flex justify-center gap-4">
           <Link
-            href="/register"
+            href={isAuthed ? '/dashboard' : '/register'}
             className="px-6 py-3 bg-green-600 rounded-lg font-semibold hover:bg-green-700 transition-colors"
           >
-            Start Free Trial
+            {isAuthed ? 'Go to Dashboard' : 'Start Free Trial'}
           </Link>
           <Link
             href="/docs"
@@ -96,15 +132,19 @@ export default function Home() {
 
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-16 text-center">
-        <h3 className="text-3xl font-bold mb-4">Ready to get started?</h3>
+        <h3 className="text-3xl font-bold mb-4">
+          {isAuthed ? 'Welcome back' : 'Ready to get started?'}
+        </h3>
         <p className="text-gray-400 mb-8 max-w-xl mx-auto">
-          Join teams using OppMon to manage their AI infrastructure with confidence.
+          {isAuthed
+            ? 'Jump back into your workspace to see live agent activity and spend.'
+            : 'Join teams using OppMon to manage their AI infrastructure with confidence.'}
         </p>
         <Link
-          href="/register"
+          href={isAuthed ? '/dashboard' : '/register'}
           className="inline-block px-8 py-4 bg-blue-600 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
         >
-          Create Free Account
+          {isAuthed ? 'Open Dashboard' : 'Create Free Account'}
         </Link>
       </section>
 
@@ -113,9 +153,15 @@ export default function Home() {
         <div className="flex justify-between items-center">
           <p className="text-gray-400">OppMon - AI Agent Gateway Platform</p>
           <div className="flex gap-4">
-            <Link href="/login" className="text-gray-400 hover:text-white text-sm">
-              Sign In
-            </Link>
+            {isAuthed ? (
+              <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm">
+                Dashboard
+              </Link>
+            ) : (
+              <Link href="/login" className="text-gray-400 hover:text-white text-sm">
+                Sign In
+              </Link>
+            )}
             <Link href="/admin" className="text-gray-400 hover:text-white text-sm">
               Admin
             </Link>
@@ -123,5 +169,5 @@ export default function Home() {
         </div>
       </footer>
     </main>
-  );
+  )
 }

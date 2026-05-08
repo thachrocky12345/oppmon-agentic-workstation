@@ -2,19 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   Arkon Workspace Theme
+   Dark teal/black surface with cyan/green accents.
+   ========================================================================== */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
+  /* Surfaces */
+  --ark-bg:           #06121a;   /* page background — near-black teal */
+  --ark-surface:      #0d1f2a;   /* cards & sidebar surface */
+  --ark-surface-2:    #122735;   /* elevated surface (hover, alt rows) */
+  --ark-surface-3:    #1a3344;   /* highest surface (modal, selected) */
+  --ark-border:       #1f3a4d;   /* hairline divider */
+  --ark-border-soft:  #16293a;   /* subtler divider */
+
+  /* Text */
+  --ark-text:         #e6f1f5;   /* primary copy */
+  --ark-text-dim:     #93a8b3;   /* secondary copy */
+  --ark-text-muted:   #5e7480;   /* tertiary / hints */
+
+  /* Accents */
+  --ark-accent:       #22d3ee;   /* cyan — primary action */
+  --ark-accent-2:     #34d399;   /* mint — success / health */
+  --ark-warn:         #fbbf24;   /* amber */
+  --ark-danger:       #f87171;   /* red */
+  --ark-info:         #60a5fa;   /* sky */
+
+  /* Safe-area insets (iOS notch) */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-rgb: 10, 10, 10;
-  }
+html, body {
+  background: var(--ark-bg);
+  color: var(--ark-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+  /* Allow drawers to slide without horizontal scroll */
+  overflow-x: hidden;
+  /* Stop pull-to-refresh on iOS PWA-ish behavior */
+  overscroll-behavior-y: contain;
 }
+
+/* Prevent iOS auto-zoom on focus by forcing >=16px font on inputs */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* Safe-area utility classes (drop-in helpers Tailwind doesn't ship) */
+.safe-top    { padding-top: var(--safe-top); }
+.safe-bottom { padding-bottom: var(--safe-bottom); }
+.safe-x      { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+
+/* Subtle scrollbar in dark theme */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--ark-border);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--ark-border-soft); }

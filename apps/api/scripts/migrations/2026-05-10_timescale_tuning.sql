@@ -310,8 +310,10 @@ BEGIN
         time_bucket('1 day', created_at) AS day,
         agent_id,
         event_type,
-        COUNT(*)                         AS event_count,
-        SUM(COALESCE(token_estimate, 0)) AS total_tokens
+        COUNT(*)                                                       AS event_count,
+        SUM(COALESCE(input_tokens, 0))                                 AS input_tokens,
+        SUM(COALESCE(output_tokens, 0))                                AS output_tokens,
+        SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0))    AS total_tokens
       FROM events
       GROUP BY day, agent_id, event_type
       WITH NO DATA

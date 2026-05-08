@@ -46,7 +46,8 @@ export default function AdminLayout({
         const response = await fetch('/api/auth/me', { credentials: 'include' })
         if (response.ok) {
           const data = await response.json()
-          setUser(data.data)
+          // /api/auth/me returns { user, tenant, teams, createdAt } — NOT wrapped in `data`.
+          setUser(data.user ?? data.data?.user ?? data.data ?? null)
         } else {
           router.push('/login')
         }
@@ -109,8 +110,12 @@ export default function AdminLayout({
                 )}
               </button>
 
-              <Link href="/admin" className="text-xl font-bold text-gray-900">
-                OppMon Admin
+              <Link
+                href="/dashboard"
+                className="text-base font-semibold text-gray-900 hover:text-gray-700 transition-colors"
+                title="Go to Dashboard"
+              >
+                OppMon Dashboard
               </Link>
 
               {/* Desktop navigation */}
@@ -132,12 +137,6 @@ export default function AdminLayout({
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <Link
-                href="/dashboard"
-                className="text-gray-500 hover:text-gray-700 text-sm hidden sm:inline"
-              >
-                Back to App
-              </Link>
               <button
                 onClick={handleLogout}
                 className="text-gray-500 hover:text-gray-700 text-sm"
@@ -166,13 +165,6 @@ export default function AdminLayout({
                   {item.label}
                 </Link>
               ))}
-              <Link
-                href="/dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 sm:hidden"
-              >
-                Back to App
-              </Link>
             </nav>
           </div>
         )}
