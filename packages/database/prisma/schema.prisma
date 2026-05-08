@@ -82,13 +82,10 @@ enum RoutingStatus {
   STOPPED
 }
 
-enum AuditAction {
-  CREATE
-  READ
-  UPDATE
-  DELETE
-  DENIED
-}
+// AuditAction enum and AuditLog model were removed in 2026-05-10_audit_consolidation.
+// Audit events now live in audit_log_v2 (event-sourced, append-only) and are written
+// via raw SQL through apps/api/src/services/audit.ts. The legacy audit_logs table is
+// renamed to audit_logs_deprecated and will be dropped in a follow-up migration.
 
 // ============================================================================
 // Multi-tenancy
@@ -108,7 +105,6 @@ model Tenant {
   teams          Team[]
   agents         Agent[]
   skills         Skill[]
-  auditLogs      AuditLog[]
   llmSessions    LlmSession[]
   embeddings     Embedding[]
   models         Model[]
@@ -165,7 +161,6 @@ model User {
   incidentUpdates      IncidentUpdate[]
   skillsCreated        Skill[]          @relation("SkillCreatedBy")
   skillVersionsCreated SkillVersion[]   @relation("SkillVersionCreatedBy")
-  auditLogs            AuditLog[]
   llmSessions          LlmSession[]
   modelsCreated        Model[]          @relation("ModelCreatedBy")
   virtualKeys          VirtualKey[]
@@ -332,8 +327,12 @@ model Notification {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   type      String
+  severity  String   @default("info") // 'info' | 'warning' | 'critical'
   title     String
   message   String
+  body      String?
+  link      String?  // relative URL to navigate to on click
+  metadata  Json     @default("{}")
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -341,6 +340,7 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
 }
 
@@ -486,30 +486,10 @@ model ResourceShare {
 // Audit Logging
 // ============================================================================
 
-model AuditLog {
-  id           String      @id @default(cuid())
-  tenantId     String      @map("tenant_id")
-  resourceType String      @map("resource_type") // e.g., 'skill', 'agent', 'workflow'
-  resourceId   String      @map("resource_id")
-  action       AuditAction
-  actorId      String      @map("actor_id")
-  beforeState  Json?       @map("before_state") // null for CREATE
-  afterState   Json?       @map("after_state") // null for DELETE
-  ipAddress    String?     @map("ip_address")
-  userAgent    String?     @map("user_agent")
-  metadata     Json?       // additional context
-  createdAt    DateTime    @default(now()) @map("created_at")
-
-  // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  actor  User   @relation(fields: [actorId], references: [id])
-
-  @@index([tenantId, resourceType, createdAt(sort: Desc)])
-  @@index([resourceType, resourceId])
-  @@index([actorId])
-  @@index([action])
-  @@map("audit_logs")
-}
+// AuditLog model was removed; see comment near where AuditAction enum used to live.
+// audit_log_v2 is not modeled in Prisma — it's accessed via raw SQL because it has
+// stricter constraints (append-only via REVOKE UPDATE/DELETE, BEFORE INSERT trigger
+// validating tenant_id against app.current_tenant) that Prisma cannot express.
 
 // ============================================================================
 // LLM Sessions & Messages
@@ -788,74 +768,11 @@ model ConversationalMemory {
   @@map("conversational_memory")
 }
 
-// 2. Semantic Memory (Knowledge Base - pgvector)
-// Research documents, team knowledge
-// Note: embedding vector(1024) stored via raw SQL for bgm-m3
-model SemanticMemory {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
-  teamId    String?  @map("team_id")
-  content   String
-  // embedding vector(1024) - stored via migration
-  metadata  Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([tenantId])
-  @@index([teamId])
-  @@map("semantic_memory")
-}
-
-// 3. Workflow Memory (Procedural - pgvector)
-// Tool execution patterns, best practices
-model WorkflowMemory {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
-  content   String
-  // embedding vector(1024) - stored via migration
-  metadata  Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([tenantId])
-  @@map("workflow_memory")
-}
-
-// 4. Toolbox Memory (Tool Registry - pgvector)
-// Augmented tool descriptions for semantic matching
-model ToolboxMemory {
-  id                   String   @id @default(cuid())
-  tenantId             String   @map("tenant_id")
-  toolName             String   @map("tool_name")
-  originalDescription  String   @map("original_description")
-  augmentedDescription String   @map("augmented_description") // LLM-enriched 200-300 word description
-  // embedding vector(1024) - stored via migration
-  category             String
-  metadata             Json     @default("{}")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-
-  @@unique([tenantId, toolName])
-  @@index([tenantId])
-  @@index([category])
-  @@map("toolbox_memory")
-}
-
-// 5. Entity Memory (Named Entities - pgvector)
-// Projects, people, concepts
-model EntityMemory {
-  id          String   @id @default(cuid())
-  tenantId    String   @map("tenant_id")
-  entityType  String   @map("entity_type") // 'project', 'person', 'concept', 'organization'
-  entityName  String   @map("entity_name")
-  description String
-  // embedding vector(1024) - stored via migration
-  metadata    Json     @default("{}")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  @@index([tenantId, entityType])
-  @@index([entityName])
-  @@map("entity_memory")
-}
+// SemanticMemory, WorkflowMemory, ToolboxMemory, and EntityMemory were
+// consolidated into memory_facts (1536-dim, MRL-compatible) in
+// 2026-05-10_memory_consolidation. memory_facts is not modeled in Prisma
+// because it stores pgvector data; access it via raw SQL through
+// apps/api/src/agent/memory-manager.ts.
 
 // 6. Summary Memory (Compressed - pgvector)
 // JIT-expandable conversation summaries

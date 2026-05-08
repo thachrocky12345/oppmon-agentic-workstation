@@ -35,14 +35,26 @@ vi.mock('@oppmon/database', () => ({
     teamMember: {
       findMany: vi.fn(),
     },
-    auditLog: {
-      create: vi.fn(),
-    },
     $transaction: vi.fn(),
   },
 }));
 
+// Mock the audit service — Skills route calls logCreate / logUpdate / logDelete
+// which now write directly to audit_log_v2 via withTenantPg, not prisma.auditLog.
+vi.mock('../services/audit.js', () => ({
+  logCreate: vi.fn(async () => undefined),
+  logUpdate: vi.fn(async () => undefined),
+  logDelete: vi.fn(async () => undefined),
+  logDenied: vi.fn(async () => undefined),
+  getAuditContext: vi.fn((req: any) =>
+    req.user
+      ? { tenantId: req.user.tenantId, actorId: req.user.id }
+      : null,
+  ),
+}));
+
 import { prisma } from '@oppmon/database';
+import { logCreate, logUpdate, logDelete } from '../services/audit.js';
 
 // Mock user for request authentication
 const mockUser = {
@@ -85,8 +97,7 @@ describe('Skills Routes', () => {
       { teamId: 'team-1', role: 'ADMIN', userId: 'user-1', id: 'tm-1', createdAt: new Date() },
     ]);
 
-    // Default mock for auditLog
-    vi.mocked(prisma.auditLog.create).mockResolvedValue({} as any);
+    // Audit-service mocks default to resolved void; assertions below verify calls.
   });
 
   describe('GET /api/skills', () => {
@@ -446,13 +457,11 @@ describe('Skills Routes', () => {
           scope: 'TENANT',
         });
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            action: 'CREATE',
-            resourceType: 'skill',
-          }),
-        })
+      expect(logCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', actorId: 'user-1' }),
+        'skill',
+        expect.any(String),
+        expect.any(Object),
       );
     });
   });
@@ -604,13 +613,12 @@ describe('Skills Routes', () => {
         .put('/api/skills/skill-1')
         .send({ description: 'New' });
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            action: 'UPDATE',
-            resourceType: 'skill',
-          }),
-        })
+      expect(logUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', actorId: 'user-1' }),
+        'skill',
+        expect.any(String),
+        expect.any(Object),
+        expect.any(Object),
       );
     });
   });
@@ -707,13 +715,11 @@ describe('Skills Routes', () => {
       const app = createTestApp();
       await request(app).delete('/api/skills/skill-1');
 
-      expect(prisma.auditLog.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            action: 'DELETE',
-            resourceType: 'skill',
-          }),
-        })
+      expect(logDelete).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', actorId: 'user-1' }),
+        'skill',
+        expect.any(String),
+        expect.any(Object),
       );
     });
   });

@@ -122,21 +122,23 @@ async function main(): Promise<void> {
       });
     });
 
-    // 5. audit_logs trigger: insert without app.current_tenant must raise.
+    // 5. audit_log_v2 trigger: insert without app.current_tenant must raise.
+    //    audit_log_v2 is the canonical event-sourced audit store (audit_logs is
+    //    deprecated; see 2026-05-10_audit_consolidation.sql).
     await withClient(pool, async (client) => {
       await resetTenant(client);
       let raised = false;
       try {
         await client.query(
-          `INSERT INTO audit_logs (id, tenant_id, resource_type, resource_id, action, actor_id, created_at)
-           VALUES ('aud_smoke_test', $1, 'smoke', 'x', 'READ'::"AuditAction", $2, NOW())`,
+          `INSERT INTO audit_log_v2 (id, actor_type, actor_id, action, target_type, target_id, tenant_id, created_at)
+           VALUES ('aud_smoke_test', 'user', $2, 'READ', 'smoke', 'x', $1, NOW())`,
           [tenantId ?? 'tenant_x', 'user_x'],
         );
       } catch (e) {
         raised = true;
       }
       results.push({
-        name: `audit_logs trigger blocks inserts without tenant context`,
+        name: `audit_log_v2 trigger blocks inserts without tenant context`,
         ok: raised,
         detail: raised ? 'raised as expected' : 'NO ERROR — trigger missing!',
       });

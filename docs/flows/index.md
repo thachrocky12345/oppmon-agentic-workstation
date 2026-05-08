@@ -1,6 +1,6 @@
 # Flow Diagrams
 
-**Last Updated:** 2026-05-07 (init sync)
+**Last Updated:** 2026-05-10 (post schema improvement plan)
 
 This directory contains Mermaid flow diagrams showing how data and processes move through the OppMon (Arkon) system.
 
@@ -12,6 +12,16 @@ This directory contains Mermaid flow diagrams showing how data and processes mov
 | [auth-flow.md](auth-flow.md) | JWT + GitHub OAuth authentication | 2026-05-07 (init sync) |
 | [data-flow.md](data-flow.md) | Data pipeline with LLM/RAG/embeddings | 2026-05-07 (init sync) |
 | [error-flow.md](error-flow.md) | Error propagation and handling | 2026-05-07 (init sync) |
+
+## Cross-Domain Flows
+
+End-to-end sequence diagrams covering single user actions that touch multiple domains (audit + outbox + notifications + RLS triggers). Added 2026-05-10 alongside the schema-improvement consolidation.
+
+| File | Description | Last Updated |
+|------|-------------|--------------|
+| [cross-domain/chat-message-end-to-end.md](cross-domain/chat-message-end-to-end.md) | POST /api/llm/chat → llm_sessions → llm_messages → usage_events → events → audit_log_v2 → event_outbox → outbox-publisher | 2026-05-10 |
+| [cross-domain/incident-creation.md](cross-domain/incident-creation.md) | Agent → incidents → audit_log_v2 → event_outbox → notifications fanout to all tenant admins | 2026-05-10 |
+| [cross-domain/tenant-deletion.md](cross-domain/tenant-deletion.md) | Admin DELETE /admin/tenants/:id → BEFORE DELETE trigger → tenant_archives + tenant_deletion_audit → ON DELETE CASCADE | 2026-05-10 |
 
 ## Flow Types
 
@@ -43,6 +53,12 @@ Documents error handling including:
 - Prisma database errors
 - LLM provider errors
 - Standardized error responses
+
+### Cross-Domain Flows
+End-to-end sequence diagrams that span multiple subsystems (API → DB → triggers → outbox → workers → web UI) and show exactly which tables get touched in what order:
+- **Chat message** — full lifecycle of `POST /api/llm/chat` from web UI through LLM provider, MCP tool calls, audit logging, usage tracking, and the outbox enqueue that fans out to downstream workers.
+- **Incident creation** — atomic write of `incidents` + `audit_log_v2` + `event_outbox` in one transaction, then async fanout to per-user `notifications` rows for every admin in the tenant.
+- **Tenant deletion** — GDPR-grade hard delete: GUC contract (`app.delete_reason`, `app.current_actor_id`), `tenants_snapshot_trigger` archives the tenant and writes a `tenant_deletion_audit` receipt, then `ON DELETE CASCADE` cleans up everything.
 
 ## Usage
 

@@ -28,9 +28,6 @@ vi.mock('@oppmon/database', () => ({
     tenant: {
       findUnique: vi.fn(),
     },
-    auditLog: {
-      create: vi.fn(),
-    },
   },
   ModelScope: {
     TENANT: 'TENANT',

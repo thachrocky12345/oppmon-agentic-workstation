@@ -47,11 +47,17 @@ import { errorHandler } from './middleware/error-handler.js';
 import { requestAuth, optionalAuth } from './middleware/request-auth.js';
 import { tenantContext } from './middleware/tenant-context.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
+import { idempotency } from './middleware/idempotency.js';
 
-// Bundle: requestAuth then tenantContext. Every authenticated route gets a
-// `req.dbTx` factory that wraps Prisma transactions with the correct
-// `app.current_tenant` GUC for RLS enforcement.
-const authChain = [requestAuth, tenantContext];
+// Background workers
+import { startOutboxPublisher, registerHandler } from './workers/outbox-publisher.js';
+
+// Bundle: requestAuth then tenantContext, then idempotency replay protection
+// for mutating verbs. Every authenticated route gets a `req.dbTx` factory
+// that wraps Prisma transactions with the correct `app.current_tenant` GUC
+// for RLS enforcement. The idempotency layer is a no-op unless the client
+// sends an `Idempotency-Key` header on a POST/PATCH/DELETE.
+const authChain = [requestAuth, tenantContext, idempotency];
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -133,6 +139,20 @@ app.use('/api/usage', optionalAuth, usageRouter);
 
 // Error handling
 app.use(errorHandler);
+
+// Outbox publisher — drains transactional events emitted via lib/outbox.ts.
+// Default handler logs the event; concrete handlers (notifications fanout,
+// webhook delivery, analytics ingest) register themselves on top of the
+// wildcard or a specific event_type. Only enabled when not running tests.
+if (process.env.NODE_ENV !== 'test' && process.env.OUTBOX_DISABLED !== 'true') {
+  registerHandler('*', async (event) => {
+    logger.info(
+      { eventType: event.event_type, aggregateType: event.aggregate_type, aggregateId: event.aggregate_id, tenantId: event.tenant_id },
+      'outbox event published (default handler)',
+    );
+  });
+  startOutboxPublisher();
+}
 
 // Start server
 app.listen(port, '0.0.0.0', () => {

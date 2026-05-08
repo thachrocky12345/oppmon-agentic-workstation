@@ -146,8 +146,9 @@ export class MemoryManager {
     }
 
     const embedding = await this.embeddingClient.embed(query)
+    const embeddingLiteral = `[${embedding.join(',')}]`
 
-    // Raw SQL for pgvector cosine similarity search
+    // Read from consolidated memory_facts (kind='semantic').
     const results = await prisma.$queryRaw<
       Array<{
         id: string
@@ -156,11 +157,12 @@ export class MemoryManager {
         similarity: number
       }>
     >`
-      SELECT id, content, metadata,
-             1 - (embedding <=> ${embedding}::vector) as similarity
-      FROM semantic_memory
-      WHERE "tenantId" = ${tenantId}
-      ORDER BY embedding <=> ${embedding}::vector
+      SELECT id, body AS content, metadata,
+             1 - (embedding <=> ${embeddingLiteral}::vector) as similarity
+      FROM memory_facts
+      WHERE tenant_id = ${tenantId}
+        AND kind = 'semantic'
+      ORDER BY embedding <=> ${embeddingLiteral}::vector
       LIMIT ${nResults}
     `
 
@@ -189,12 +191,15 @@ export class MemoryManager {
     }
 
     const embedding = await this.embeddingClient.embed(content)
+    const embeddingLiteral = `[${embedding.join(',')}]`
+    // Fold team_id into metadata so kind='semantic' rows can still be
+    // team-scoped without extending the memory_facts schema.
+    const enrichedMetadata = { ...(metadata ?? {}), ...(teamId ? { team_id: teamId } : {}) }
 
-    // Insert with embedding via raw SQL
     const result = await prisma.$queryRaw<Array<{ id: string }>>`
-      INSERT INTO semantic_memory ("id", "tenantId", "teamId", "content", "embedding", "metadata", "createdAt")
-      VALUES (gen_random_uuid()::text, ${tenantId}, ${teamId}, ${content}, ${embedding}::vector, ${JSON.stringify(metadata ?? {})}::jsonb, NOW())
-      RETURNING id
+      INSERT INTO memory_facts (id, tenant_id, kind, body, embedding, embedding_dim, metadata, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${tenantId}, 'semantic', ${content}, ${embeddingLiteral}::vector, 1536, ${JSON.stringify(enrichedMetadata)}::jsonb, NOW(), NOW())
+      RETURNING id::text AS id
     `
 
     // Invalidate cache
@@ -217,31 +222,39 @@ export class MemoryManager {
     }
 
     const embedding = await this.embeddingClient.embed(query)
+    const embeddingLiteral = `[${embedding.join(',')}]`
 
+    // Entities live in memory_facts under kind='entity'; entity_type and
+    // entity_name are stored inside metadata.
     const results = await prisma.$queryRaw<
       Array<{
         id: string
-        entityType: string
-        entityName: string
+        entity_type: string
+        entity_name: string
         description: string
         metadata: Record<string, unknown>
         similarity: number
       }>
     >`
-      SELECT id, "entityType", "entityName", description, metadata,
-             1 - (embedding <=> ${embedding}::vector) as similarity
-      FROM entity_memory
-      WHERE "tenantId" = ${tenantId}
-      ORDER BY embedding <=> ${embedding}::vector
+      SELECT id,
+             metadata->>'entity_type' AS entity_type,
+             metadata->>'entity_name' AS entity_name,
+             body AS description,
+             metadata,
+             1 - (embedding <=> ${embeddingLiteral}::vector) as similarity
+      FROM memory_facts
+      WHERE tenant_id = ${tenantId}
+        AND kind = 'entity'
+      ORDER BY embedding <=> ${embeddingLiteral}::vector
       LIMIT ${nResults}
     `
 
     return results.map((r) => ({
       id: r.id,
-      content: `${r.entityName}: ${r.description}`,
+      content: `${r.entity_name}: ${r.description}`,
       score: r.similarity,
       relevance: r.similarity,
-      metadata: { ...r.metadata, entityType: r.entityType, entityName: r.entityName },
+      metadata: { ...r.metadata, entityType: r.entity_type, entityName: r.entity_name },
     }))
   }
 
@@ -255,16 +268,25 @@ export class MemoryManager {
 
     const text = `${entity.name}: ${entity.description}`
     const embedding = await this.embeddingClient.embed(text)
+    const embeddingLiteral = `[${embedding.join(',')}]`
+    const merged = {
+      ...(entity.metadata ?? {}),
+      entity_type: entity.type,
+      entity_name: entity.name,
+    }
 
+    // Upsert via the partial unique index on (tenant_id, metadata->>'entity_name')
+    // WHERE kind='entity'.
     const result = await prisma.$queryRaw<Array<{ id: string }>>`
-      INSERT INTO entity_memory ("id", "tenantId", "entityType", "entityName", "description", "embedding", "metadata", "createdAt", "updatedAt")
-      VALUES (gen_random_uuid()::text, ${tenantId}, ${entity.type}, ${entity.name}, ${entity.description}, ${embedding}::vector, ${JSON.stringify(entity.metadata ?? {})}::jsonb, NOW(), NOW())
-      ON CONFLICT ("tenantId", "entityName") DO UPDATE SET
-        description = EXCLUDED.description,
+      INSERT INTO memory_facts (id, tenant_id, kind, body, embedding, embedding_dim, metadata, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${tenantId}, 'entity', ${entity.description}, ${embeddingLiteral}::vector, 1536, ${JSON.stringify(merged)}::jsonb, NOW(), NOW())
+      ON CONFLICT (tenant_id, (metadata->>'entity_name')) WHERE kind = 'entity'
+      DO UPDATE SET
+        body = EXCLUDED.body,
         embedding = EXCLUDED.embedding,
         metadata = EXCLUDED.metadata,
-        "updatedAt" = NOW()
-      RETURNING id
+        updated_at = NOW()
+      RETURNING id::text AS id
     `
 
     return result[0].id
@@ -284,6 +306,7 @@ export class MemoryManager {
     }
 
     const embedding = await this.embeddingClient.embed(query)
+    const embeddingLiteral = `[${embedding.join(',')}]`
 
     const results = await prisma.$queryRaw<
       Array<{
@@ -293,11 +316,12 @@ export class MemoryManager {
         similarity: number
       }>
     >`
-      SELECT id, content, metadata,
-             1 - (embedding <=> ${embedding}::vector) as similarity
-      FROM workflow_memory
-      WHERE "tenantId" = ${tenantId}
-      ORDER BY embedding <=> ${embedding}::vector
+      SELECT id, body AS content, metadata,
+             1 - (embedding <=> ${embeddingLiteral}::vector) as similarity
+      FROM memory_facts
+      WHERE tenant_id = ${tenantId}
+        AND kind = 'workflow'
+      ORDER BY embedding <=> ${embeddingLiteral}::vector
       LIMIT ${nResults}
     `
 
@@ -320,11 +344,12 @@ export class MemoryManager {
     }
 
     const embedding = await this.embeddingClient.embed(content)
+    const embeddingLiteral = `[${embedding.join(',')}]`
 
     const result = await prisma.$queryRaw<Array<{ id: string }>>`
-      INSERT INTO workflow_memory ("id", "tenantId", "content", "embedding", "metadata", "createdAt")
-      VALUES (gen_random_uuid()::text, ${tenantId}, ${content}, ${embedding}::vector, ${JSON.stringify(metadata ?? {})}::jsonb, NOW())
-      RETURNING id
+      INSERT INTO memory_facts (id, tenant_id, kind, body, embedding, embedding_dim, metadata, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${tenantId}, 'workflow', ${content}, ${embeddingLiteral}::vector, 1536, ${JSON.stringify(metadata ?? {})}::jsonb, NOW(), NOW())
+      RETURNING id::text AS id
     `
 
     return result[0].id
@@ -460,18 +485,27 @@ export class MemoryManager {
 
     const textToEmbed = tool.augmentedDescription ?? tool.originalDescription
     const embedding = await this.embeddingClient.embed(textToEmbed)
+    const embeddingLiteral = `[${embedding.join(',')}]`
+    const merged = {
+      ...(tool.metadata ?? {}),
+      tool_name: tool.toolName,
+      original_description: tool.originalDescription,
+      category: tool.category,
+    }
 
+    // Body holds the augmented description (the field used for retrieval).
+    // Upsert via partial unique index on (tenant_id, metadata->>'tool_name')
+    // WHERE kind='toolbox'.
     const result = await prisma.$queryRaw<Array<{ id: string }>>`
-      INSERT INTO toolbox_memory ("id", "tenantId", "toolName", "originalDescription", "augmentedDescription", "embedding", "category", "metadata", "createdAt", "updatedAt")
-      VALUES (gen_random_uuid()::text, ${tenantId}, ${tool.toolName}, ${tool.originalDescription}, ${tool.augmentedDescription ?? tool.originalDescription}, ${embedding}::vector, ${tool.category}, ${JSON.stringify(tool.metadata ?? {})}::jsonb, NOW(), NOW())
-      ON CONFLICT ("tenantId", "toolName") DO UPDATE SET
-        "originalDescription" = EXCLUDED."originalDescription",
-        "augmentedDescription" = EXCLUDED."augmentedDescription",
+      INSERT INTO memory_facts (id, tenant_id, kind, body, embedding, embedding_dim, metadata, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${tenantId}, 'toolbox', ${tool.augmentedDescription ?? tool.originalDescription}, ${embeddingLiteral}::vector, 1536, ${JSON.stringify(merged)}::jsonb, NOW(), NOW())
+      ON CONFLICT (tenant_id, (metadata->>'tool_name')) WHERE kind = 'toolbox'
+      DO UPDATE SET
+        body = EXCLUDED.body,
         embedding = EXCLUDED.embedding,
-        category = EXCLUDED.category,
         metadata = EXCLUDED.metadata,
-        "updatedAt" = NOW()
-      RETURNING id
+        updated_at = NOW()
+      RETURNING id::text AS id
     `
 
     return result[0].id
@@ -487,31 +521,37 @@ export class MemoryManager {
     }
 
     const embedding = await this.embeddingClient.embed(query)
+    const embeddingLiteral = `[${embedding.join(',')}]`
 
     const results = await prisma.$queryRaw<
       Array<{
         id: string
-        toolName: string
-        augmentedDescription: string
+        tool_name: string
+        body: string
         category: string
         metadata: Record<string, unknown>
         similarity: number
       }>
     >`
-      SELECT id, "toolName", "augmentedDescription", category, metadata,
-             1 - (embedding <=> ${embedding}::vector) as similarity
-      FROM toolbox_memory
-      WHERE "tenantId" = ${tenantId}
-      ORDER BY embedding <=> ${embedding}::vector
+      SELECT id,
+             metadata->>'tool_name' AS tool_name,
+             body,
+             metadata->>'category' AS category,
+             metadata,
+             1 - (embedding <=> ${embeddingLiteral}::vector) as similarity
+      FROM memory_facts
+      WHERE tenant_id = ${tenantId}
+        AND kind = 'toolbox'
+      ORDER BY embedding <=> ${embeddingLiteral}::vector
       LIMIT ${nResults}
     `
 
     return results.map((r) => ({
       id: r.id,
-      content: r.augmentedDescription,
+      content: r.body,
       score: r.similarity,
       relevance: r.similarity,
-      metadata: { toolName: r.toolName, category: r.category, ...r.metadata },
+      metadata: { toolName: r.tool_name, category: r.category, ...r.metadata },
     }))
   }
 

@@ -10,11 +10,14 @@ import { useState, useEffect } from 'react'
 
 interface Notification {
   id: string
-  type: 'info' | 'warning' | 'error' | 'success'
+  type: string
+  severity: 'info' | 'warning' | 'error' | 'success'
   title: string
   message: string
-  read: boolean
-  actionUrl?: string
+  body?: string | null
+  link?: string | null
+  metadata?: Record<string, unknown>
+  isRead: boolean
   createdAt: string
 }
 
@@ -22,12 +25,10 @@ interface NotificationPreferences {
   email: boolean
   push: boolean
   slack: boolean
-  types: {
-    security: boolean
-    incidents: boolean
-    budgets: boolean
-    agents: boolean
-  }
+  incidents: boolean
+  budgetAlerts: boolean
+  securityAlerts: boolean
+  weeklyDigest: boolean
 }
 
 export default function NotificationsPage() {
@@ -53,7 +54,7 @@ export default function NotificationsPage() {
       }
       if (prefsRes.ok) {
         const data = await prefsRes.json()
-        setPreferences(data.data)
+        setPreferences(data)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load notifications')
@@ -72,7 +73,7 @@ export default function NotificationsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(notificationId ? { ids: [notificationId] } : { all: true }),
+        body: JSON.stringify(notificationId ? { notificationIds: [notificationId] } : { all: true }),
       })
       if (!response.ok) throw new Error('Failed to mark as read')
       fetchData()
@@ -111,8 +112,8 @@ export default function NotificationsPage() {
     }
   }
 
-  const getTypeIcon = (type: string): string => {
-    switch (type) {
+  const getSeverityIcon = (severity: string): string => {
+    switch (severity) {
       case 'success': return '✅'
       case 'warning': return '⚠️'
       case 'error': return '❌'
@@ -120,8 +121,8 @@ export default function NotificationsPage() {
     }
   }
 
-  const getTypeColor = (type: string): string => {
-    switch (type) {
+  const getSeverityColor = (severity: string): string => {
+    switch (severity) {
       case 'success': return 'border-l-green-500 bg-green-50'
       case 'warning': return 'border-l-yellow-500 bg-yellow-50'
       case 'error': return 'border-l-red-500 bg-red-50'
@@ -129,7 +130,7 @@ export default function NotificationsPage() {
     }
   }
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  const unreadCount = notifications.filter(n => !n.isRead).length
 
   if (loading) {
     return (
@@ -183,31 +184,34 @@ export default function NotificationsPage() {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-4 border-l-4 ${getTypeColor(notification.type)} ${notification.read ? 'opacity-60' : ''}`}
+                className={`p-4 border-l-4 ${getSeverityColor(notification.severity)} ${notification.isRead ? 'opacity-60' : ''}`}
               >
                 <div className="flex items-start gap-3">
-                  <span className="text-xl">{getTypeIcon(notification.type)}</span>
+                  <span className="text-xl">{getSeverityIcon(notification.severity)}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium text-gray-900">{notification.title}</h3>
-                      {!notification.read && (
+                      {!notification.isRead && (
                         <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                       )}
                     </div>
                     <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                    {notification.body && (
+                      <p className="text-sm text-gray-500 mt-1 whitespace-pre-line">{notification.body}</p>
+                    )}
                     <div className="flex items-center gap-4 mt-2">
                       <span className="text-xs text-gray-400">
                         {new Date(notification.createdAt).toLocaleString()}
                       </span>
-                      {notification.actionUrl && (
+                      {notification.link && (
                         <a
-                          href={notification.actionUrl}
+                          href={notification.link}
                           className="text-xs text-blue-600 hover:text-blue-800"
                         >
                           View details
                         </a>
                       )}
-                      {!notification.read && (
+                      {!notification.isRead && (
                         <button
                           onClick={() => handleMarkRead(notification.id)}
                           className="text-xs text-gray-500 hover:text-gray-700"
@@ -279,11 +283,8 @@ export default function NotificationsPage() {
                   <label className="flex items-center gap-3">
                     <input
                       type="checkbox"
-                      checked={preferences.types.security}
-                      onChange={(e) => setPreferences({
-                        ...preferences,
-                        types: { ...preferences.types, security: e.target.checked }
-                      })}
+                      checked={preferences.securityAlerts}
+                      onChange={(e) => setPreferences({ ...preferences, securityAlerts: e.target.checked })}
                       className="rounded"
                     />
                     <span>Security alerts</span>
@@ -291,11 +292,8 @@ export default function NotificationsPage() {
                   <label className="flex items-center gap-3">
                     <input
                       type="checkbox"
-                      checked={preferences.types.incidents}
-                      onChange={(e) => setPreferences({
-                        ...preferences,
-                        types: { ...preferences.types, incidents: e.target.checked }
-                      })}
+                      checked={preferences.incidents}
+                      onChange={(e) => setPreferences({ ...preferences, incidents: e.target.checked })}
                       className="rounded"
                     />
                     <span>Incident updates</span>
@@ -303,11 +301,8 @@ export default function NotificationsPage() {
                   <label className="flex items-center gap-3">
                     <input
                       type="checkbox"
-                      checked={preferences.types.budgets}
-                      onChange={(e) => setPreferences({
-                        ...preferences,
-                        types: { ...preferences.types, budgets: e.target.checked }
-                      })}
+                      checked={preferences.budgetAlerts}
+                      onChange={(e) => setPreferences({ ...preferences, budgetAlerts: e.target.checked })}
                       className="rounded"
                     />
                     <span>Budget alerts</span>
@@ -315,14 +310,11 @@ export default function NotificationsPage() {
                   <label className="flex items-center gap-3">
                     <input
                       type="checkbox"
-                      checked={preferences.types.agents}
-                      onChange={(e) => setPreferences({
-                        ...preferences,
-                        types: { ...preferences.types, agents: e.target.checked }
-                      })}
+                      checked={preferences.weeklyDigest}
+                      onChange={(e) => setPreferences({ ...preferences, weeklyDigest: e.target.checked })}
                       className="rounded"
                     />
-                    <span>Agent status changes</span>
+                    <span>Weekly digest</span>
                   </label>
                 </div>
               </div>
