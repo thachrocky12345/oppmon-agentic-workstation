@@ -2,22 +2,23 @@
 # OppMon - Docker Swarm Stack
 # =============================================================================
 # Deploy:
-#   docker stack deploy -c docker-stack.yml oppmon
+#   docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
 #
 # Notes:
-# - Targets node.hostname == old_windows (where the host DB at 192.168.1.195
-#   lives and where images are built locally).
-# - Database is external to the stack (host PostgreSQL at 192.168.1.195:5433),
+# - API runs on old_windows (manager), web runs on z800 (worker).
+# - Database is external to the stack (host PostgreSQL at 192.168.1.195:5432),
 #   reached via the host LAN IP from the API container.
-# - Images are built locally on old_windows (oppmon-api:latest, oppmon-web:latest).
-#   Because there is no registry push, services are pinned to old_windows.
+# - Both images are pushed to Docker Hub:
+#     - thachrocky/oppmon_api  (note underscore — historical naming)
+#     - thachrocky/oppmon-web  (note hyphen — historical naming)
+#   Bump the tag here whenever you push a new version so workers actually pull.
 # =============================================================================
 
 version: "3.8"
 
 services:
   api:
-    image: oppmon-api:latest
+    image: thachrocky/oppmon-api:v72277
     networks:
       - oppmon-net
     ports:
@@ -90,7 +91,7 @@ services:
         failure_action: rollback
 
   web:
-    image: thachrocky/oppmon-web:v4
+    image: thachrocky/oppmon-web:v5
     networks:
       - oppmon-net
     ports:
@@ -106,6 +107,11 @@ services:
       NEXT_PUBLIC_API_URL: ""
       # Server-side rewrite target (Next.js process inside the container hits this).
       INTERNAL_API_URL: http://192.168.1.195:3001
+      # Must match the API's JWT_SECRET — Next.js edge middleware verifies the
+      # cookie with this. If unset, the middleware silently falls back to a
+      # non-matching default and rejects every JWT (see deploy-retro-2026-05-07.md
+      # item C). Keep parity with `services.api.environment.JWT_SECRET`.
+      JWT_SECRET: development-secret-key-change-in-production
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
       interval: 30s

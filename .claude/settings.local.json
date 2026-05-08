@@ -7,7 +7,10 @@
       "WebFetch(domain:registry.npmjs.org)",
       "Bash(chown -R thachbui:thachbui /home/thachbui/workstation/arkon-work-station)",
       "Bash(rm -rf /tmp/create-oppmon-test)",
-      "Bash(chown -R thachbui:thachbui /home/thachbui/workstation/arkon-work-station/packages/create-oppmon)"
+      "Bash(chown -R thachbui:thachbui /home/thachbui/workstation/arkon-work-station/packages/create-oppmon)",
+      "Bash(python3 -c 'import json;d=json.load\\(open\\(\"/home/thachbui/workstation/arkon-work-station/package.json\"\\)\\);print\\(\"\\\\n\".join\\(f\"  {k} -> {v[:80]}\" for k,v in d[\"scripts\"].items\\(\\)\\)\\)')",
+      "Bash(docker build *)",
+      "Bash(tee /tmp/api-build8.log)"
     ]
   }
 }

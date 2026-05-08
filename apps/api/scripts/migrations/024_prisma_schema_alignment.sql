@@ -355,8 +355,13 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON embeddings(content_hash);
 -- ============================================================================
 -- MCP Server Registry
 -- ============================================================================
-DROP TABLE IF EXISTS mcp_servers CASCADE;
-CREATE TABLE mcp_servers (
+-- mcp_servers: do NOT drop. If Prisma db push already created it, scope is the
+-- proper SkillScope enum (matches schema.prisma). Dropping + recreating with
+-- `scope TEXT` causes Prisma queries to fail with `text = "SkillScope"`.
+-- Use IF NOT EXISTS to handle migrate-only flows (no Prisma push first), and
+-- defensively fix the column type if a previous version of this migration
+-- already left it as text.
+CREATE TABLE IF NOT EXISTS mcp_servers (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL,
   team_id TEXT,
@@ -367,17 +372,35 @@ CREATE TABLE mcp_servers (
   env JSONB DEFAULT '{}',
   version TEXT DEFAULT '1.0.0',
   sha256 TEXT NOT NULL,
-  scope TEXT DEFAULT 'TEAM',
+  scope "SkillScope" DEFAULT 'TEAM'::"SkillScope",
   enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   deleted_at TIMESTAMPTZ,
   UNIQUE(tenant_id, name)
 );
-CREATE INDEX idx_mcp_servers_tenant ON mcp_servers(tenant_id);
-CREATE INDEX idx_mcp_servers_team ON mcp_servers(team_id);
-CREATE INDEX idx_mcp_servers_scope ON mcp_servers(scope);
-CREATE INDEX idx_mcp_servers_deleted ON mcp_servers(deleted_at);
+
+-- Defensive: if an older version of this migration created scope as TEXT,
+-- convert it to the SkillScope enum.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'mcp_servers'
+      AND column_name  = 'scope'
+      AND data_type    = 'text'
+  ) THEN
+    ALTER TABLE mcp_servers ALTER COLUMN scope DROP DEFAULT;
+    ALTER TABLE mcp_servers ALTER COLUMN scope TYPE "SkillScope" USING scope::"SkillScope";
+    ALTER TABLE mcp_servers ALTER COLUMN scope SET DEFAULT 'TEAM'::"SkillScope";
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_tenant ON mcp_servers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_team   ON mcp_servers(team_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_scope  ON mcp_servers(scope);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_deleted ON mcp_servers(deleted_at);
 
 -- ============================================================================
 -- Tenant Settings
@@ -663,16 +686,37 @@ ALTER TABLE entity_memory     ADD COLUMN IF NOT EXISTS embedding vector(1024);
 ALTER TABLE summary_memory    ADD COLUMN IF NOT EXISTS embedding vector(1024);
 ALTER TABLE persona_memory    ADD COLUMN IF NOT EXISTS embedding vector(1024);
 
--- For embeddings table (1536 dimensions - OpenAI)
-CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING hnsw (embedding vector_cosine_ops);
+-- Vector indexes — version-aware. pgvector >= 0.5 supports HNSW; older only ivfflat.
+-- Prod runs pgvector 0.4.2 (Ubuntu 18.04 apt) — fall back to ivfflat there.
+DO $$
+DECLARE
+  vec_ver TEXT;
+  use_hnsw BOOLEAN;
+  vector_tables TEXT[] := ARRAY[
+    'embeddings', 'rag_chunks',
+    'semantic_memory', 'workflow_memory', 'toolbox_memory',
+    'entity_memory', 'summary_memory', 'persona_memory'
+  ];
+  tbl TEXT;
+BEGIN
+  SELECT extversion INTO vec_ver FROM pg_extension WHERE extname = 'vector';
+  IF vec_ver IS NULL THEN
+    RAISE NOTICE 'pgvector not installed — skipping vector indexes';
+    RETURN;
+  END IF;
+  use_hnsw := string_to_array(vec_ver, '.')::int[] >= ARRAY[0,5,0]::int[];
 
--- For RAG chunks (1536 dimensions - OpenAI)
-CREATE INDEX IF NOT EXISTS idx_rag_chunks_vector ON rag_chunks USING hnsw (embedding vector_cosine_ops);
-
--- For memory tables (1024 dimensions - BGE-M3)
-CREATE INDEX IF NOT EXISTS idx_semantic_memory_vector ON semantic_memory USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX IF NOT EXISTS idx_workflow_memory_vector ON workflow_memory USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX IF NOT EXISTS idx_toolbox_memory_vector ON toolbox_memory USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX IF NOT EXISTS idx_entity_memory_vector ON entity_memory USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX IF NOT EXISTS idx_summary_memory_vector ON summary_memory USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX IF NOT EXISTS idx_persona_memory_vector ON persona_memory USING hnsw (embedding vector_cosine_ops);
+  FOREACH tbl IN ARRAY vector_tables LOOP
+    IF use_hnsw THEN
+      EXECUTE format(
+        'CREATE INDEX IF NOT EXISTS idx_%s_vector ON %I USING hnsw (embedding vector_cosine_ops)',
+        tbl, tbl
+      );
+    ELSE
+      EXECUTE format(
+        'CREATE INDEX IF NOT EXISTS idx_%s_vector ON %I USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)',
+        tbl, tbl
+      );
+    END IF;
+  END LOOP;
+END $$;
