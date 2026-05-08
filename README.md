@@ -300,6 +300,42 @@ AUTO_EMBEDDING_ENABLED=true
 - [Embeddings](docs/embeddings.md) - Embedding provider integration
 - [RAG Pipeline](docs/rag.md) - Retrieval Augmented Generation
 - [Auto-Embedding](docs/auto_embedding.md) - Automatic embedding hooks
+- [Data Model (markdown)](docs/diagrams/data-model.md) - Per-domain ERDs, full table inventory, RLS & trigger reference
+
+## Data Model
+
+The Arkon data model — 23 pages covering the domain map, per-domain ERDs (Identity & Tenancy, Agent Runtime, LLM/Routing/MCP, Memory, RAG, Journal, Workflows/Skills, Audit & Usage, Notifications, Infra/Cost, Security & Rate Limit), the full table inventory with expected scale annotations, and the trigger / RLS / enum reference.
+
+→ **[Download full PDF (23 pages)](docs/arkon_data_model.pdf)** · [Markdown source](docs/diagrams/data-model.md)
+
+<details open>
+<summary><strong>All 23 pages (click any image to open the PDF)</strong></summary>
+
+[![Page 1](docs/assets/data_model/page_01.png)](docs/arkon_data_model.pdf)
+[![Page 2](docs/assets/data_model/page_02.png)](docs/arkon_data_model.pdf)
+[![Page 3](docs/assets/data_model/page_03.png)](docs/arkon_data_model.pdf)
+[![Page 4](docs/assets/data_model/page_04.png)](docs/arkon_data_model.pdf)
+[![Page 5](docs/assets/data_model/page_05.png)](docs/arkon_data_model.pdf)
+[![Page 6](docs/assets/data_model/page_06.png)](docs/arkon_data_model.pdf)
+[![Page 7](docs/assets/data_model/page_07.png)](docs/arkon_data_model.pdf)
+[![Page 8](docs/assets/data_model/page_08.png)](docs/arkon_data_model.pdf)
+[![Page 9](docs/assets/data_model/page_09.png)](docs/arkon_data_model.pdf)
+[![Page 10](docs/assets/data_model/page_10.png)](docs/arkon_data_model.pdf)
+[![Page 11](docs/assets/data_model/page_11.png)](docs/arkon_data_model.pdf)
+[![Page 12](docs/assets/data_model/page_12.png)](docs/arkon_data_model.pdf)
+[![Page 13](docs/assets/data_model/page_13.png)](docs/arkon_data_model.pdf)
+[![Page 14](docs/assets/data_model/page_14.png)](docs/arkon_data_model.pdf)
+[![Page 15](docs/assets/data_model/page_15.png)](docs/arkon_data_model.pdf)
+[![Page 16](docs/assets/data_model/page_16.png)](docs/arkon_data_model.pdf)
+[![Page 17](docs/assets/data_model/page_17.png)](docs/arkon_data_model.pdf)
+[![Page 18](docs/assets/data_model/page_18.png)](docs/arkon_data_model.pdf)
+[![Page 19](docs/assets/data_model/page_19.png)](docs/arkon_data_model.pdf)
+[![Page 20](docs/assets/data_model/page_20.png)](docs/arkon_data_model.pdf)
+[![Page 21](docs/assets/data_model/page_21.png)](docs/arkon_data_model.pdf)
+[![Page 22](docs/assets/data_model/page_22.png)](docs/arkon_data_model.pdf)
+[![Page 23](docs/assets/data_model/page_23.png)](docs/arkon_data_model.pdf)
+
+</details>
 
 ## Architecture
 
