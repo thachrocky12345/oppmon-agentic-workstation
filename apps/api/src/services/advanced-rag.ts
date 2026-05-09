@@ -111,23 +111,63 @@ export function generateQueryVariants(queryText: string): string[] {
     variants.push(mechanismQuery);
   }
 
-  // Variant 4: Examples format
+  // Variant 4: Protocol / methodology format (science domain — Methods section)
+  variants.push(`Protocol and methodology of ${definitionQuery || queryLower}`);
+
+  // Variant 5: Evidence / findings format (science domain — Results / Discussion)
+  variants.push(`Evidence and findings about ${definitionQuery || queryLower}`);
+
+  // Variant 6: Examples format
   variants.push(`Examples of ${definitionQuery || queryLower}`);
 
-  // Limit to 4 variants for performance
-  return variants.slice(0, 4);
+  // Limit to 6 variants for science-domain coverage:
+  //   how (mechanism) / what (definition) / why (rationale) /
+  //   protocol (methodology) / evidence (results) / examples
+  return variants.slice(0, 6);
 }
 
 /**
- * Enhance query with contextual terms
+ * Enhance query with science-domain contextual terms.
+ *
+ * Routes the query to an intent-specific term pack based on its leading
+ * interrogative ("how", "what", "why") or topical keywords ("protocol",
+ * "method", "procedure"). Falls back to a general scientific base pack.
+ *
+ * Mirrors the longevity-domain enhancement in advanced_rag.py:_enhance_query
+ * but generalised for science Q&A (mechanism / definition / rationale /
+ * methodology / evidence).
  */
 export function enhanceQuery(queryText: string): string {
-  // Add common terms that improve retrieval
-  const enhancementTerms = [
-    'explanation', 'details', 'information', 'context'
+  const q = queryText.toLowerCase().trim();
+
+  // Intent-tagged term packs
+  const HOW_TERMS = ['mechanism', 'process', 'pathway', 'procedure'];
+  const WHAT_TERMS = ['definition', 'concept', 'classification', 'characteristics'];
+  const WHY_TERMS = ['cause', 'rationale', 'explanation', 'evidence'];
+  const PROTOCOL_TERMS = [
+    'protocol', 'methodology', 'experimental design',
+    'procedure', 'steps', 'reagents', 'controls',
+  ];
+  const SCIENCE_BASE = [
+    'hypothesis', 'results', 'findings', 'study',
+    'data', 'analysis', 'mechanism',
   ];
 
-  return `${queryText} ${enhancementTerms.slice(0, 2).join(' ')}`;
+  const packs: string[] = [];
+  if (q.startsWith('how')) packs.push(...HOW_TERMS);
+  if (q.startsWith('what')) packs.push(...WHAT_TERMS);
+  if (q.startsWith('why')) packs.push(...WHY_TERMS);
+  if (q.includes('protocol') || q.includes('procedure') || q.includes('method')) {
+    packs.push(...PROTOCOL_TERMS);
+  }
+
+  // Fallback: always include science base terms when no intent matched
+  if (packs.length === 0) {
+    packs.push(...SCIENCE_BASE);
+  }
+
+  // Take 3 terms (matches Python's enhancement_terms[:3] budget)
+  return `${queryText} ${packs.slice(0, 3).join(' ')}`;
 }
 
 // ============================================================================
@@ -412,7 +452,9 @@ async function multiVectorSearch(
 
   // Generate query variants
   const queryVariants = generateQueryVariants(queryText);
-  const variantWeights = [1.0, 0.8, 0.7, 0.6]; // Weight original query highest
+  // Weight original query highest, then question/definition/mechanism,
+  // then science-domain variants (protocol / evidence / examples)
+  const variantWeights = [1.0, 0.8, 0.7, 0.65, 0.6, 0.55];
 
   // Search with each variant
   const allResults: Array<RetrievedChunk & { queryVariant: number }> = [];
