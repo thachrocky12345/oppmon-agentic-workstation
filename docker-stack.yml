@@ -18,7 +18,7 @@ version: "3.8"
 
 services:
   api:
-    image: thachrocky/oppmon-api:v72277
+    image: thachrocky/oppmon-api:v97401
     networks:
       - oppmon-net
     ports:
@@ -28,46 +28,27 @@ services:
         # ingress so multiple replicas on old_windows can share :3001 via
         # swarm's routing mesh. mode: host would limit us to one replica.
         mode: ingress
+    # Base config comes from apps/api/.env (loaded at deploy time on the
+    # manager and embedded in the service spec). The `environment:` block
+    # below overrides values that must differ in prod (LAN host IPs,
+    # container volume paths, NODE_ENV, etc.). Compose precedence:
+    # `environment:` wins over `env_file:`.
+    env_file:
+      - apps/api/.env
     environment:
       NODE_ENV: production
-      PORT: "3001"
-      LOG_LEVEL: info
       # Flip to "true" and redeploy when the Prisma schema changes; it's a
       # one-shot startup hook that runs `prisma db push --accept-data-loss`
       # before the API boots. Leave "false" otherwise.
       DB_AUTO_PUSH: "false"
-      # RAG document storage root (matches the oppmon-documents volume mount).
+      # RAG document storage root (matches the oppmon-documents volume mount;
+      # apps/api/.env points at a relative dev path).
       TAG_DOCUMENT_ROOT: /app/data/documents
-      DATABASE_URL: postgres://thachbui:db4n89o3J824@192.168.1.195:5432/oppmon
-      JWT_SECRET: development-secret-key-change-in-production
-      JWT_EXPIRES_IN: 7d
+      # Prod LAN URLs — apps/api/.env points at localhost.
+      PUBLIC_URL: http://192.168.1.195:3001
       CORS_ORIGIN: http://192.168.1.195,http://192.168.1.105
-      # LLM providers
-      LLM_DEFAULT_PROVIDER: anthropic
+      FRONTEND_URL: http://192.168.1.105
       OLLAMA_BASE_URL: http://192.168.1.195:11434
-      OLLAMA_MODEL: llama3.2
-      OLLAMA_TIMEOUT: "120000"
-      CEREBRAS_API_KEY: csk-4jrn3tphtc59vnep8xmeyn2ddp452e6p4vckn29kvmfd94rt
-      CEREBRAS_MODEL: llama3.1-8b
-      CEREBRAS_TIMEOUT: "60000"
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
-      ANTHROPIC_MODEL: claude-sonnet-4-20250514
-      ANTHROPIC_TIMEOUT: "60000"
-      # Embedding
-      POC_SEARCH_EMBEDDING_PROVIDER: openai
-      OPENAI_API_KEY: "${OPENAI_API_KEY}"
-      OPENAI_EMBEDDING_MODEL: text-embedding-3-small
-      OPENAI_EMBEDDING_DIMENSIONS: "1536"
-      OPENAI_EMBEDDING_TIMEOUT: "60000"
-      OPENAI_EMBEDDING_BATCH_SIZE: "2048"
-      # RAG
-      RAG_DEFAULT_TOP_K: "5"
-      RAG_DEFAULT_THRESHOLD: "0.7"
-      RAG_MAX_CONTEXT_TOKENS: "4000"
-      RAG_STRATEGY: simple
-      RAG_INCLUDE_SOURCES: "true"
-      AUTO_EMBEDDING_ENABLED: "true"
-      TAG_ENCRYPTION_MASTER_KEY: 2PSWveNizjoD0FcpaKjNh6mujpyYrV5uBdKFQUpHHgk=
     volumes:
       - oppmon-documents:/app/data/documents
     healthcheck:

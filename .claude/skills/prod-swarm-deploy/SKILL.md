@@ -82,10 +82,21 @@ If `docker push` is permission-blocked: ask the user to run it manually, then co
 sed -i "s|thachrocky/oppmon-api:v[0-9]*|thachrocky/oppmon-api:$NEXT_API_TAG|" docker-stack.yml
 sed -i "s|thachrocky/oppmon-web:v[0-9]*|thachrocky/oppmon-web:$NEXT_WEB_TAG|" docker-stack.yml
 
+# REQUIRED: source apps/api/.env so any ${VAR} substitutions in docker-stack.yml
+# resolve to real values. Without this, Compose silently expands missing vars
+# to "" and the container starts without the secret — e.g. OPENAI_API_KEY
+# substitution would yield an empty string and the API throws
+# "OPENAI_API_KEY environment variable is required" on first embedding call.
+set -a && . apps/api/.env && set +a
+
 docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
 ```
 
 `--with-registry-auth` is required so swarm nodes can pull from Docker Hub (both `oppmon_api` on old_windows and `oppmon_web` on z800).
+
+> **Permanent fix worth doing:** the `${VAR}` indirection in the stack file is fragile — every deployer has to remember to source `.env`, and a missed export silently produces an empty secret. Two cleaner options:
+> 1. Reference `env_file: - apps/api/.env` directly in the api service (Compose v3 supports this; values are read at deploy time on the manager). Keep an `environment:` block only for prod-specific overrides (NODE_ENV, LAN URLs, volume paths) since `environment:` wins over `env_file:`.
+> 2. Move secrets to **Docker Swarm secrets** (`docker secret create …`) and mount them as files — no env-file plumbing, no shell sourcing, and rotated values don't require a redeploy.
 
 Wait for convergence (don't sleep-poll — use a `until` loop with Bash run_in_background):
 
