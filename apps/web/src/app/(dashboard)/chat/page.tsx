@@ -25,6 +25,14 @@ import AgentGraphPanel, {
 const GRAPH_AGENT_URL =
   process.env.NEXT_PUBLIC_GRAPH_AGENT_URL || 'http://localhost:8002/solve_v2'
 
+// Resizable-panel constraints.
+const GRAPH_PANEL_MIN_PX = 320
+function clampGraphWidth(px: number): number {
+  if (typeof window === 'undefined') return px
+  const max = Math.floor(window.innerWidth * 0.7)
+  return Math.max(GRAPH_PANEL_MIN_PX, Math.min(max, px))
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -127,6 +135,57 @@ export default function ChatPage() {
   // and renders a live planner+searcher graph on the right side.
   const [graphMode, setGraphMode] = useState(false)
   const [graphState, setGraphState] = useState<AgentGraphState | null>(null)
+  // Resizable graph panel width (px). Default 520, clamped to [320, 70vw].
+  // Persisted in localStorage so it survives reloads.
+  const [graphPanelWidth, setGraphPanelWidth] = useState<number>(520)
+  const isResizingRef = useRef(false)
+
+  // Load saved width on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = window.localStorage.getItem('arkon.chat.graphPanelWidth')
+    if (saved) {
+      const n = parseInt(saved, 10)
+      if (!Number.isNaN(n)) setGraphPanelWidth(clampGraphWidth(n))
+    }
+  }, [])
+
+  // Persist on change (debounced via effect-skip during drag is unnecessary;
+  // localStorage writes are cheap).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('arkon.chat.graphPanelWidth', String(graphPanelWidth))
+  }, [graphPanelWidth])
+
+  // Drag handlers — attached at window level so we keep tracking even if
+  // the cursor leaves the thin handle div.
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!isResizingRef.current) return
+      // Right panel width = viewport width - cursor X (the handle is on the
+      // panel's left edge). Clamp to sane bounds.
+      const next = clampGraphWidth(window.innerWidth - e.clientX)
+      setGraphPanelWidth(next)
+    }
+    function onUp() {
+      if (!isResizingRef.current) return
+      isResizingRef.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  function startResize() {
+    isResizingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -704,13 +763,14 @@ export default function ChatPage() {
       {/* Main Chat Area (row: chat column + optional graph panel) */}
       <div className="flex-1 flex min-w-0">
       <div className="flex-1 flex flex-col bg-gray-50 text-gray-900 min-w-0">
-        {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 bg-white border-b">
-          <div className="flex items-center gap-3">
+        {/* Header — flex-wrap so toggles fall to a new row when the column is
+            narrow (e.g. when graph mode steals horizontal space). */}
+        <header className="flex flex-wrap items-center justify-between gap-y-2 gap-x-3 px-4 py-3 bg-white border-b">
+          <div className="flex items-center gap-3 flex-shrink-0">
             {/* Sidebar Toggle */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
               title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
             >
               <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -718,10 +778,10 @@ export default function ChatPage() {
               </svg>
             </button>
 
-            <h1 className="text-lg font-semibold text-gray-900">OppMon Chat</h1>
+            <h1 className="text-lg font-semibold text-gray-900 whitespace-nowrap">OppMon Chat</h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
             {/* Model Selector */}
             <div className="relative" ref={modelDropdownRef}>
               <button
@@ -1114,35 +1174,87 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-      {/* Right-side agent graph panel — visible only in graph mode. */}
+      {/* Drag handle + right-side agent graph panel — visible only in graph mode. */}
       {graphMode && (
-        <aside className="w-[440px] flex-shrink-0 border-l border-gray-200 bg-white flex flex-col">
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">Agent Graph</h2>
-              <p className="text-[11px] text-gray-500">
-                Live planner → searcher decomposition
-              </p>
+        <>
+          {/* Resize handle. Always-visible 4px gray bar with grip dots so
+              users can actually find and grab it. Hover/active swaps to indigo. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize agent graph panel"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              startResize()
+            }}
+            onDoubleClick={() => setGraphPanelWidth(clampGraphWidth(520))}
+            title="Drag to resize · double-click to reset to 520px"
+            className="group relative w-1 flex-shrink-0 cursor-col-resize bg-gray-300 hover:bg-indigo-400 active:bg-indigo-500 transition-colors"
+          >
+            {/* Wider invisible hit-target on top of the visible 4px bar — easier to grab. */}
+            <span className="absolute inset-y-0 -left-1.5 -right-1.5" aria-hidden />
+            {/* Always-visible grip dots, centered vertically. */}
+            <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1">
+              <span className="block w-1 h-1 rounded-full bg-white shadow-sm" />
+              <span className="block w-1 h-1 rounded-full bg-white shadow-sm" />
+              <span className="block w-1 h-1 rounded-full bg-white shadow-sm" />
             </div>
-            <span
-              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                graphState?.done
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : graphState
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              {graphState?.done ? 'done' : graphState ? 'live' : 'idle'}
-            </span>
           </div>
-          <div className="flex-1 min-h-0">
-            <AgentGraphPanel
-              state={graphState}
-              emptyHint="Ask a multi-part question (e.g. 'compare CRISPR-Cas9 and Cas12') to see the agent decompose it."
-            />
-          </div>
-        </aside>
+          <aside
+            className="flex-shrink-0 border-l border-gray-200 bg-white flex flex-col"
+            style={{ width: `${graphPanelWidth}px` }}
+          >
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-gray-900">Agent Graph</h2>
+                <p className="text-[11px] text-gray-500 truncate">
+                  Live planner → searcher decomposition · {graphPanelWidth}px
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setGraphPanelWidth(clampGraphWidth(graphPanelWidth - 80))}
+                  className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                  title="Narrower"
+                  aria-label="Make graph panel narrower"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGraphPanelWidth(clampGraphWidth(graphPanelWidth + 80))}
+                  className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                  title="Wider"
+                  aria-label="Make graph panel wider"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                    graphState?.done
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : graphState
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {graphState?.done ? 'done' : graphState ? 'live' : 'idle'}
+                </span>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0">
+              <AgentGraphPanel
+                state={graphState}
+                emptyHint="Ask a multi-part question (e.g. 'compare CRISPR-Cas9 and Cas12') to see the agent decompose it."
+              />
+            </div>
+          </aside>
+        </>
       )}
       </div>
     </div>
