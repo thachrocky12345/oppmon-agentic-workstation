@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-**Last Updated:** 2026-05-09 (post migration cutover + tenant/user review)
+**Last Updated:** 2026-05-11 (init sync — no new ADRs; deps unchanged since 2026-05-07)
 
 This directory contains Architecture Decision Records (ADRs) for the OppMon (Arkon) project.
 

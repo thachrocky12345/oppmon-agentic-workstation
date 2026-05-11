@@ -1,6 +1,6 @@
 # Request Flow
 
-**Last Updated:** 2026-05-07 (init sync)
+**Last Updated:** 2026-05-11 (init sync)
 
 ## Overview
 
@@ -37,7 +37,8 @@ sequenceDiagram
     end
 
     Mdw->>Mdw: morgan / helmet / cors / compression / cookie-parser / rate-limit
-    Mdw->>Mdw: request-auth.ts (JWT) + rbac.ts
+    Mdw->>Mdw: request-auth.ts (JWT) + tenant-context (RLS GUCs) + access + rbac
+    Mdw->>Mdw: idempotency (POST replay-safety)
     Mdw->>Rt: req with claims
     Rt->>Sv: invoke service
     opt Agent path
@@ -63,10 +64,13 @@ sequenceDiagram
 4. `compression` — gzip
 5. `cookie-parser` — parse cookies
 6. `request-auth.ts` — JWT verification (skips public paths)
-7. `rbac.ts` — role / scope check
-8. `rate-limiter.ts` — per-route limits
-9. Route handler → service → Prisma → response
-10. `error-handler.ts` — last-resort error formatter
+7. `tenant-context.ts` — sets Postgres GUCs (`app.tenant_id`, `app.current_actor_id`) so RLS policies apply
+8. `access.ts` — scope / policy evaluation
+9. `rbac.ts` — role check
+10. `idempotency.ts` — replay-safe POSTs via Idempotency-Key
+11. `rate-limiter.ts` — per-route limits
+12. Route handler → service → Prisma → response
+13. `error-handler.ts` — last-resort error formatter
 
 ## Notes
 

@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2026-05-07 (init sync)
+**Last Updated:** 2026-05-11 (init sync)
 
 ## Overview
 
@@ -37,7 +37,10 @@ graph TD
             CORS["CORS"]
             Compress["Compression"]
             Cookie["cookie-parser"]
-            Auth["JWT Auth"]
+            Auth["JWT Auth (request-auth)"]
+            TenantCtx["Tenant Context (RLS GUCs)"]
+            Access["Access (scope check)"]
+            Idem["Idempotency"]
             RBAC["RBAC"]
             RateLimit["Rate Limiter"]
         end
@@ -119,6 +122,7 @@ graph TD
         TSConfig["@oppmon/tsconfig"]
         EngineCore["engine-core (Rust)"]
         CLIPkg["@oppmon/cli"]
+        Scaffold["create-oppmon (scaffold)"]
     end
 
     Browser --> NextApp
