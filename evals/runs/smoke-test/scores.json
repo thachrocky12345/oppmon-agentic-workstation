@@ -1,0 +1,124 @@
+{
+  "run_id": "smoke-test",
+  "judged_at": "2026-05-11T20:56:17.982Z",
+  "judge_model": "claude-sonnet-4-20250514",
+  "judge_prompt_version": "v1-2026-05-11",
+  "results": [
+    {
+      "question_id": "Q01",
+      "mode": "graph",
+      "axes": {
+        "factuality": {
+          "score": 4,
+          "rationale": "Most technical claims about PAM sequences, cut types, and mechanisms are accurate, though some details about Cas12a processing capabilities could be more precise."
+        },
+        "completeness": {
+          "score": 3.5,
+          "rationale": "Addresses all four required sections but lacks specific details on multiplexing advantages and protein size differences that were explicitly mentioned in expected key points."
+        },
+        "citations": {
+          "score": 2,
+          "rationale": "Uses numbered citation markers throughout but provides no actual source list or URLs, making verification impossible."
+        },
+        "structure": {
+          "score": 4.5,
+          "rationale": "Well-organized with clear headings matching the question structure and logical flow within each section."
+        },
+        "depth": {
+          "score": 3,
+          "rationale": "Provides some mechanistic details and mentions therapeutic applications but lacks concrete numbers, specific examples, or detailed tradeoff analysis."
+        },
+        "reasoning": {
+          "score": 3.5,
+          "rationale": "Explains some causal relationships like how staggered cuts facilitate HDR and why different PAM requirements matter, but could better articulate practical implications."
+        },
+        "decomposition": {
+          "score": 4,
+          "rationale": "Follows the question structure exactly with appropriate subsections that comprehensively cover the requested comparison points."
+        },
+        "source_diversity": {
+          "score": 1,
+          "rationale": "Claims to use multiple sources based on citation numbers but provides no actual sources or evidence of diverse information gathering."
+        }
+      },
+      "raw_total": 25.5,
+      "weighted_total": 29.25,
+      "notable_wins": [
+        "Clear structural organization",
+        "Accurate technical details on PAM sequences",
+        "Good explanation of cut type differences",
+        "Mentions therapeutic applications"
+      ],
+      "notable_losses": [
+        "No actual citations provided",
+        "Missing key details on multiplexing and size differences",
+        "Lacks concrete examples or numbers",
+        "Limited depth on practical implications"
+      ],
+      "rank_vs_refs": {
+        "order": [
+          "arkon",
+          "chatgpt",
+          "claude"
+        ],
+        "reasoning": "Answer B is the only substantive response among the three, providing a structured comparison that addresses the main question components with generally accurate technical information. Answers A and C are empty, making B the clear winner despite its limitations in citations and some missing details about multiplexing advantages and protein sizes."
+      },
+      "raw_judge_output": {
+        "axes": {
+          "factuality": {
+            "score": 4,
+            "rationale": "Most technical claims about PAM sequences, cut types, and mechanisms are accurate, though some details about Cas12a processing capabilities could be more precise."
+          },
+          "completeness": {
+            "score": 3.5,
+            "rationale": "Addresses all four required sections but lacks specific details on multiplexing advantages and protein size differences that were explicitly mentioned in expected key points."
+          },
+          "citations": {
+            "score": 2,
+            "rationale": "Uses numbered citation markers throughout but provides no actual source list or URLs, making verification impossible."
+          },
+          "structure": {
+            "score": 4.5,
+            "rationale": "Well-organized with clear headings matching the question structure and logical flow within each section."
+          },
+          "depth": {
+            "score": 3,
+            "rationale": "Provides some mechanistic details and mentions therapeutic applications but lacks concrete numbers, specific examples, or detailed tradeoff analysis."
+          },
+          "reasoning": {
+            "score": 3.5,
+            "rationale": "Explains some causal relationships like how staggered cuts facilitate HDR and why different PAM requirements matter, but could better articulate practical implications."
+          },
+          "decomposition": {
+            "score": 4,
+            "rationale": "Follows the question structure exactly with appropriate subsections that comprehensively cover the requested comparison points."
+          },
+          "source_diversity": {
+            "score": 1,
+            "rationale": "Claims to use multiple sources based on citation numbers but provides no actual sources or evidence of diverse information gathering."
+          }
+        },
+        "notable_wins": [
+          "Clear structural organization",
+          "Accurate technical details on PAM sequences",
+          "Good explanation of cut type differences",
+          "Mentions therapeutic applications"
+        ],
+        "notable_losses": [
+          "No actual citations provided",
+          "Missing key details on multiplexing and size differences",
+          "Lacks concrete examples or numbers",
+          "Limited depth on practical implications"
+        ],
+        "rank_vs_refs": {
+          "order": [
+            "arkon",
+            "chatgpt",
+            "claude"
+          ],
+          "reasoning": "Answer B is the only substantive response among the three, providing a structured comparison that addresses the main question components with generally accurate technical information. Answers A and C are empty, making B the clear winner despite its limitations in citations and some missing details about multiplexing advantages and protein sizes."
+        }
+      }
+    }
+  ]
+}

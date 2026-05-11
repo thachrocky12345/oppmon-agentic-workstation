@@ -14,6 +14,16 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import AgentGraphPanel, {
+  type AgentGraphState,
+  type AdjEdge,
+  type AgentNode as AgentNodeT,
+} from '@/components/AgentGraphPanel'
+
+// URL of the graph-mode agent (KnowledgeSearchBackend /solve_v2).
+// Override with NEXT_PUBLIC_GRAPH_AGENT_URL to point at a different host.
+const GRAPH_AGENT_URL =
+  process.env.NEXT_PUBLIC_GRAPH_AGENT_URL || 'http://localhost:8002/solve_v2'
 
 // ============================================================================
 // Types
@@ -112,6 +122,11 @@ export default function ChatPage() {
   // Tools state
   const [enableTools, setEnableTools] = useState(false)
   const [enableWebFallback, setEnableWebFallback] = useState(false)
+
+  // Graph mode — when on, the chat calls /solve_v2 (KnowledgeSearchBackend)
+  // and renders a live planner+searcher graph on the right side.
+  const [graphMode, setGraphMode] = useState(false)
+  const [graphState, setGraphState] = useState<AgentGraphState | null>(null)
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -320,6 +335,125 @@ export default function ChatPage() {
       }))
 
     try {
+      // -------------------------------------------------------------------
+      // Graph mode: call KnowledgeSearchBackend /solve_v2 and stream a
+      // planner+searcher graph into the right-side panel. Final answer is
+      // appended to the assistant message just like simple mode.
+      // -------------------------------------------------------------------
+      if (graphMode) {
+        const assistantMessageId = `assistant-${Date.now()}`
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            citations: [],
+            isStreaming: true,
+          },
+        ])
+        // Reset graph state at the start of every new query.
+        setGraphState({
+          nodes: {},
+          adj: {},
+          references: {},
+          currentNode: null,
+          done: false,
+        })
+
+        const resp = await fetch(GRAPH_AGENT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: messageText,
+            web_fallback: enableWebFallback,
+            enable_tools: enableTools,
+            collection_ids: selectedCollections.length > 0 ? selectedCollections : [],
+          }),
+        })
+        if (!resp.ok || !resp.body) {
+          throw new Error(`Graph agent error: ${resp.status} ${resp.statusText}`)
+        }
+
+        const reader = resp.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+        // Track the last answer text seen so we can update the streaming
+        // assistant bubble without flicker (planner emits the same `response`
+        // field multiple times during finalize).
+        let lastAnswer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          // Split on blank lines (SSE event boundaries) — but be tolerant of
+          // single \n separators too.
+          const lines = buf.split('\n')
+          buf = lines.pop() || ''
+          for (const raw of lines) {
+            const line = raw.trim()
+            if (!line.startsWith('data:')) continue
+            const payload = line.slice(5).trim()
+            if (!payload) continue
+            let evt: {
+              response?: {
+                type?: string
+                state?: string
+                response?: string
+                nodes?: Record<string, AgentNodeT>
+                adj?: Record<string, AdjEdge[]>
+                references?: Record<string, string>
+              }
+              current_node?: string | null
+              error?: { msg: string; details?: string }
+            }
+            try {
+              evt = JSON.parse(payload)
+            } catch {
+              continue
+            }
+            if (evt.error) {
+              throw new Error(evt.error.msg + (evt.error.details ? `: ${evt.error.details}` : ''))
+            }
+            const r = evt.response
+            if (!r) continue
+
+            // Update graph state if this event carries one.
+            if (r.nodes && r.adj) {
+              const done = r.state === 'END'
+              setGraphState({
+                nodes: r.nodes,
+                adj: r.adj,
+                references: r.references || {},
+                currentNode: evt.current_node ?? null,
+                done,
+              })
+            }
+
+            // Surface the latest planner answer text into the chat bubble.
+            // Searcher events also carry `response` but we want the planner's
+            // synthesis, so we only update on type=planner.
+            if (r.type === 'planner' && r.response && r.response !== lastAnswer) {
+              lastAnswer = r.response
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId ? { ...m, content: r.response! } : m,
+                ),
+              )
+            }
+
+            if (r.state === 'END') {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId ? { ...m, isStreaming: false } : m,
+                ),
+              )
+            }
+          }
+        }
+        return // graph-mode path complete
+      }
+
       const modelConfig = selectedModel ? models.find(m => m.id === selectedModel) : undefined
 
       const response = await fetch('/api/rag/chat/stream', {
@@ -441,7 +575,7 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, messages, selectedCollections, selectedModel, models, currentSessionId])
+  }, [input, isLoading, messages, selectedCollections, selectedModel, models, currentSessionId, graphMode, enableTools, enableWebFallback])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -567,7 +701,8 @@ export default function ChatPage() {
         </div>
       </aside>
 
-      {/* Main Chat Area */}
+      {/* Main Chat Area (row: chat column + optional graph panel) */}
+      <div className="flex-1 flex min-w-0">
       <div className="flex-1 flex flex-col bg-gray-50 text-gray-900 min-w-0">
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-3 bg-white border-b">
@@ -729,6 +864,30 @@ export default function ChatPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
               </svg>
               <span className="text-gray-700">Web</span>
+            </label>
+
+            {/* Graph-mode Toggle — shows the planner+searcher graph live on the right. */}
+            <label
+              className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg cursor-pointer transition-colors ${
+                graphMode
+                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                  : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+              }`}
+              title="Show how the agent thinks: live graph of sub-questions, searches, and synthesis."
+            >
+              <input
+                type="checkbox"
+                checked={graphMode}
+                onChange={(e) => setGraphMode(e.target.checked)}
+                className="rounded text-indigo-600 focus:ring-indigo-500"
+              />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <circle cx="6" cy="6" r="2" strokeWidth={2} />
+                <circle cx="18" cy="6" r="2" strokeWidth={2} />
+                <circle cx="12" cy="18" r="2" strokeWidth={2} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.5 7.5l3.5 9M16.5 7.5l-3.5 9" />
+              </svg>
+              <span>Graph</span>
             </label>
           </div>
         </header>
@@ -954,6 +1113,37 @@ export default function ChatPage() {
             </form>
           </div>
         </div>
+      </div>
+      {/* Right-side agent graph panel — visible only in graph mode. */}
+      {graphMode && (
+        <aside className="w-[440px] flex-shrink-0 border-l border-gray-200 bg-white flex flex-col">
+          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Agent Graph</h2>
+              <p className="text-[11px] text-gray-500">
+                Live planner → searcher decomposition
+              </p>
+            </div>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                graphState?.done
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : graphState
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {graphState?.done ? 'done' : graphState ? 'live' : 'idle'}
+            </span>
+          </div>
+          <div className="flex-1 min-h-0">
+            <AgentGraphPanel
+              state={graphState}
+              emptyHint="Ask a multi-part question (e.g. 'compare CRISPR-Cas9 and Cas12') to see the agent decompose it."
+            />
+          </div>
+        </aside>
+      )}
       </div>
     </div>
   )
