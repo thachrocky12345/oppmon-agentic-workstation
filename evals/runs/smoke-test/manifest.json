@@ -1,0 +1,21 @@
+{
+  "run_id": "smoke-test",
+  "started_at": "2026-05-11T20:54:58.196Z",
+  "finished_at": "2026-05-11T20:55:31.607Z",
+  "endpoints": {
+    "simple": "http://localhost:3001/api/rag/chat/stream",
+    "graph": "http://localhost:8002/solve_v2"
+  },
+  "modes": [
+    "graph"
+  ],
+  "question_ids": [
+    "Q01"
+  ],
+  "flags": {
+    "enable_tools": false,
+    "web_fallback": true,
+    "collection_ids": []
+  },
+  "notes": "harness smoke test"
+}

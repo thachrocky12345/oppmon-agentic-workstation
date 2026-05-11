@@ -14,6 +14,24 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import AgentGraphPanel, {
+  type AgentGraphState,
+  type AdjEdge,
+  type AgentNode as AgentNodeT,
+} from '@/components/AgentGraphPanel'
+
+// URL of the graph-mode agent (KnowledgeSearchBackend /solve_v2).
+// Override with NEXT_PUBLIC_GRAPH_AGENT_URL to point at a different host.
+const GRAPH_AGENT_URL =
+  process.env.NEXT_PUBLIC_GRAPH_AGENT_URL || 'http://localhost:8002/solve_v2'
+
+// Resizable-panel constraints.
+const GRAPH_PANEL_MIN_PX = 320
+function clampGraphWidth(px: number): number {
+  if (typeof window === 'undefined') return px
+  const max = Math.floor(window.innerWidth * 0.7)
+  return Math.max(GRAPH_PANEL_MIN_PX, Math.min(max, px))
+}
 
 // ============================================================================
 // Types
@@ -112,6 +130,62 @@ export default function ChatPage() {
   // Tools state
   const [enableTools, setEnableTools] = useState(false)
   const [enableWebFallback, setEnableWebFallback] = useState(false)
+
+  // Graph mode — when on, the chat calls /solve_v2 (KnowledgeSearchBackend)
+  // and renders a live planner+searcher graph on the right side.
+  const [graphMode, setGraphMode] = useState(false)
+  const [graphState, setGraphState] = useState<AgentGraphState | null>(null)
+  // Resizable graph panel width (px). Default 520, clamped to [320, 70vw].
+  // Persisted in localStorage so it survives reloads.
+  const [graphPanelWidth, setGraphPanelWidth] = useState<number>(520)
+  const isResizingRef = useRef(false)
+
+  // Load saved width on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = window.localStorage.getItem('arkon.chat.graphPanelWidth')
+    if (saved) {
+      const n = parseInt(saved, 10)
+      if (!Number.isNaN(n)) setGraphPanelWidth(clampGraphWidth(n))
+    }
+  }, [])
+
+  // Persist on change (debounced via effect-skip during drag is unnecessary;
+  // localStorage writes are cheap).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('arkon.chat.graphPanelWidth', String(graphPanelWidth))
+  }, [graphPanelWidth])
+
+  // Drag handlers — attached at window level so we keep tracking even if
+  // the cursor leaves the thin handle div.
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!isResizingRef.current) return
+      // Right panel width = viewport width - cursor X (the handle is on the
+      // panel's left edge). Clamp to sane bounds.
+      const next = clampGraphWidth(window.innerWidth - e.clientX)
+      setGraphPanelWidth(next)
+    }
+    function onUp() {
+      if (!isResizingRef.current) return
+      isResizingRef.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  function startResize() {
+    isResizingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -320,6 +394,125 @@ export default function ChatPage() {
       }))
 
     try {
+      // -------------------------------------------------------------------
+      // Graph mode: call KnowledgeSearchBackend /solve_v2 and stream a
+      // planner+searcher graph into the right-side panel. Final answer is
+      // appended to the assistant message just like simple mode.
+      // -------------------------------------------------------------------
+      if (graphMode) {
+        const assistantMessageId = `assistant-${Date.now()}`
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            citations: [],
+            isStreaming: true,
+          },
+        ])
+        // Reset graph state at the start of every new query.
+        setGraphState({
+          nodes: {},
+          adj: {},
+          references: {},
+          currentNode: null,
+          done: false,
+        })
+
+        const resp = await fetch(GRAPH_AGENT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputs: messageText,
+            web_fallback: enableWebFallback,
+            enable_tools: enableTools,
+            collection_ids: selectedCollections.length > 0 ? selectedCollections : [],
+          }),
+        })
+        if (!resp.ok || !resp.body) {
+          throw new Error(`Graph agent error: ${resp.status} ${resp.statusText}`)
+        }
+
+        const reader = resp.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = ''
+        // Track the last answer text seen so we can update the streaming
+        // assistant bubble without flicker (planner emits the same `response`
+        // field multiple times during finalize).
+        let lastAnswer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          // Split on blank lines (SSE event boundaries) — but be tolerant of
+          // single \n separators too.
+          const lines = buf.split('\n')
+          buf = lines.pop() || ''
+          for (const raw of lines) {
+            const line = raw.trim()
+            if (!line.startsWith('data:')) continue
+            const payload = line.slice(5).trim()
+            if (!payload) continue
+            let evt: {
+              response?: {
+                type?: string
+                state?: string
+                response?: string
+                nodes?: Record<string, AgentNodeT>
+                adj?: Record<string, AdjEdge[]>
+                references?: Record<string, string>
+              }
+              current_node?: string | null
+              error?: { msg: string; details?: string }
+            }
+            try {
+              evt = JSON.parse(payload)
+            } catch {
+              continue
+            }
+            if (evt.error) {
+              throw new Error(evt.error.msg + (evt.error.details ? `: ${evt.error.details}` : ''))
+            }
+            const r = evt.response
+            if (!r) continue
+
+            // Update graph state if this event carries one.
+            if (r.nodes && r.adj) {
+              const done = r.state === 'END'
+              setGraphState({
+                nodes: r.nodes,
+                adj: r.adj,
+                references: r.references || {},
+                currentNode: evt.current_node ?? null,
+                done,
+              })
+            }
+
+            // Surface the latest planner answer text into the chat bubble.
+            // Searcher events also carry `response` but we want the planner's
+            // synthesis, so we only update on type=planner.
+            if (r.type === 'planner' && r.response && r.response !== lastAnswer) {
+              lastAnswer = r.response
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId ? { ...m, content: r.response! } : m,
+                ),
+              )
+            }
+
+            if (r.state === 'END') {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId ? { ...m, isStreaming: false } : m,
+                ),
+              )
+            }
+          }
+        }
+        return // graph-mode path complete
+      }
+
       const modelConfig = selectedModel ? models.find(m => m.id === selectedModel) : undefined
 
       const response = await fetch('/api/rag/chat/stream', {
@@ -441,7 +634,7 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, messages, selectedCollections, selectedModel, models, currentSessionId])
+  }, [input, isLoading, messages, selectedCollections, selectedModel, models, currentSessionId, graphMode, enableTools, enableWebFallback])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -567,15 +760,17 @@ export default function ChatPage() {
         </div>
       </aside>
 
-      {/* Main Chat Area */}
+      {/* Main Chat Area (row: chat column + optional graph panel) */}
+      <div className="flex-1 flex min-w-0">
       <div className="flex-1 flex flex-col bg-gray-50 text-gray-900 min-w-0">
-        {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 bg-white border-b">
-          <div className="flex items-center gap-3">
+        {/* Header — flex-wrap so toggles fall to a new row when the column is
+            narrow (e.g. when graph mode steals horizontal space). */}
+        <header className="flex flex-wrap items-center justify-between gap-y-2 gap-x-3 px-4 py-3 bg-white border-b">
+          <div className="flex items-center gap-3 flex-shrink-0">
             {/* Sidebar Toggle */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
               title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
             >
               <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -583,10 +778,10 @@ export default function ChatPage() {
               </svg>
             </button>
 
-            <h1 className="text-lg font-semibold text-gray-900">OppMon Chat</h1>
+            <h1 className="text-lg font-semibold text-gray-900 whitespace-nowrap">OppMon Chat</h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
             {/* Model Selector */}
             <div className="relative" ref={modelDropdownRef}>
               <button
@@ -729,6 +924,30 @@ export default function ChatPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
               </svg>
               <span className="text-gray-700">Web</span>
+            </label>
+
+            {/* Graph-mode Toggle — shows the planner+searcher graph live on the right. */}
+            <label
+              className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg cursor-pointer transition-colors ${
+                graphMode
+                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                  : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+              }`}
+              title="Show how the agent thinks: live graph of sub-questions, searches, and synthesis."
+            >
+              <input
+                type="checkbox"
+                checked={graphMode}
+                onChange={(e) => setGraphMode(e.target.checked)}
+                className="rounded text-indigo-600 focus:ring-indigo-500"
+              />
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <circle cx="6" cy="6" r="2" strokeWidth={2} />
+                <circle cx="18" cy="6" r="2" strokeWidth={2} />
+                <circle cx="12" cy="18" r="2" strokeWidth={2} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.5 7.5l3.5 9M16.5 7.5l-3.5 9" />
+              </svg>
+              <span>Graph</span>
             </label>
           </div>
         </header>
@@ -954,6 +1173,89 @@ export default function ChatPage() {
             </form>
           </div>
         </div>
+      </div>
+      {/* Drag handle + right-side agent graph panel — visible only in graph mode. */}
+      {graphMode && (
+        <>
+          {/* Resize handle. Always-visible 4px gray bar with grip dots so
+              users can actually find and grab it. Hover/active swaps to indigo. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize agent graph panel"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              startResize()
+            }}
+            onDoubleClick={() => setGraphPanelWidth(clampGraphWidth(520))}
+            title="Drag to resize · double-click to reset to 520px"
+            className="group relative w-1 flex-shrink-0 cursor-col-resize bg-gray-300 hover:bg-indigo-400 active:bg-indigo-500 transition-colors"
+          >
+            {/* Wider invisible hit-target on top of the visible 4px bar — easier to grab. */}
+            <span className="absolute inset-y-0 -left-1.5 -right-1.5" aria-hidden />
+            {/* Always-visible grip dots, centered vertically. */}
+            <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1">
+              <span className="block w-1 h-1 rounded-full bg-white shadow-sm" />
+              <span className="block w-1 h-1 rounded-full bg-white shadow-sm" />
+              <span className="block w-1 h-1 rounded-full bg-white shadow-sm" />
+            </div>
+          </div>
+          <aside
+            className="flex-shrink-0 border-l border-gray-200 bg-white flex flex-col"
+            style={{ width: `${graphPanelWidth}px` }}
+          >
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-gray-900">Agent Graph</h2>
+                <p className="text-[11px] text-gray-500 truncate">
+                  Live planner → searcher decomposition · {graphPanelWidth}px
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setGraphPanelWidth(clampGraphWidth(graphPanelWidth - 80))}
+                  className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                  title="Narrower"
+                  aria-label="Make graph panel narrower"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGraphPanelWidth(clampGraphWidth(graphPanelWidth + 80))}
+                  className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                  title="Wider"
+                  aria-label="Make graph panel wider"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                    graphState?.done
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : graphState
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {graphState?.done ? 'done' : graphState ? 'live' : 'idle'}
+                </span>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0">
+              <AgentGraphPanel
+                state={graphState}
+                emptyHint="Ask a multi-part question (e.g. 'compare CRISPR-Cas9 and Cas12') to see the agent decompose it."
+              />
+            </div>
+          </aside>
+        </>
+      )}
       </div>
     </div>
   )
