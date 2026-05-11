@@ -1,6 +1,6 @@
 # Dependency Graph
 
-**Last Updated:** 2026-05-07 (init sync)
+**Last Updated:** 2026-05-11 (init sync)
 
 ## Overview
 
@@ -20,6 +20,7 @@ graph TB
             Shared["@oppmon/shared<br/>(Types)"]
             TSConfig["@oppmon/tsconfig"]
             CLI["@oppmon/cli<br/>(tag command)"]
+            CreateOppmon["create-oppmon<br/>(npm scaffold)"]
             AgentEng["@arkon/agent-engine"]
             Guardrails["@arkon/guardrails"]
             Obs["@arkon/observability"]
