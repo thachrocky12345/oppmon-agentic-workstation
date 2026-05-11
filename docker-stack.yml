@@ -18,7 +18,7 @@ version: "3.8"
 
 services:
   api:
-    image: thachrocky/oppmon-api:v97401
+    image: thachrocky/oppmon-api:v35495
     networks:
       - oppmon-net
     ports:
@@ -72,7 +72,7 @@ services:
         failure_action: rollback
 
   web:
-    image: thachrocky/oppmon-web:v5
+    image: thachrocky/oppmon-web:v35643
     networks:
       - oppmon-net
     ports:
