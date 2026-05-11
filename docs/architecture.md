@@ -1,6 +1,6 @@
 # OppMon (Arkon) Architecture
 
-**Last Updated:** 2026-05-07 (init sync)
+**Last Updated:** 2026-05-11 (init sync)
 
 ## Important: Repository Structure
 
@@ -14,6 +14,7 @@ This is a **pnpm + Turborepo monorepo** with the following structure:
 | `packages/database/` | **ACTIVE** | Prisma schema and client (@oppmon/database) |
 | `packages/shared/` | **ACTIVE** | Shared TypeScript types (@oppmon/shared) |
 | `packages/cli/` | **ACTIVE** | CLI tool for AI Gateway management (@oppmon/cli) |
+| `packages/create-oppmon/` | **ACTIVE** | npm scaffold (`create-oppmon`) — bootstraps a new workstation |
 | `packages/agent-engine/` | **ACTIVE** | Agent execution primitives (@arkon/agent-engine) |
 | `packages/guardrails/` | **ACTIVE** | Safety / policy enforcement (@arkon/guardrails) |
 | `packages/observability/` | **ACTIVE** | Tracing, metrics, latency (@arkon/observability) |
@@ -134,6 +135,7 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 
 ### Shared Packages
 - **@oppmon/cli**: CLI tool for AI Gateway management (`tag` command)
+- **create-oppmon**: npm scaffold that bootstraps a new workstation (env files, dev DB, install)
 - **@oppmon/database**: Prisma schema with multi-tenancy, pgvector support
 - **@oppmon/shared**: TypeScript types (JWTClaims, Role, TeamMembership), provider templates
 - **@oppmon/tsconfig**: Base TypeScript configurations

@@ -107,7 +107,24 @@ DECLARE
   tbl TEXT;
   idx_name TEXT;
   vector_tables TEXT[] := ARRAY['embeddings','rag_chunks','memory_facts','summary_memory','persona_memory'];
+  vec_ver TEXT;
+  idx_method TEXT;
+  idx_with TEXT;
 BEGIN
+  -- Choose vector index method based on pgvector version (HNSW needs >= 0.5).
+  SELECT extversion INTO vec_ver FROM pg_extension WHERE extname = 'vector';
+  IF vec_ver IS NULL THEN
+    RAISE NOTICE 'pgvector not installed — skipping partial vector indexes';
+    RETURN;
+  END IF;
+  IF string_to_array(vec_ver, '.')::int[] >= ARRAY[0,5,0]::int[] THEN
+    idx_method := 'hnsw';
+    idx_with   := '';
+  ELSE
+    idx_method := 'ivfflat';
+    idx_with   := ' WITH (lists = 100)';
+  END IF;
+
   FOREACH tbl IN ARRAY vector_tables LOOP
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.tables
@@ -120,10 +137,10 @@ BEGIN
     idx_name := format('idx_%s_vec_openai_v3small', tbl);
     EXECUTE format(
       'CREATE INDEX IF NOT EXISTS %I
-          ON %I USING hnsw (embedding vector_cosine_ops)
+          ON %I USING %s (embedding vector_cosine_ops)%s
           WHERE embedding_provider = ''openai''
             AND embedding_model    = ''text-embedding-3-small''',
-      idx_name, tbl
+      idx_name, tbl, idx_method, idx_with
     );
 
     -- BGE-M3 partial index (1024 dim) for memory tables that use it
@@ -131,10 +148,10 @@ BEGIN
       idx_name := format('idx_%s_vec_bge_m3', tbl);
       EXECUTE format(
         'CREATE INDEX IF NOT EXISTS %I
-            ON %I USING hnsw (embedding vector_cosine_ops)
+            ON %I USING %s (embedding vector_cosine_ops)%s
             WHERE embedding_provider = ''baai''
               AND embedding_model    = ''bge-m3''',
-        idx_name, tbl
+        idx_name, tbl, idx_method, idx_with
       );
     END IF;
   END LOOP;

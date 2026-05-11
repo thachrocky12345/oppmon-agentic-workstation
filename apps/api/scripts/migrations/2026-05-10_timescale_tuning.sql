@@ -223,7 +223,7 @@ BEGIN
       ALTER TABLE events SET (
         timescaledb.compress,
         timescaledb.compress_segmentby = 'agent_id',
-        timescaledb.compress_orderby   = 'created_at DESC'
+        timescaledb.compress_orderby   = 'created_at DESC, id'
       )
     $sql$;
     PERFORM add_compression_policy('events', INTERVAL '7 days', if_not_exists => TRUE);
@@ -235,7 +235,7 @@ BEGIN
       ALTER TABLE tool_calls SET (
         timescaledb.compress,
         timescaledb.compress_segmentby = 'agent_id',
-        timescaledb.compress_orderby   = 'created_at DESC'
+        timescaledb.compress_orderby   = 'created_at DESC, id'
       )
     $sql$;
     PERFORM add_compression_policy('tool_calls', INTERVAL '7 days', if_not_exists => TRUE);
@@ -247,7 +247,7 @@ BEGIN
       ALTER TABLE llm_messages SET (
         timescaledb.compress,
         timescaledb.compress_segmentby = 'session_id',
-        timescaledb.compress_orderby   = 'created_at DESC'
+        timescaledb.compress_orderby   = 'created_at DESC, id'
       )
     $sql$;
     PERFORM add_compression_policy('llm_messages', INTERVAL '7 days', if_not_exists => TRUE);
@@ -259,7 +259,7 @@ BEGIN
       ALTER TABLE mcp_proxy_logs SET (
         timescaledb.compress,
         timescaledb.compress_segmentby = 'server_id',
-        timescaledb.compress_orderby   = 'created_at DESC'
+        timescaledb.compress_orderby   = 'created_at DESC, id'
       )
     $sql$;
     PERFORM add_compression_policy('mcp_proxy_logs', INTERVAL '7 days', if_not_exists => TRUE);
@@ -270,7 +270,7 @@ BEGIN
     EXECUTE $sql$
       ALTER TABLE traces SET (
         timescaledb.compress,
-        timescaledb.compress_orderby = 'started_at DESC'
+        timescaledb.compress_orderby = 'started_at DESC, id'
       )
     $sql$;
     PERFORM add_compression_policy('traces', INTERVAL '7 days', if_not_exists => TRUE);
@@ -280,7 +280,7 @@ BEGIN
       ALTER TABLE spans SET (
         timescaledb.compress,
         timescaledb.compress_segmentby = 'trace_id',
-        timescaledb.compress_orderby   = 'started_at DESC'
+        timescaledb.compress_orderby   = 'started_at DESC, id'
       )
     $sql$;
     PERFORM add_compression_policy('spans', INTERVAL '7 days', if_not_exists => TRUE);

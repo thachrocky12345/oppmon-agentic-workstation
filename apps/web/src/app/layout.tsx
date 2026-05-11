@@ -26,7 +26,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="antialiased bg-ark-bg text-ark-text">{children}</body>
+      {/* suppressHydrationWarning: browser extensions (Grammarly, LastPass, etc.)
+          inject attributes onto <body> before React hydrates, causing a benign
+          mismatch warning. The flag silences only direct-child diffs of body. */}
+      <body className="antialiased bg-ark-bg text-ark-text" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }
