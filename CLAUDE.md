@@ -15,6 +15,7 @@ This directory contains the original monorepo code and is **FOR REFERENCE ONLY**
 - `apps/web/` — Next.js frontend (@oppmon/web)
 - `apps/router/` — LiteLLM proxy router (@oppmon/router)
 - `packages/cli/` — CLI tool for AI Gateway management (@oppmon/cli)
+- `packages/create-oppmon/` — npm scaffold (`create-oppmon` bin)
 - `packages/database/` — Prisma schema and client (@oppmon/database)
 - `packages/shared/` — Shared TypeScript types (@oppmon/shared)
 - `packages/agent-engine/` — Reusable agent execution primitives (@arkon/agent-engine)
@@ -89,7 +90,7 @@ Whenever `/init` is run:
 ## Known Dependencies
 <!-- Claude auto-updates this section on every /init — do not edit manually -->
 
-**Last synced:** 2026-05-07 (init sync)
+**Last synced:** 2026-05-11 (init sync)
 
 ### Reference Only (arkon-reference-only/) — DO NOT MODIFY
 | Package | Version | Category |
@@ -320,6 +321,10 @@ arkon-workstation/
 │   │   │   └── index.ts        # Entry point
 │   │   └── package.json
 │   │
+│   ├── create-oppmon/          # ✅ npm scaffold (create-oppmon)
+│   │   ├── bin/                # Entry point
+│   │   └── package.json
+│   │
 │   ├── database/               # ✅ Prisma schema (@oppmon/database)
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma   # Database schema
@@ -437,6 +442,9 @@ arkon-workstation/
 |--------|----------|---------|
 | Auth | `request-auth.ts` | JWT verification |
 | RBAC | `rbac.ts` | Role-based access control |
+| Access | `access.ts` | Access policy / scope evaluation |
+| Tenant Context | `tenant-context.ts` | Sets Postgres GUCs (`app.tenant_id`, `app.current_actor_id`) for RLS |
+| Idempotency | `idempotency.ts` | Replay-safe POST handling via Idempotency-Key |
 | Rate Limiter | `rate-limiter.ts` | Rate limiting |
 | Error Handler | `error-handler.ts` | Error responses |
 
@@ -447,7 +455,10 @@ arkon-workstation/
 | JWT | `jwt.ts` | JWT sign/verify |
 | OAuth | `oauth.ts` | Arctic OAuth helpers |
 | RBAC | `rbac.ts` | RBAC utilities |
+| Authz | `authz.ts` | Authorization helpers (scope, ownership) |
+| Token Version | `token-version.ts` | JWT revocation via version counter |
 | Audit | `audit.ts` | Audit logging |
+| Outbox | `outbox.ts` | Transactional outbox enqueue for fanout |
 | Storage | `storage/local-disk.ts` | Pluggable file storage (local-disk impl) |
 | RAG | `rag/` | RAG context builder |
 | Embedding | `embedding/` | OpenAI embeddings |
@@ -515,6 +526,7 @@ arkon-workstation/
 | Package | Location | Purpose |
 |---------|----------|---------|
 | @oppmon/cli | `packages/cli/` | CLI tool for AI Gateway management (`tag` command) |
+| create-oppmon | `packages/create-oppmon/` | npm scaffold (`create-oppmon` bin) — bootstraps a fresh workstation |
 | @oppmon/database | `packages/database/` | Prisma schema with multi-tenancy |
 | @oppmon/shared | `packages/shared/` | JWTClaims, Role, TeamMembership types, Provider templates |
 | @oppmon/tsconfig | `packages/tsconfig/` | Base TypeScript configs |
