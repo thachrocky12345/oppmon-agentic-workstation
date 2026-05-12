@@ -2,6 +2,7 @@
   "name": "@oppmon/web",
   "version": "1.0.0",
   "description": "OppMon Frontend Application",
+  "license": "BUSL-1.1",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3002",

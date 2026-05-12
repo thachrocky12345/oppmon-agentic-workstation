@@ -2,6 +2,7 @@
   "name": "@arkon/observability",
   "version": "1.0.0",
   "description": "Observability and tracing for Arkon AI Gateway",
+  "license": "BUSL-1.1",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

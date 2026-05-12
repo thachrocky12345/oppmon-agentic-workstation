@@ -1,6 +1,7 @@
 {
   "name": "oppmon-workstation",
   "version": "0.1.0",
+  "license": "BUSL-1.1",
   "private": true,
   "packageManager": "pnpm@9.0.0",
   "scripts": {
@@ -39,7 +40,6 @@
     "test:e2e": "pnpm --filter @oppmon/web test:e2e",
     "test:e2e:auth": "pnpm --filter @oppmon/web test:e2e:auth",
     "clean": "turbo run clean && rm -rf node_modules .turbo",
-
     "db:generate": "pnpm --filter @oppmon/database db:generate",
     "db:push": "pnpm --filter @oppmon/database db:push",
     "db:migrate": "pnpm --filter @oppmon/database db:migrate",
@@ -47,7 +47,6 @@
     "db:seed": "pnpm --filter @oppmon/api seed",
     "db:studio": "pnpm --filter @oppmon/database db:studio",
     "db:reset": "pnpm --filter @oppmon/database db:push --force-reset && pnpm db:seed",
-
     "docker:up": "docker compose up -d db",
     "docker:up:dev": "docker compose --profile dev up -d",
     "docker:up:prod": "docker compose --profile prod up -d",
@@ -61,7 +60,6 @@
     "docker:ps": "docker compose ps",
     "docker:build": "docker compose build",
     "docker:build:no-cache": "docker compose build --no-cache",
-
     "setup": "pnpm install && pnpm docker:up && sleep 3 && pnpm db:push && pnpm db:seed",
     "setup:clean": "pnpm docker:down:clean && pnpm setup"
   },

@@ -2,6 +2,7 @@
   "name": "@arkon/agent-engine",
   "version": "1.0.0",
   "description": "High-performance agent execution engine with Go orchestration and Rust compute",
+  "license": "BUSL-1.1",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
