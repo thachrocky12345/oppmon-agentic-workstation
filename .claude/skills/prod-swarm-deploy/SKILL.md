@@ -21,9 +21,19 @@ Port 7002 is the graph-agent (KnowledgeSearchBackend `/solve_v2`). 8002 is in
 use by another local service — DO NOT use 8002 for graph-agent. See
 [docs/solve-v2.md](../../../docs/solve-v2.md).
 
-Both images are versioned and pushed to Docker Hub under `thachrocky/`. Always
-bump the tag on every push — never reuse `:latest` or a previous version, or
-swarm workers may serve a stale cached digest.
+All three images are versioned and pushed to Docker Hub under `thachrocky/`.
+Always bump the tag on every push — never reuse `:latest` or a previous
+version, or swarm workers may serve a stale cached digest.
+
+| Service | Source | Docker Hub repo | Notes |
+|---|---|---|---|
+| `oppmon_api` | `apps/api/` | `thachrocky/oppmon-api` | Express/Node |
+| `oppmon_web` | `apps/web/` | `thachrocky/oppmon-web` | Next.js 15 |
+| `oppmon_graph-agent` | `apps/KnowledgeSearchBackend/` | `thachrocky/mindsearch` (tag prefix `backend.v2.*`) | Python FastAPI, serves `/solve_v2` only |
+
+For the graph-agent, **always use the `backend.v2.<N>` tag pattern** — the
+legacy `backend.<year>` tags (e.g. `backend.2025`) point at the old image
+without `/solve_v2`. See [docs/solve-v2.md](../../../docs/solve-v2.md).
 
 DB user: `thachbui` / password in `apps/api/.env`. Use the **host LAN IP**
 (`192.168.1.195`) in DATABASE_URL — never `localhost` (it's the container).
@@ -140,52 +150,85 @@ done
 docker stack ps oppmon --filter "desired-state=running"
 ```
 
-## Step: deploy-graph (optional — KnowledgeSearchBackend)
+## Step: build-graph + push-graph
 
-Graph mode in OppMon Chat depends on a separate Python service that serves
-`POST /solve_v2`. The image is NOT built from this repo. To deploy it:
+The graph-agent image is built from `apps/KnowledgeSearchBackend/` in this
+repo and pushed to `thachrocky/mindsearch` under the `backend.v2.*` tag
+prefix. v2 images are NOT compatible with the legacy `backend.<year>` tags —
+those don't include `/solve_v2`.
 
-1. **Confirm the image tag** you want to deploy (it lives in a separate Docker
-   Hub repo, e.g. `thachrocky/knowledge-search-backend:vN`).
-2. **Uncomment the `graph-agent` block** in `docker-stack.yml` (around line
-   124) and set:
-   - `image:` → the tag from step 1
-   - `node.hostname == old_windows` (or wherever the GPUs live)
-3. **Wire the web service** to it in the same file:
-   ```yaml
-   services.web.environment.GRAPH_BACKEND_URL: http://graph-agent:7002
-   services.web.environment.GRAPH_BACKEND_TOKEN: "<shared-secret>"  # optional
-   ```
-4. **Rebuild the web image** with the build-time flag so the toggle renders:
-   ```bash
-   NEXT_WEB_TAG=v$(($(date +%s) % 100000))
-   docker build -f apps/web/Dockerfile \
-     --build-arg INTERNAL_API_URL=http://192.168.1.195:3001 \
-     --build-arg NEXT_PUBLIC_GRAPH_ENABLED=true \
-     -t thachrocky/oppmon-web:$NEXT_WEB_TAG .
-   docker push thachrocky/oppmon-web:$NEXT_WEB_TAG
-   ```
-5. **Deploy** (same env-sourcing rule applies):
-   ```bash
-   set -a && . apps/api/.env && set +a
-   docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
-   ```
-6. **Smoke-test the proxy** end-to-end from the web host:
-   ```bash
-   curl -N -X POST http://192.168.1.105/api/graph/solve \
-        -H 'Content-Type: application/json' \
-        -d '{"inputs":"hello","web_fallback":false,"enable_tools":false,"collection_ids":[]}'
-   ```
-   Expect a stream of `data: {...}` lines. A `503 graph_backend_not_configured`
-   means the web service didn't see `GRAPH_BACKEND_URL` — re-check the stack
-   env and that you sourced `.env`.
+```bash
+# Bump the v2 tag every push so workers actually pull
+NEXT_GRAPH_TAG=backend.v2.$(($(date +%s) % 100000))   # or pick the next manual number
+
+docker build -f apps/KnowledgeSearchBackend/dockerfile \
+  -t oppmon-graph-agent:latest \
+  -t thachrocky/mindsearch:$NEXT_GRAPH_TAG \
+  apps/KnowledgeSearchBackend
+
+docker push thachrocky/mindsearch:$NEXT_GRAPH_TAG
+```
+
+Notes:
+- The Dockerfile installs from `requirements-v2.txt` (minimal: fastapi,
+  uvicorn, sse-starlette, pydantic, pydantic-settings, anthropic, openai,
+  httpx, ddgs, python-dotenv). The legacy `requirement.locked.txt` is no
+  longer read.
+- Entry point is `python3 -m mindsearch.v2_server` — listens on container
+  port **8002**, exposes `/healthz`, `/`, and `POST /solve_v2`.
+- Build cost: ~30s on a warm cache. Image size: ~250 MB (vs the legacy
+  ~6.8 GB image with torch + jupyter + streamlit + transformers).
+- Local smoke-test before pushing:
+  ```bash
+  docker compose --profile graph up -d graph-agent
+  curl -sS -o /dev/null -w "%{http_code}\n" http://localhost:7002/healthz
+  ```
+  Expect `200`. Then POST a question to `/solve_v2` and confirm SSE events
+  stream.
+
+If `docker push` is permission-blocked: ask the user to run it manually,
+then come back to update the stack.
+
+## Step: deploy-graph (wire into the stack)
+
+After pushing the v2 image, update `docker-stack.yml`:
+
+```bash
+# Bump the graph image tag
+sed -i "s|thachrocky/mindsearch:backend.v2[._a-z0-9]*|thachrocky/mindsearch:$NEXT_GRAPH_TAG|" docker-stack.yml
+
+# Same env-sourcing rule as the main deploy step.
+set -a && . apps/api/.env && set +a
+
+docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
+```
+
+Make sure `docker-stack.yml` has:
+- `services.graph-agent` uncommented, pointing at `thachrocky/mindsearch:$NEXT_GRAPH_TAG`
+- `services.web.environment.GRAPH_BACKEND_URL: http://graph-agent:8002`
+  (container port — NOT 7002, which is only the local dev host mapping)
+- Web image rebuilt with `--build-arg NEXT_PUBLIC_GRAPH_ENABLED=true` so the
+  Graph toggle renders in `/chat`.
 
 To disable graph mode later, set
 `services.web.environment.GRAPH_BACKEND_URL: ""` and redeploy. The toggle
 hides automatically when the build-arg `NEXT_PUBLIC_GRAPH_ENABLED=false`.
 
-See [docs/solve-v2.md](../../../docs/solve-v2.md) for the full architecture and
-the SSE envelope shape.
+Smoke-test the proxy end-to-end through the web host:
+```bash
+curl -N -X POST http://192.168.1.105/api/graph/solve \
+     -H 'Content-Type: application/json' \
+     -d '{"inputs":"hello","web_fallback":false,"enable_tools":false,"collection_ids":[]}'
+```
+Expect a stream of `data: {...}` lines. Failure modes:
+- `503 graph_backend_not_configured` → web container didn't see
+  `GRAPH_BACKEND_URL`. You forgot the `set -a && . apps/api/.env && set +a`
+  step, or the stack env is empty-string.
+- `502 graph_backend_unreachable` → graph-agent container isn't running or
+  DNS resolution failed. `docker service ps oppmon_graph-agent`.
+
+See [docs/solve-v2.md](../../../docs/solve-v2.md) for the full architecture
+and the SSE envelope shape.
 
 ## Step: apply-schema (Prisma push + pgvector)
 

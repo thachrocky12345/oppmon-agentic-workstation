@@ -14,9 +14,8 @@ service. Source for the proxy is in
 
 ```
 KnowledgeSearchBackend/
-├── dockerfile                         # builds the v2-only image
-├── requirement.locked.txt             # pinned pip deps (still includes some
-│                                       legacy bloat — see Followups)
+├── dockerfile                         # builds the v2-only image (~250 MB)
+├── requirements-v2.txt                # minimal pip deps (~10 packages)
 ├── .env / .env.example                # LLM + search keys
 └── mindsearch/
     ├── __init__.py                    # empty
@@ -46,7 +45,7 @@ KnowledgeSearchBackend/
 
 ```bash
 cd apps/KnowledgeSearchBackend
-pip install -r requirement.locked.txt
+pip install -r requirements-v2.txt
 cp .env.example .env       # then fill in ANTHROPIC_API_KEY etc.
 python -m mindsearch.v2_server
 ```
@@ -91,17 +90,21 @@ Inside the docker network the web app reaches this service at
 Full list in [`.env.example`](.env.example). Keys must come from env — they
 must never be hardcoded in `mindsearch/` source (push protection enforces).
 
-## Followups
+## Image
 
-- **Prune `requirement.locked.txt`.** Legacy bloat still ships: `lmdeploy`,
-  `streamlit`, `gradio`, `transformers`, `torch`, `jupyter*`, all the
-  `nvidia-*` packages. None are used by `agent_v2/`. Dropping them would
-  shrink the image from ~6.8 GB to a few hundred MB.
-- **Add a `requirements-v2.txt`** with the minimal set: `fastapi`, `uvicorn`,
-  `sse-starlette`, `pydantic`, `anthropic`, `openai`, `httpx`,
-  `duckduckgo_search`, `google-api-python-client`, `python-dotenv`.
-- **Containerize the entry without the apt heavyweights** (drop `python3-pandas`,
-  `python3-matplotlib`, etc. from the Dockerfile's `apt-get install`).
+Pushed to Docker Hub as `thachrocky/mindsearch:backend.v2.<N>`. The legacy
+`backend.<year>` tags point at the old image without `/solve_v2` — do **not**
+use them. Always bump `<N>` on every push so swarm workers actually pull the
+new digest.
+
+Build / push:
+
+```bash
+NEXT_GRAPH_TAG=backend.v2.$(($(date +%s) % 100000))
+docker build -f apps/KnowledgeSearchBackend/dockerfile \
+  -t thachrocky/mindsearch:$NEXT_GRAPH_TAG apps/KnowledgeSearchBackend
+docker push thachrocky/mindsearch:$NEXT_GRAPH_TAG
+```
 
 ## License
 

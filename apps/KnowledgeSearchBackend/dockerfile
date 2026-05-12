@@ -9,31 +9,21 @@ ENV TERM=linux
 # Set working directory
 WORKDIR /root
 
-# Install system dependencies first (these change rarely)
-# Docker says run apt-get update and install together,
-# and then rm /var/lib/apt/lists to reduce image size.
-RUN apt-get update && apt-get install -y \
-    git \
-    apt-utils \
-    python3-pil \
-    python3-requests \
-    python3-pip \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    python3-pandas \
-    python3-matplotlib \
-    python3-psycopg2 \
+# Install minimal system dependencies. The v2 server only needs curl for
+# healthchecks; everything else is pure Python (anthropic/openai SDKs use
+# urllib3 under the hood — no native compilation required).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file first (for better caching)
-# This layer will only rebuild if requirements change
-COPY requirement.locked.txt ./
+# Copy minimal v2 requirements (the old locked file was for legacy mindsearch
+# and pinned torch/jupyter/streamlit/gradio/lmdeploy which v2 doesn't use).
+COPY requirements-v2.txt ./
 
 # Install Python dependencies
-# This layer will be cached unless requirement.locked.txt changes
-RUN pip3 install --no-cache-dir -r requirement.locked.txt
+# This layer rebuilds only when requirements-v2.txt changes.
+RUN pip3 install --no-cache-dir -r requirements-v2.txt
 
 # Create a non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /root

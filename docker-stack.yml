@@ -18,7 +18,7 @@ version: "3.8"
 
 services:
   api:
-    image: thachrocky/oppmon-api:v97401
+    image: thachrocky/oppmon-api:v2.1
     networks:
       - oppmon-net
     ports:
@@ -72,7 +72,7 @@ services:
         failure_action: rollback
 
   web:
-    image: thachrocky/oppmon-web:v5
+    image: thachrocky/oppmon-web:v2.1
     networks:
       - oppmon-net
     ports:
@@ -93,11 +93,10 @@ services:
       # non-matching default and rejects every JWT (see deploy-retro-2026-05-07.md
       # item C). Keep parity with `services.api.environment.JWT_SECRET`.
       JWT_SECRET: development-secret-key-change-in-production
-      # ----- Graph mode (optional) -----
-      # When the graph-agent service is deployed in this stack, point at it by
-      # service name (Swarm overlay DNS). Leave empty to keep the proxy
-      # returning 503 and the toggle hidden.
-      GRAPH_BACKEND_URL: ""
+      # ----- Graph mode -----
+      # The graph-agent service below listens on container port 8002 (NOT 7002 —
+      # that's only the dev-time host mapping). Web reaches it via Swarm overlay DNS.
+      GRAPH_BACKEND_URL: http://graph-agent:8002
       GRAPH_BACKEND_TOKEN: ""
       # NOTE: NEXT_PUBLIC_GRAPH_ENABLED is build-time only — it must be passed
       # via --build-arg when building thachrocky/oppmon-web. Setting it here
@@ -121,36 +120,48 @@ services:
         failure_action: rollback
 
   # ===========================================================================
-  # Graph-mode agent - KnowledgeSearchBackend (commented out by default)
+  # Graph-mode agent - KnowledgeSearchBackend (mindsearch v2-only)
   # ===========================================================================
-  # Uncomment + set GRAPH_AGENT_IMAGE to enable. After deploying, also set
-  # services.web.environment.GRAPH_BACKEND_URL to http://graph-agent:7002 and
-  # rebuild the web image with --build-arg NEXT_PUBLIC_GRAPH_ENABLED=true.
-  # See docs/solve-v2.md for the full rollout checklist.
+  # Serves POST /solve_v2 (SSE) for OppMon Chat's Graph mode. Source is in
+  # apps/KnowledgeSearchBackend/ in this repo. See docs/solve-v2.md.
   #
-  # graph-agent:
-  #   image: thachrocky/knowledge-search-backend:vX        # set tag
-  #   networks:
-  #     - oppmon-net
-  #   environment:
-  #     PORT: 7002
-  #     GRAPH_BACKEND_TOKEN: ""                            # shared secret, optional
-  #     OPENAI_API_KEY: ""
-  #     ANTHROPIC_API_KEY: ""
-  #   healthcheck:
-  #     test: ["CMD", "wget", "-qO-", "http://localhost:7002/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
-  #   deploy:
-  #     replicas: 1
-  #     placement:
-  #       constraints:
-  #         - node.hostname == old_windows  # or wherever the GPUs live
-  #     restart_policy:
-  #       condition: any
-  #       delay: 5s
+  # Bump the image tag every push so swarm workers actually pull. Use the
+  # `backend.v2.<N>` prefix — the legacy `backend.<year>` tags don't have
+  # /solve_v2 and will break the chat page.
+  graph-agent:
+    image: thachrocky/mindsearch:backend.v2.1
+    networks:
+      - oppmon-net
+    # All graph-agent config lives in apps/api/.env on the manager. The vars
+    # the v2 server actually reads: LLM_PROVIDER, ANTHROPIC_API_KEY,
+    # ANTHROPIC_MODEL, OPENAI_API_KEY, WEB_SEARCH_PROVIDER,
+    # GOOGLE_SEARCH_API_KEY, GOOGLE_SEARCH_ENGINE_ID, PLANNER_MAX_ITERATIONS,
+    # SEARCHER_MAX_ITERATIONS, MINDSEARCH_DEBUG.
+    # Source `apps/api/.env` before deploy: `set -a && . apps/api/.env && set +a`
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-duckduckgo}
+      GOOGLE_SEARCH_API_KEY: ${GOOGLE_SEARCH_API_KEY:-}
+      GOOGLE_SEARCH_ENGINE_ID: ${GOOGLE_SEARCH_ENGINE_ID:-}
+      PLANNER_MAX_ITERATIONS: ${PLANNER_MAX_ITERATIONS:-6}
+      SEARCHER_MAX_ITERATIONS: ${SEARCHER_MAX_ITERATIONS:-3}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == old_windows
+      restart_policy:
+        condition: any
+        delay: 5s
 
 networks:
   oppmon-net:
