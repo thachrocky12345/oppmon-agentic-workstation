@@ -215,3 +215,12 @@ yapf==0.40.2
 zipp==3.20.0
 streamlit-cognito-auth
 google-api-python-client==2.179.0
+
+# --- agent_v2 (v2-only) extras ---
+# pydantic_settings is imported at module load in agent_v2/config.py.
+# anthropic + openai are lazy-loaded but required at runtime based on
+# LLM_PROVIDER (anthropic by default). Pinned to versions compatible with
+# pydantic 2.8.2 above.
+pydantic-settings==2.5.2
+anthropic==0.39.0
+openai==1.59.6

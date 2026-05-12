@@ -46,9 +46,10 @@ COPY --chown=appuser:appuser mindsearch /root/mindsearch
 # Expose the application port
 EXPOSE 8002
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8002/ || exit 1
+# Health check — v2_server.py exposes a dedicated /healthz endpoint.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8002/healthz || exit 1
 
-# Start the mindsearch application with specified parameters
-CMD ["python3", "-m", "mindsearch.app", "--lang", "en", "--model_format", "gpt4", "--search_engine", "GoogleSearch"]
+# Start the v2-only FastAPI server (mounts /solve_v2). The legacy /solve
+# entrypoint and its `mindsearch.agent` package were deleted intentionally.
+CMD ["python3", "-m", "mindsearch.v2_server"]

@@ -268,8 +268,8 @@ services:
       # Host:Container — mindsearch hardcodes 8002 inside the container.
       - "${GRAPH_AGENT_PORT:-7002}:8002"
     healthcheck:
-      # Hit the FastAPI root (returns the docs page). /health doesn't exist.
-      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8002/\", timeout=3)'"]
+      # v2_server.py exposes /healthz that returns {"status": "ok", ...}
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8002/healthz\", timeout=3)'"]
       interval: 30s
       timeout: 10s
       retries: 3
