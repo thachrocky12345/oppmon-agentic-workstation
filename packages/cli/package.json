@@ -2,6 +2,7 @@
   "name": "@oppmon/cli",
   "version": "0.1.0",
   "description": "OppMon CLI - oppmon command for AI Gateway management",
+  "license": "BUSL-1.1",
   "type": "module",
   "bin": {
     "oppmon": "./dist/index.js",

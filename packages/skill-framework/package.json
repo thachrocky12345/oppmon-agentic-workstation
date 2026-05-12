@@ -2,6 +2,7 @@
   "name": "@arkon/skill-framework",
   "version": "1.0.0",
   "description": "Skill definition framework with YAML frontmatter and intent-based triggers",
+  "license": "BUSL-1.1",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -2,6 +2,7 @@
   "name": "create-oppmon",
   "version": "0.1.0",
   "description": "Bootstrap a new OppMon AI Gateway workstation. One command sets up the repo, env files, and dev database.",
+  "license": "BUSL-1.1",
   "type": "module",
   "bin": {
     "create-oppmon": "./bin/index.js"
@@ -14,7 +15,6 @@
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT",
   "author": "Thach Bui",
   "homepage": "https://github.com/thachrocky12345/oppmon-agentic-workstation#readme",
   "repository": {
