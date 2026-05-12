@@ -40,6 +40,11 @@
     "test:e2e": "pnpm --filter @oppmon/web test:e2e",
     "test:e2e:auth": "pnpm --filter @oppmon/web test:e2e:auth",
     "clean": "turbo run clean && rm -rf node_modules .turbo",
+
+    "eval:run": "pnpm --dir evals exec tsx scripts/run.ts",
+    "eval:judge": "pnpm --dir evals exec tsx scripts/judge.ts",
+    "eval:report": "pnpm --dir evals exec tsx scripts/report.ts",
+
     "db:generate": "pnpm --filter @oppmon/database db:generate",
     "db:push": "pnpm --filter @oppmon/database db:push",
     "db:migrate": "pnpm --filter @oppmon/database db:migrate",

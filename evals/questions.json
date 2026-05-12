@@ -1,0 +1,144 @@
+{
+  "$schema": "./schema/questions.schema.json",
+  "version": 1,
+  "description": "Eval question set for Arkon chat. Edit freely — `id` is the only field referenced by runs/scores.",
+  "questions": [
+    {
+      "id": "Q01",
+      "title": "CRISPR-Cas9 vs Cas12",
+      "category": "multi-part-technical",
+      "question": "Compare CRISPR-Cas9 and CRISPR-Cas12. Cover: (a) mechanism of action, (b) PAM requirements, (c) typical applications, and (d) key practical differences (cut type, multiplexing, size).",
+      "rubric_weights": { "factuality": 1.5, "completeness": 1.5, "citations": 1.0, "structure": 1.0, "depth": 1.0, "reasoning": 1.0 },
+      "expected_keypoints": [
+        "Cas9 makes blunt double-strand cuts; Cas12 makes staggered cuts with 5' overhangs",
+        "Cas9 PAM = NGG; Cas12a PAM = TTTV (5' of protospacer)",
+        "Cas12 processes its own crRNA → easier multiplexing",
+        "Cas12 is smaller (~1200 aa) than Cas9 (~1400 aa) — easier delivery"
+      ],
+      "favors": ["graph", "decomposition"]
+    },
+    {
+      "id": "Q02",
+      "title": "EU AI Act provisions taking effect in 2026",
+      "category": "current-events",
+      "question": "What major provisions of the EU AI Act take effect in 2026, and what specifically do they require of providers of general-purpose AI models (GPAI)?",
+      "rubric_weights": { "factuality": 2.0, "completeness": 1.0, "citations": 1.5, "structure": 1.0, "depth": 0.5, "reasoning": 0.5 },
+      "expected_keypoints": [
+        "Most obligations apply 24 months after entry into force (Aug 2, 2026)",
+        "GPAI provider obligations: technical documentation, training data summaries, copyright policy",
+        "Systemic-risk GPAI (>10^25 FLOPs): incident reporting, adversarial testing, cybersecurity"
+      ],
+      "favors": ["web-search", "current-data"]
+    },
+    {
+      "id": "Q03",
+      "title": "Multi-tenant pgvector at SQL layer",
+      "category": "technical-synthesis",
+      "question": "How would you design a multi-tenant pgvector schema where each tenant's embeddings are isolated at the SQL layer — not by partitioning? Cover the relevant Postgres features (RLS, GUCs, role demotion) and the main tradeoffs.",
+      "rubric_weights": { "factuality": 1.5, "completeness": 1.0, "citations": 0.5, "structure": 1.0, "depth": 1.5, "reasoning": 1.5 },
+      "expected_keypoints": [
+        "RLS policies keyed on a tenant_id column",
+        "current_setting('app.tenant_id', true) inside policy, set via SET LOCAL per transaction",
+        "Connection-level role demotion (SET LOCAL ROLE) to NOSUPERUSER NOBYPASSRLS",
+        "Tradeoffs: index efficiency on large fan-out, query planner stats per-tenant, BYPASS RLS for admin paths"
+      ],
+      "favors": ["depth", "arkon-adjacent"]
+    },
+    {
+      "id": "Q04",
+      "title": "Anthropic vs OpenAI prompt caching",
+      "category": "comparison",
+      "question": "Compare Anthropic's prompt caching with OpenAI's prompt caching. Cover: cache scope (per-key, per-org), TTL behavior, pricing model, and the API ergonomics for marking cacheable spans. When does each provider win for which use case?",
+      "rubric_weights": { "factuality": 2.0, "completeness": 1.5, "citations": 1.0, "structure": 1.0, "depth": 1.0, "reasoning": 1.0 },
+      "expected_keypoints": [
+        "Anthropic: explicit cache_control breakpoints in messages; 5 min default TTL; per-org",
+        "OpenAI: automatic on >1024 tokens; 5–10 min TTL; opaque",
+        "Anthropic discounts cache reads ~10x; OpenAI ~50%",
+        "Anthropic wins for long-system-prompt agents; OpenAI for incidental savings"
+      ],
+      "favors": ["graph", "comparison"]
+    },
+    {
+      "id": "Q05",
+      "title": "Hybrid retrieval + reranker tradeoffs",
+      "category": "specialist-depth",
+      "question": "Explain hybrid retrieval combining BM25, dense vectors, and reciprocal rank fusion (RRF). At ~100k-document scale, when does adding a cross-encoder reranker help vs hurt? Cover latency, cost, and recall/precision tradeoffs concretely.",
+      "rubric_weights": { "factuality": 1.5, "completeness": 1.0, "citations": 0.5, "structure": 1.0, "depth": 2.0, "reasoning": 1.5 },
+      "expected_keypoints": [
+        "RRF: 1/(k+rank) sum across rankers; k=60 typical; rank-only, score-free fusion",
+        "Cross-encoder reranker: ~20–100ms / pair × ~100 candidates → 2–10s added latency",
+        "Help: noisy first-stage, long queries, fine-grained relevance",
+        "Hurt: already high precision, latency budget < 200ms, cost-sensitive paths"
+      ],
+      "favors": ["depth", "arkon-adjacent"]
+    },
+    {
+      "id": "Q06",
+      "title": "LangGraph vs LlamaIndex Workflows vs hand-rolled loop",
+      "category": "multi-system-comparison",
+      "question": "Compare LangGraph, LlamaIndex Workflows, and a hand-rolled Claude tool-use loop. Cover code maintenance cost, debuggability, observability hooks, and which one you'd pick for: (a) a 2-engineer startup, (b) a 50-engineer enterprise rebuild, (c) a research prototype.",
+      "rubric_weights": { "factuality": 1.5, "completeness": 1.5, "citations": 1.0, "structure": 1.0, "depth": 1.5, "reasoning": 1.5 },
+      "expected_keypoints": [
+        "LangGraph: graph DSL + state, strong observability via LangSmith, dependency-heavy",
+        "LlamaIndex Workflows: event-driven, lighter, less mature",
+        "Hand-rolled: minimal deps, full control, must build retries/observability yourself",
+        "Startup → hand-rolled; enterprise → LangGraph; research → hand-rolled"
+      ],
+      "favors": ["graph", "decomposition"]
+    },
+    {
+      "id": "Q07",
+      "title": "RLHF sycophancy and mitigations (DPO, CAI, KTO)",
+      "category": "causal-with-citations",
+      "question": "Why does RLHF tend to produce sycophantic responses, and how do DPO, constitutional AI, and KTO try to mitigate this? Cite specific papers and the year each was introduced.",
+      "rubric_weights": { "factuality": 2.0, "completeness": 1.0, "citations": 2.0, "structure": 1.0, "depth": 1.0, "reasoning": 1.5 },
+      "expected_keypoints": [
+        "RLHF reward model rewards agreement → policy drift toward sycophancy",
+        "DPO (Rafailov 2023): direct preference optimization, skip reward model",
+        "Constitutional AI (Bai 2022): self-critique with principles before RLHF",
+        "KTO (Ethayarajh 2024): prospect-theoretic loss; binary feedback only"
+      ],
+      "favors": ["citations", "depth"]
+    },
+    {
+      "id": "Q08",
+      "title": "MCP server vs Anthropic-built tool",
+      "category": "niche-multi-axis",
+      "question": "What's the difference between an MCP (Model Context Protocol) server and an Anthropic-built tool, from a security and operations perspective? Cover: who runs each, where credentials live, audit trail differences, and which is more appropriate for accessing internal corporate data.",
+      "rubric_weights": { "factuality": 1.5, "completeness": 1.5, "citations": 1.0, "structure": 1.0, "depth": 1.5, "reasoning": 1.5 },
+      "expected_keypoints": [
+        "MCP server: customer-hosted (or self-hosted), credentials never leave customer infra",
+        "Anthropic-built tool: hosted by Anthropic, credentials passed through API",
+        "Audit: MCP audit is on customer side; Anthropic tool audit is in Anthropic logs",
+        "Internal data → MCP wins (data residency)"
+      ],
+      "favors": ["graph", "depth"]
+    },
+    {
+      "id": "Q09",
+      "title": "Zero-downtime migration to RLS multi-tenancy",
+      "category": "how-to-with-risk",
+      "question": "Outline the steps to migrate a single-tenant SaaS to row-level-security multi-tenancy on PostgreSQL 15+ with zero downtime. What can go wrong at each step, and how would you roll back?",
+      "rubric_weights": { "factuality": 1.5, "completeness": 1.5, "citations": 0.5, "structure": 1.5, "depth": 1.5, "reasoning": 1.5 },
+      "expected_keypoints": [
+        "Step: add tenant_id (nullable) → backfill → NOT NULL → policies → demote role",
+        "Risks: index bloat during backfill; missing tenant_id breaks RLS silently; admin paths need BYPASSRLS",
+        "Rollback: drop policies (instant); keep tenant_id column for forensics"
+      ],
+      "favors": ["arkon-adjacent", "depth"]
+    },
+    {
+      "id": "Q10",
+      "title": "Evaluating agentic LLM apps in production",
+      "category": "meta",
+      "question": "What's the current best practice for evaluating agentic LLM applications in production? Cover what to log, sampling strategy, and how to avoid LLM-as-judge drift over time.",
+      "rubric_weights": { "factuality": 1.5, "completeness": 1.5, "citations": 1.0, "structure": 1.0, "depth": 1.5, "reasoning": 1.5 },
+      "expected_keypoints": [
+        "Log: full traces (tool calls, inputs/outputs), latency per step, model version",
+        "Sample: stratified by user intent + outcome (success/error/escalation)",
+        "Anti-drift: pin judge model version, periodically re-score golden set, ensemble judges, human spot-checks"
+      ],
+      "favors": ["depth", "self-relevant"]
+    }
+  ]
+}

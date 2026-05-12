@@ -860,7 +860,7 @@ async function processDocumentExtraction(documentId: string, tenantId: string): 
     }
 
     // Chunk the text
-    const textChunks = chunkText(text, { maxChunkSize: 800, overlap: 100 });
+    const textChunks = chunkText(text, { maxChunkSize: 800, overlap: 200 });
 
     if (textChunks.length === 0) {
       throw new Error('No text content extracted from document');
@@ -928,7 +928,7 @@ export function chunkText(
   text: string,
   options: { maxChunkSize?: number; overlap?: number } = {}
 ): string[] {
-  const { maxChunkSize = 800, overlap = 100 } = options;
+  const { maxChunkSize = 800, overlap = 200 } = options;
 
   // Split by paragraphs first
   const paragraphs = text.split(/\n\s*\n/);

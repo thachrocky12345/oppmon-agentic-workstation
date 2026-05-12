@@ -1,0 +1,21 @@
+{
+  "name": "@oppmon/evals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Regression-evaluation harness for Arkon chat (simple + graph modes).",
+  "scripts": {
+    "run": "tsx scripts/run.ts",
+    "judge": "tsx scripts/judge.ts",
+    "report": "tsx scripts/report.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
