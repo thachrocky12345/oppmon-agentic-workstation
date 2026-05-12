@@ -50,3 +50,10 @@ nul
 # Rust
 target/
 Cargo.lock
+
+# Database dumps & deploy artifacts (never commit — may contain prod data)
+.deploy-backup/
+*.sql.bak
+*.dump
+pgdump.err
+restore.err
