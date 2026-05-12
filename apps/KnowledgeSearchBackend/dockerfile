@@ -1,0 +1,54 @@
+ARG PYTHON_VERSION=3.12-bullseye
+
+FROM python:${PYTHON_VERSION} AS base
+
+# Turn off debconf messages during build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERM=linux
+
+# Set working directory
+WORKDIR /root
+
+# Install system dependencies first (these change rarely)
+# Docker says run apt-get update and install together,
+# and then rm /var/lib/apt/lists to reduce image size.
+RUN apt-get update && apt-get install -y \
+    git \
+    apt-utils \
+    python3-pil \
+    python3-requests \
+    python3-pip \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    python3-pandas \
+    python3-matplotlib \
+    python3-psycopg2 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file first (for better caching)
+# This layer will only rebuild if requirements change
+COPY requirement.locked.txt ./
+
+# Install Python dependencies
+# This layer will be cached unless requirement.locked.txt changes
+RUN pip3 install --no-cache-dir -r requirement.locked.txt
+
+# Create a non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /root
+USER appuser
+
+# Copy the application code LAST (this changes most frequently)
+# This ensures code changes don't invalidate the dependency cache
+COPY --chown=appuser:appuser mindsearch /root/mindsearch
+
+# Expose the application port
+EXPOSE 8002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8002/ || exit 1
+
+# Start the mindsearch application with specified parameters
+CMD ["python3", "-m", "mindsearch.app", "--lang", "en", "--model_format", "gpt4", "--search_engine", "GoogleSearch"]

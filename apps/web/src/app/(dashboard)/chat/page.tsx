@@ -20,10 +20,18 @@ import AgentGraphPanel, {
   type AgentNode as AgentNodeT,
 } from '@/components/AgentGraphPanel'
 
-// URL of the graph-mode agent (KnowledgeSearchBackend /solve_v2).
-// Override with NEXT_PUBLIC_GRAPH_AGENT_URL to point at a different host.
+// URL of the graph-mode agent. Default: same-origin Next.js proxy at
+// /api/graph/solve (see apps/web/src/app/api/graph/solve/route.ts), which
+// forwards to GRAPH_BACKEND_URL on the server side.
+// Override with NEXT_PUBLIC_GRAPH_AGENT_URL only when intentionally bypassing
+// the proxy (e.g. pointing a dev frontend at a remote backend directly).
 const GRAPH_AGENT_URL =
-  process.env.NEXT_PUBLIC_GRAPH_AGENT_URL || 'http://localhost:8002/solve_v2'
+  process.env.NEXT_PUBLIC_GRAPH_AGENT_URL || '/api/graph/solve'
+
+// Feature flag: the Graph toggle only renders when this is "true". Lets us
+// ship the UI to environments that haven't deployed KnowledgeSearchBackend yet
+// without users hitting a network error the moment they flip the toggle.
+const GRAPH_ENABLED = process.env.NEXT_PUBLIC_GRAPH_ENABLED === 'true'
 
 // Resizable-panel constraints.
 const GRAPH_PANEL_MIN_PX = 320
@@ -431,7 +439,16 @@ export default function ChatPage() {
           }),
         })
         if (!resp.ok || !resp.body) {
-          throw new Error(`Graph agent error: ${resp.status} ${resp.statusText}`)
+          // Proxy returns structured { error: { code, message } } on non-2xx.
+          // Surface the message to the user instead of a bare status string.
+          let detail = `${resp.status} ${resp.statusText}`
+          try {
+            const data = await resp.json()
+            if (data?.error?.message) detail = data.error.message
+          } catch {
+            // body wasn't JSON — keep the status fallback
+          }
+          throw new Error(`Graph agent error: ${detail}`)
         }
 
         const reader = resp.body.getReader()
@@ -926,29 +943,34 @@ export default function ChatPage() {
               <span className="text-gray-700">Web</span>
             </label>
 
-            {/* Graph-mode Toggle — shows the planner+searcher graph live on the right. */}
-            <label
-              className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg cursor-pointer transition-colors ${
-                graphMode
-                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                  : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-              }`}
-              title="Show how the agent thinks: live graph of sub-questions, searches, and synthesis."
-            >
-              <input
-                type="checkbox"
-                checked={graphMode}
-                onChange={(e) => setGraphMode(e.target.checked)}
-                className="rounded text-indigo-600 focus:ring-indigo-500"
-              />
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <circle cx="6" cy="6" r="2" strokeWidth={2} />
-                <circle cx="18" cy="6" r="2" strokeWidth={2} />
-                <circle cx="12" cy="18" r="2" strokeWidth={2} />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.5 7.5l3.5 9M16.5 7.5l-3.5 9" />
-              </svg>
-              <span>Graph</span>
-            </label>
+            {/* Graph-mode Toggle — shows the planner+searcher graph live on the right.
+                Hidden unless NEXT_PUBLIC_GRAPH_ENABLED=true at build time, so
+                environments without KnowledgeSearchBackend deployed don't show
+                a toggle that always fails. */}
+            {GRAPH_ENABLED && (
+              <label
+                className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg cursor-pointer transition-colors ${
+                  graphMode
+                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                }`}
+                title="Show how the agent thinks: live graph of sub-questions, searches, and synthesis."
+              >
+                <input
+                  type="checkbox"
+                  checked={graphMode}
+                  onChange={(e) => setGraphMode(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
+                />
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <circle cx="6" cy="6" r="2" strokeWidth={2} />
+                  <circle cx="18" cy="6" r="2" strokeWidth={2} />
+                  <circle cx="12" cy="18" r="2" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.5 7.5l3.5 9M16.5 7.5l-3.5 9" />
+                </svg>
+                <span>Graph</span>
+              </label>
+            )}
           </div>
         </header>
 

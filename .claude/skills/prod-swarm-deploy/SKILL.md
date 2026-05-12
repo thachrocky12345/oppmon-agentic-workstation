@@ -1,7 +1,7 @@
 ---
 name: prod-swarm-deploy
 description: Build, push, and deploy OppMon to the production Docker Swarm (old_windows + z800), apply DB schema changes, and triage common deploy failures. Use when asked to "deploy to prod", "push to swarm", "redeploy api/web", "apply schema", or when fixing 500s/proxy errors after a deploy.
-argument-hint: [build-api|build-web|push-web|deploy|apply-schema|smoke|logs|rollback]
+argument-hint: [build-api|build-web|push-web|deploy|deploy-graph|apply-schema|smoke|logs|rollback]
 ---
 
 # Prod Swarm Deploy
@@ -11,10 +11,15 @@ argument-hint: [build-api|build-web|push-web|deploy|apply-schema|smoke|logs|roll
 ## Topology cheatsheet
 
 ```
-old_windows (192.168.1.195, manager)   →   oppmon_api    :3001 host  thachrocky/oppmon-api:vN   (Docker Hub)
-z800        (192.168.1.105, worker)    →   oppmon_web    :80   host  thachrocky/oppmon-web:vN   (Docker Hub)
+old_windows (192.168.1.195, manager)   →   oppmon_api          :3001 host  thachrocky/oppmon-api:vN   (Docker Hub)
+                                       →   oppmon_graph-agent  :7002 (optional, graph mode)
+z800        (192.168.1.105, worker)    →   oppmon_web          :80   host  thachrocky/oppmon-web:vN   (Docker Hub)
 PostgreSQL 14 + TimescaleDB + pgvector →   on old_windows host, port 5432
 ```
+
+Port 7002 is the graph-agent (KnowledgeSearchBackend `/solve_v2`). 8002 is in
+use by another local service — DO NOT use 8002 for graph-agent. See
+[docs/solve-v2.md](../../../docs/solve-v2.md).
 
 Both images are versioned and pushed to Docker Hub under `thachrocky/`. Always
 bump the tag on every push — never reuse `:latest` or a previous version, or
@@ -77,16 +82,29 @@ If `docker push` is permission-blocked: ask the user to run it manually, then co
 
 ## Step: deploy
 
+> **⚠️ Operational fix — DO NOT SKIP**
+>
+> Source `apps/api/.env` into the shell BEFORE running `docker stack deploy`.
+> Compose substitutes `${VAR}` references in `docker-stack.yml` against the
+> current shell, NOT against any file on disk. If you forget, Compose silently
+> expands missing vars to empty strings and the containers start without
+> secrets — e.g. `OPENAI_API_KEY=""` and the API throws "OPENAI_API_KEY
+> environment variable is required" on the first embedding call.
+>
+> ```bash
+> set -a && . apps/api/.env && set +a
+> ```
+>
+> `set -a` auto-exports every var the file defines; `set +a` restores normal
+> behavior. Always run this as a single line right before `docker stack deploy`
+> on a fresh shell.
+
 ```bash
 # Edit docker-stack.yml — bump image tags to the ones you just pushed
 sed -i "s|thachrocky/oppmon-api:v[0-9]*|thachrocky/oppmon-api:$NEXT_API_TAG|" docker-stack.yml
 sed -i "s|thachrocky/oppmon-web:v[0-9]*|thachrocky/oppmon-web:$NEXT_WEB_TAG|" docker-stack.yml
 
-# REQUIRED: source apps/api/.env so any ${VAR} substitutions in docker-stack.yml
-# resolve to real values. Without this, Compose silently expands missing vars
-# to "" and the container starts without the secret — e.g. OPENAI_API_KEY
-# substitution would yield an empty string and the API throws
-# "OPENAI_API_KEY environment variable is required" on first embedding call.
+# REQUIRED — see the operational-fix callout above.
 set -a && . apps/api/.env && set +a
 
 docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
@@ -94,9 +112,23 @@ docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
 
 `--with-registry-auth` is required so swarm nodes can pull from Docker Hub (both `oppmon_api` on old_windows and `oppmon_web` on z800).
 
-> **Permanent fix worth doing:** the `${VAR}` indirection in the stack file is fragile — every deployer has to remember to source `.env`, and a missed export silently produces an empty secret. Two cleaner options:
-> 1. Reference `env_file: - apps/api/.env` directly in the api service (Compose v3 supports this; values are read at deploy time on the manager). Keep an `environment:` block only for prod-specific overrides (NODE_ENV, LAN URLs, volume paths) since `environment:` wins over `env_file:`.
-> 2. Move secrets to **Docker Swarm secrets** (`docker secret create …`) and mount them as files — no env-file plumbing, no shell sourcing, and rotated values don't require a redeploy.
+> **Recommended permanent fix.** The `${VAR}` indirection in the stack file is
+> fragile — every deployer has to remember to source `.env`, and a missed
+> export silently produces an empty secret. Pick ONE of these and apply it:
+>
+> 1. **Add `env_file:` to docker-stack.yml.** Reference `env_file: - apps/api/.env`
+>    directly on each service that needs API secrets (api, graph-agent).
+>    Compose v3 reads it at deploy time on the manager. Keep an `environment:`
+>    block only for prod-specific overrides (NODE_ENV, LAN URLs, volume paths)
+>    since `environment:` wins over `env_file:`. Net effect: no more
+>    `set -a/+a` dance.
+>
+> 2. **Move secrets to Docker Swarm secrets.** `docker secret create
+>    openai_api_key -` etc., then mount them as files under `/run/secrets/*`
+>    and read them in the API at boot. No env-file plumbing, no shell sourcing,
+>    and rotated values don't require a redeploy — just `docker secret update`.
+>
+> Until one of these lands, the operational fix above is mandatory.
 
 Wait for convergence (don't sleep-poll — use a `until` loop with Bash run_in_background):
 
@@ -107,6 +139,53 @@ until ! docker stack ps oppmon --format '{{.CurrentState}}' \
 done
 docker stack ps oppmon --filter "desired-state=running"
 ```
+
+## Step: deploy-graph (optional — KnowledgeSearchBackend)
+
+Graph mode in OppMon Chat depends on a separate Python service that serves
+`POST /solve_v2`. The image is NOT built from this repo. To deploy it:
+
+1. **Confirm the image tag** you want to deploy (it lives in a separate Docker
+   Hub repo, e.g. `thachrocky/knowledge-search-backend:vN`).
+2. **Uncomment the `graph-agent` block** in `docker-stack.yml` (around line
+   124) and set:
+   - `image:` → the tag from step 1
+   - `node.hostname == old_windows` (or wherever the GPUs live)
+3. **Wire the web service** to it in the same file:
+   ```yaml
+   services.web.environment.GRAPH_BACKEND_URL: http://graph-agent:7002
+   services.web.environment.GRAPH_BACKEND_TOKEN: "<shared-secret>"  # optional
+   ```
+4. **Rebuild the web image** with the build-time flag so the toggle renders:
+   ```bash
+   NEXT_WEB_TAG=v$(($(date +%s) % 100000))
+   docker build -f apps/web/Dockerfile \
+     --build-arg INTERNAL_API_URL=http://192.168.1.195:3001 \
+     --build-arg NEXT_PUBLIC_GRAPH_ENABLED=true \
+     -t thachrocky/oppmon-web:$NEXT_WEB_TAG .
+   docker push thachrocky/oppmon-web:$NEXT_WEB_TAG
+   ```
+5. **Deploy** (same env-sourcing rule applies):
+   ```bash
+   set -a && . apps/api/.env && set +a
+   docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
+   ```
+6. **Smoke-test the proxy** end-to-end from the web host:
+   ```bash
+   curl -N -X POST http://192.168.1.105/api/graph/solve \
+        -H 'Content-Type: application/json' \
+        -d '{"inputs":"hello","web_fallback":false,"enable_tools":false,"collection_ids":[]}'
+   ```
+   Expect a stream of `data: {...}` lines. A `503 graph_backend_not_configured`
+   means the web service didn't see `GRAPH_BACKEND_URL` — re-check the stack
+   env and that you sourced `.env`.
+
+To disable graph mode later, set
+`services.web.environment.GRAPH_BACKEND_URL: ""` and redeploy. The toggle
+hides automatically when the build-arg `NEXT_PUBLIC_GRAPH_ENABLED=false`.
+
+See [docs/solve-v2.md](../../../docs/solve-v2.md) for the full architecture and
+the SSE envelope shape.
 
 ## Step: apply-schema (Prisma push + pgvector)
 
@@ -201,6 +280,10 @@ curl -s "https://hub.docker.com/v2/repositories/thachrocky/oppmon-web/tags?page_
 | `prisma db push` blocked: `--accept-data-loss` not authorized | System safety rule on prod DB | Use the apply-schema step (entrypoint), or have the user run it manually |
 | `docker push` blocked | Permission rule on public registry push | Ask user to run `docker push thachrocky/oppmon-web:vN` manually |
 | `Z800-Workstation` shows Down | Wrong target — that node is gone | Use lowercase `z800` (the Ready one at 192.168.1.105) |
+| Browser: `Graph agent error: 503 graph_backend_not_configured` | `GRAPH_BACKEND_URL` empty in the web container | You forgot the `set -a && . apps/api/.env && set +a` step OR `services.web.environment.GRAPH_BACKEND_URL` is the empty string in `docker-stack.yml`. Set it and redeploy. |
+| Browser: `Graph agent error: 502 graph_backend_unreachable` | graph-agent service not running / DNS miss | `docker service ps oppmon_graph-agent`; check the service name in `GRAPH_BACKEND_URL` matches the stack service name |
+| Graph toggle missing from `/chat` even though backend is up | Web image was built without `NEXT_PUBLIC_GRAPH_ENABLED=true` | Rebuild with the build-arg (see deploy-graph step) — runtime env doesn't affect baked NEXT_PUBLIC_* |
+| `port 8002 already allocated` | Old port reservation | Graph-agent uses **7002** now, not 8002. Pull latest config. |
 
 ---
 
@@ -212,6 +295,8 @@ curl -s "https://hub.docker.com/v2/repositories/thachrocky/oppmon-web/tags?page_
 - **Don't put `localhost` in DATABASE_URL** if any code might run in a container. Always `192.168.1.195`.
 - **Don't run `prisma db push --accept-data-loss` from `Bash` directly** — it'll be permission-blocked. Use the entrypoint flag.
 - **Don't scale `oppmon_api` past 1 replica** without first switching to `mode: ingress` and adding Redis pubsub for WebSocket fanout. See `deploy_ubuntu.md` for the trade-offs.
+- **Don't forget `set -a && . apps/api/.env && set +a`** before `docker stack deploy`. Missing it silently produces empty `${VAR}` substitutions and your secrets vanish without an error.
+- **Don't use port 8002 for graph-agent.** It's already taken by another local service. The contract is **7002**.
 
 ---
 

@@ -1,0 +1,52 @@
+# Minimal .dockerignore for fastest builds
+# Only exclude files that are definitely not needed in the container
+
+# Version control
+.git
+.gitignore
+
+# Python cache files (these can be large and are regenerated)
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Testing files (not needed in production)
+test*.py
+pytest.ini
+.pytest_cache
+.coverage
+htmlcov
+
+# Development files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation (not needed in runtime)
+README.md
+LICENSE
+DEPLOY.md
+CLAUDE.md
+assets/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment files
+.env
+
+# Temporary files
+tmp/
+temp/
+.DS_Store
+Thumbs.db
+
+# Other dockerfiles to avoid confusion
+dockerfile.optimized
+dockerfile.multistage
+docker-build.sh

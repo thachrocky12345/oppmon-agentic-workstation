@@ -22,6 +22,7 @@ End-to-end sequence diagrams covering single user actions that touch multiple do
 | [cross-domain/chat-message-end-to-end.md](cross-domain/chat-message-end-to-end.md) | POST /api/llm/chat → llm_sessions → llm_messages → usage_events → events → audit_log_v2 → event_outbox → outbox-publisher | 2026-05-10 |
 | [cross-domain/incident-creation.md](cross-domain/incident-creation.md) | Agent → incidents → audit_log_v2 → event_outbox → notifications fanout to all tenant admins | 2026-05-10 |
 | [cross-domain/tenant-deletion.md](cross-domain/tenant-deletion.md) | Admin DELETE /admin/tenants/:id → BEFORE DELETE trigger → tenant_archives + tenant_deletion_audit → ON DELETE CASCADE | 2026-05-10 |
+| [../solve-v2.md](../solve-v2.md) | Graph-mode chat: web → KnowledgeSearchBackend `/solve_v2` (SSE) → live planner+searcher DAG → final synthesis | 2026-05-12 |
 
 ## Flow Types
 

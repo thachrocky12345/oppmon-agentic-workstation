@@ -1,0 +1,61 @@
+**/node_modules
+**/dist
+**/.git
+**/.gitignore
+**/.vscode
+**/README.md
+**/LICENSE
+**/.env
+**/npm-debug.log
+**/yarn-debug.log
+**/yarn-error.log
+**/.pnpm-debug.log
+
+# Python cache and build artifacts
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/build
+**/develop-eggs
+**/dist
+**/downloads
+**/eggs
+**/.eggs
+**/lib
+**/lib64
+**/parts
+**/sdist
+**/var
+**/wheels
+**/*.egg-info
+**/.installed.cfg
+**/*.egg
+
+# Testing
+**/test*.py
+**/pytest.ini
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+
+# IDE and editor files
+**/.idea
+**/*.swp
+**/*.swo
+**/Thumbs.db
+**/.DS_Store
+
+# Docker files (exclude other dockerfiles to avoid confusion)
+**/dockerfile.optimized
+**/docker-compose.yaml
+
+# Documentation and assets that don't affect runtime
+**/assets
+**/DEPLOY.md
+**/CLAUDE.md
+
+# Temporary files
+**/tmp
+**/temp

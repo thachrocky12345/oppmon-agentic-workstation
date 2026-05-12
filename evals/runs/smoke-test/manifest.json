@@ -4,7 +4,7 @@
   "finished_at": "2026-05-11T20:55:31.607Z",
   "endpoints": {
     "simple": "http://localhost:3001/api/rag/chat/stream",
-    "graph": "http://localhost:8002/solve_v2"
+    "graph": "http://192.168.1.195:8002/solve_v2"
   },
   "modes": [
     "graph"

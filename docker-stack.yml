@@ -93,6 +93,15 @@ services:
       # non-matching default and rejects every JWT (see deploy-retro-2026-05-07.md
       # item C). Keep parity with `services.api.environment.JWT_SECRET`.
       JWT_SECRET: development-secret-key-change-in-production
+      # ----- Graph mode (optional) -----
+      # When the graph-agent service is deployed in this stack, point at it by
+      # service name (Swarm overlay DNS). Leave empty to keep the proxy
+      # returning 503 and the toggle hidden.
+      GRAPH_BACKEND_URL: ""
+      GRAPH_BACKEND_TOKEN: ""
+      # NOTE: NEXT_PUBLIC_GRAPH_ENABLED is build-time only — it must be passed
+      # via --build-arg when building thachrocky/oppmon-web. Setting it here
+      # has no effect on the already-built image.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
       interval: 30s
@@ -110,6 +119,38 @@ services:
       update_config:
         order: start-first
         failure_action: rollback
+
+  # ===========================================================================
+  # Graph-mode agent - KnowledgeSearchBackend (commented out by default)
+  # ===========================================================================
+  # Uncomment + set GRAPH_AGENT_IMAGE to enable. After deploying, also set
+  # services.web.environment.GRAPH_BACKEND_URL to http://graph-agent:7002 and
+  # rebuild the web image with --build-arg NEXT_PUBLIC_GRAPH_ENABLED=true.
+  # See docs/solve-v2.md for the full rollout checklist.
+  #
+  # graph-agent:
+  #   image: thachrocky/knowledge-search-backend:vX        # set tag
+  #   networks:
+  #     - oppmon-net
+  #   environment:
+  #     PORT: 7002
+  #     GRAPH_BACKEND_TOKEN: ""                            # shared secret, optional
+  #     OPENAI_API_KEY: ""
+  #     ANTHROPIC_API_KEY: ""
+  #   healthcheck:
+  #     test: ["CMD", "wget", "-qO-", "http://localhost:7002/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
+  #   deploy:
+  #     replicas: 1
+  #     placement:
+  #       constraints:
+  #         - node.hostname == old_windows  # or wherever the GPUs live
+  #     restart_policy:
+  #       condition: any
+  #       delay: 5s
 
 networks:
   oppmon-net:

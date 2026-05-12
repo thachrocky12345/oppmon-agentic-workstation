@@ -41,7 +41,7 @@ function parseArgs(argv: string[]): CliArgs {
     enableTools: false,
     collectionIds: [],
     simpleUrl: envOr('ARKON_SIMPLE_URL', 'http://localhost:3001/api/rag/chat/stream'),
-    graphUrl: envOr('ARKON_GRAPH_URL', 'http://localhost:8002/solve_v2'),
+    graphUrl: envOr('ARKON_GRAPH_URL', 'http://192.168.1.195:8002/solve_v2'),
     timeoutMs: parseInt(envOr('EVAL_TIMEOUT_MS', '180000'), 10),
     notes: '',
   };
