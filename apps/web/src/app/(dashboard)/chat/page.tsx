@@ -433,7 +433,12 @@ export default function ChatPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             inputs: messageText,
-            web_fallback: enableWebFallback,
+            // Graph mode has no RAG corpus behind it — without web fallback,
+            // every searcher node returns "no grounding". Force web on when
+            // the user hasn't explicitly enabled it AND no collections are
+            // selected. If they did pick collections, respect their choice.
+            web_fallback:
+              enableWebFallback || selectedCollections.length === 0,
             enable_tools: enableTools,
             collection_ids: selectedCollections.length > 0 ? selectedCollections : [],
           }),

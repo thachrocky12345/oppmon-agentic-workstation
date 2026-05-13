@@ -41,8 +41,14 @@ COPY . .
 # next.config.ts rewrites during `next build`, not at runtime.
 ARG NEXT_PUBLIC_API_URL=
 ARG INTERNAL_API_URL=http://192.168.1.195:3001
+# NEXT_PUBLIC_GRAPH_ENABLED is baked into the client bundle at build time —
+# the Graph toggle in /chat reads it from process.env at compile, so a
+# runtime env in the stack file does nothing. Default off; flip to "true"
+# when building images that should expose graph mode.
+ARG NEXT_PUBLIC_GRAPH_ENABLED=false
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV INTERNAL_API_URL=$INTERNAL_API_URL
+ENV NEXT_PUBLIC_GRAPH_ENABLED=$NEXT_PUBLIC_GRAPH_ENABLED
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN pnpm --filter @oppmon/web build

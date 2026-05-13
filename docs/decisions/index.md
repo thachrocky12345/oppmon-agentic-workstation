@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-**Last Updated:** 2026-05-11 (init sync — no new ADRs; deps unchanged since 2026-05-07)
+**Last Updated:** 2026-05-12 (init sync — added ADR-0011 for FastAPI KnowledgeSearchBackend)
 
 This directory contains Architecture Decision Records (ADRs) for the OppMon (Arkon) project.
 
@@ -33,6 +33,7 @@ An Architecture Decision Record captures an important architectural decision mad
 | [0008](ADR-0008-agent-engine-subsystem.md) | [AUTO] Agent Engine Subsystem with Oracle Loop and Semantic Cache | Accepted | 2026-05-07 |
 | [0009](ADR-0009-guardrails-and-observability.md) | [AUTO] Guardrails and Observability Packages | Accepted | 2026-05-07 |
 | [0010](ADR-0010-document-ingestion-pipeline.md) | [AUTO] Document Ingestion Pipeline (PDF / DOCX / Multipart) | Accepted | 2026-05-07 |
+| [0011](ADR-0011-fastapi-knowledgesearch-backend.md) | [AUTO] FastAPI Python KnowledgeSearchBackend for Graph-Mode Chat | Accepted | 2026-05-12 |
 
 ## Status Definitions
 

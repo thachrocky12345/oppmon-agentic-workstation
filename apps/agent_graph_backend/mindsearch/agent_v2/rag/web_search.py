@@ -20,6 +20,7 @@ from .citation import SearchHit
 
 _BLOCKLIST = ("youtube.com", "bilibili.com", "researchgate.net")
 _BASE_URL = "https://www.googleapis.com/customsearch/v1"
+_TAVILY_URL = "https://api.tavily.com/search"
 
 log = logging.getLogger(__name__)
 
@@ -99,6 +100,81 @@ class GoogleWebSearch:
         return hits
 
 
+class TavilyWebSearch:
+    """Web search via Tavily (https://tavily.com).
+
+    Tavily is an LLM-optimized search API: a single POST returns deduped,
+    snippet-trimmed results with relevance scores. Used as the primary
+    web search provider now that Google PSE is phasing out whole-web mode.
+    """
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        timeout: float = 8.0,
+        search_depth: str = "basic",
+        blocklist: tuple[str, ...] = _BLOCKLIST,
+    ):
+        if not api_key:
+            raise RuntimeError(
+                "TavilyWebSearch requires api_key. Set TAVILY_API_KEY."
+            )
+        self._api_key = api_key
+        self._timeout = timeout
+        self._search_depth = search_depth
+        self._blocklist = blocklist
+
+    async def search(self, query: str, *, topk: int = 3) -> list[SearchHit]:
+        try:
+            import httpx  # type: ignore
+        except ImportError as e:
+            raise RuntimeError(
+                "httpx not installed. Run: pip install 'httpx>=0.27'"
+            ) from e
+
+        payload = {
+            "api_key": self._api_key,
+            "query": query.strip("'\""),
+            "search_depth": self._search_depth,
+            "max_results": min(20, max(topk * 2, 5)),
+            "include_answer": False,
+            "include_raw_content": False,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await asyncio.wait_for(
+                    client.post(_TAVILY_URL, json=payload), timeout=self._timeout
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except asyncio.TimeoutError:
+            log.warning("TavilyWebSearch timeout after %ss for query=%r", self._timeout, query)
+            return []
+        except Exception as e:  # noqa: BLE001
+            log.warning("TavilyWebSearch error for query=%r: %s", query, e)
+            return []
+
+        results = data.get("results") or []
+        hits: list[SearchHit] = []
+        for r in results:
+            url = r.get("url", "") or ""
+            if not url or any(b in url for b in self._blocklist) or url.endswith(".pdf"):
+                continue
+            hits.append(
+                SearchHit(
+                    source="web",
+                    title=r.get("title", "") or "",
+                    snippet=r.get("content", "") or "",
+                    url=url,
+                    score=float(r.get("score", 1.0) or 1.0),
+                )
+            )
+            if len(hits) >= topk:
+                break
+        return hits
+
+
 class DuckDuckGoWebSearch:
     """No-API-key web search via duckduckgo-search / ddgs.
 
@@ -158,6 +234,48 @@ class DuckDuckGoWebSearch:
             return []
 
 
+class ChainedWebSearch:
+    """Try providers in order, falling back when one returns no hits or errors.
+
+    Tavily is rate-limit-friendly and reliable but has a monthly quota.
+    DDG is free but Bing throttles container egress on finance-y queries.
+    Chaining `[Tavily, DDG]` gives us Tavily's reliability with DDG as a
+    free overflow when Tavily is unavailable.
+    """
+
+    def __init__(self, providers: list["WebSearch"]):
+        if not providers:
+            raise RuntimeError("ChainedWebSearch needs at least one provider.")
+        self._providers = providers
+
+    async def search(self, query: str, *, topk: int = 3) -> list[SearchHit]:
+        last_err: Exception | None = None
+        for idx, p in enumerate(self._providers):
+            try:
+                hits = await p.search(query, topk=topk)
+            except Exception as e:  # noqa: BLE001
+                last_err = e
+                log.warning(
+                    "ChainedWebSearch[%d] %s raised %s — trying next",
+                    idx, p.__class__.__name__, e,
+                )
+                continue
+            if hits:
+                if idx > 0:
+                    log.info(
+                        "ChainedWebSearch[%d] %s served %d hit(s) (earlier providers empty)",
+                        idx, p.__class__.__name__, len(hits),
+                    )
+                return hits
+            log.info(
+                "ChainedWebSearch[%d] %s returned 0 hits — trying next",
+                idx, p.__class__.__name__,
+            )
+        if last_err is not None:
+            log.warning("ChainedWebSearch exhausted; last error: %s", last_err)
+        return []
+
+
 class StubWebSearch:
     """Deterministic stub for tests.
 
@@ -200,4 +318,11 @@ class StubWebSearch:
         ]
 
 
-__all__ = ["GoogleWebSearch", "StubWebSearch", "WebSearch"]
+__all__ = [
+    "ChainedWebSearch",
+    "DuckDuckGoWebSearch",
+    "GoogleWebSearch",
+    "StubWebSearch",
+    "TavilyWebSearch",
+    "WebSearch",
+]

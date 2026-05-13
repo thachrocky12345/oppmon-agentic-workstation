@@ -42,8 +42,12 @@ class Settings(BaseSettings):
     llm_top_p: float = 0.9
 
     # ---- Web search ----
-    # Provider: 'google' | 'duckduckgo' | '' (auto: prefer google if keys set, else ddg)
+    # Provider: 'tavily' | 'google' | 'duckduckgo' | '' (auto: prefer tavily if
+    # key set, else google if keys set, else ddg)
     web_search_provider: str = ""
+    tavily_api_key: str = ""
+    tavily_search_timeout: float = 8.0
+    tavily_search_depth: str = "basic"  # 'basic' | 'advanced'
     google_search_api_key: str = ""
     google_search_engine_id: str = ""
     google_search_timeout: float = 5.0

@@ -1,6 +1,6 @@
 # OppMon (Arkon) Architecture
 
-**Last Updated:** 2026-05-11 (init sync)
+**Last Updated:** 2026-05-12 (init sync)
 
 ## Important: Repository Structure
 
@@ -11,6 +11,8 @@ This is a **pnpm + Turborepo monorepo** with the following structure:
 | `apps/api/` | **ACTIVE** | Express API server (@oppmon/api) |
 | `apps/router/` | **ACTIVE** | LiteLLM proxy router (@oppmon/router) |
 | `apps/web/` | **ACTIVE** | Next.js frontend (@oppmon/web) |
+| `apps/KnowledgeSearchBackend/` | **ACTIVE** | Python FastAPI mindsearch v2 (graph-mode chat, `/solve_v2`) |
+| `evals/` | **ACTIVE** | Regression eval harness (@oppmon/evals) |
 | `packages/database/` | **ACTIVE** | Prisma schema and client (@oppmon/database) |
 | `packages/shared/` | **ACTIVE** | Shared TypeScript types (@oppmon/shared) |
 | `packages/cli/` | **ACTIVE** | CLI tool for AI Gateway management (@oppmon/cli) |
@@ -53,14 +55,26 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **Real-time**: WebSocket (ws), Web Push
 - **Security**: Helmet, CORS, compression
 
+### Graph-Mode Backend (`apps/KnowledgeSearchBackend/`)
+- **Runtime**: Python 3.x
+- **Framework**: FastAPI 0.115 + Uvicorn (ASGI)
+- **Streaming**: SSE via sse-starlette
+- **LLM**: Anthropic + OpenAI SDKs (lazy-imported)
+- **Web Search**: DuckDuckGo (ddgs 9.0)
+- **HTTP Client**: httpx 0.28 (for Google Custom Search)
+- **Endpoint**: `POST /solve_v2` — planner→searcher DAG with synthesis
+- **Port**: 8002 (graph profile in docker-compose)
+- **Wire contract**: `docs/solve-v2.md`
+
 ### Rust Engine (`packages/engine-core/`)
 - **Common**: Envelope<T>, Error types, SHA-256 hashing
 - **NAPI**: Node.js bindings (planned)
 
 ### Infrastructure
-- **Monorepo**: pnpm + Turborepo
-- **Containerization**: Docker, Docker Compose
+- **Monorepo**: pnpm + Turborepo (workspaces: apps/*, packages/*, evals)
+- **Containerization**: Docker, Docker Compose (profiles: dev, prod, full, graph)
 - **Database**: TimescaleDB (PostgreSQL extension)
+- **Production**: Docker Swarm (`docker-stack.yml`, v2.x image tag convention)
 - **CI/CD**: GitHub Actions
 
 ## System Layers
@@ -76,19 +90,20 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 │                    Frontend (Next.js)                       │
 │  - Server Components     - React Flow diagrams             │
 │  - Client Components     - Real-time updates               │
-│  - API Routes            - Dashboard & Analytics           │
+│  - API Routes            - /api/graph/solve proxy          │
+│  - Dashboard & Analytics - AgentGraphPanel                 │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Backend API (Express)                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │ Middleware  │  │  Services   │  │  WebSocket  │         │
-│  │ - OAuth     │  │  - Agents   │  │  - Events   │         │
-│  │ - JWT       │  │  - Workflows│  │  - Alerts   │         │
-│  │ - Validate  │  │  - Analytics│  │             │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
+              │                              │
+              ▼                              ▼
+┌──────────────────────────────┐ ┌──────────────────────────────┐
+│   Backend API (Express)      │ │  KnowledgeSearchBackend      │
+│  ┌──────────┐ ┌──────────┐   │ │  (Python FastAPI v2)         │
+│  │ Middleware│ │ Services │   │ │  - /solve_v2 (SSE)           │
+│  │ - OAuth   │ │ - Agents │   │ │  - planner + searcher DAG   │
+│  │ - JWT     │ │ - LLM    │   │ │  - hybrid search + ddgs     │
+│  │ - Tenant  │ │ - RAG    │   │ │  - anthropic/openai LLM     │
+│  └──────────┘ └──────────┘   │ │  - guardrails (constitution)│
+└──────────────────────────────┘ └──────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -98,6 +113,7 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 │  │  - Tenants, Teams     │  │  - Events (time-series)    │ │
 │  │  - Users, Agents      │  │  - Metrics                 │ │
 │  │  - Workflows          │  │  - Audit Logs              │ │
+│  │  - pgvector embeds    │  │                            │ │
 │  └───────────────────────┘  └────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -145,6 +161,20 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **@arkon/skill-framework**: YAML frontmatter skill registry and workflow runner
 - **@arkon/integration-tests**: Cross-package smoke + integration tests
 - **engine-core**: Rust workspace for high-performance utilities
+
+### Graph-Mode Modules (Python — apps/KnowledgeSearchBackend/mindsearch/agent_v2/)
+- **Orchestrator**: planner + searcher loop, graph state, SSE streaming
+- **LLM**: anthropic + openai clients with a factory + fake client for tests
+- **RAG**: hybrid_search, retriever, web_search (DuckDuckGo), citation
+- **Memory**: conversational history + tool log
+- **Tools**: planner_tools, searcher_tools, registry
+- **Guardrails**: constitution checks
+
+### Evaluation Harness (evals/)
+- **Questions**: `evals/questions.json` (10 baseline questions Q01–Q10)
+- **References**: ChatGPT and Claude reference answers
+- **Scripts**: `run.ts` (execute), `judge.ts` (LLM-as-judge), `report.ts` (aggregate scores)
+- **Runs**: Recorded under `evals/runs/<name>/` with manifest + scores
 
 ## Multi-Tenancy Model
 
@@ -209,7 +239,7 @@ See [Admin User Guide](admin-user-guide.md) for admin features and [Runbooks](ru
 - [x] Multi-tenancy isolation approach — **Resolved: Tenant/Team/User model with Prisma**
 - [x] Admin action framework — **Resolved: Decorator-based actions with audit logging**
 - [x] Deployment procedures — **Resolved: Runbooks created**
+- [x] Parallel backend consideration — **Resolved 2026-05-12: FastAPI Python service (KnowledgeSearchBackend) for graph-mode chat. See ADR-0011.**
 - [ ] Redis caching strategy for high-volume events
 - [ ] Message queue for async processing (considering BullMQ)
 - [ ] Rate limiting strategy per tenant
-- [ ] Parallel backend consideration (FastAPI Python or Rust+Go) — deferred

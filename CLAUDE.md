@@ -14,6 +14,7 @@ This directory contains the original monorepo code and is **FOR REFERENCE ONLY**
 - `apps/api/` — Express API server (@oppmon/api)
 - `apps/web/` — Next.js frontend (@oppmon/web)
 - `apps/router/` — LiteLLM proxy router (@oppmon/router)
+- `apps/KnowledgeSearchBackend/` — Python FastAPI mindsearch v2 service (graph-mode chat, `/solve_v2`)
 - `packages/cli/` — CLI tool for AI Gateway management (@oppmon/cli)
 - `packages/create-oppmon/` — npm scaffold (`create-oppmon` bin)
 - `packages/database/` — Prisma schema and client (@oppmon/database)
@@ -24,6 +25,7 @@ This directory contains the original monorepo code and is **FOR REFERENCE ONLY**
 - `packages/skill-framework/` — Skill definition framework (@arkon/skill-framework)
 - `packages/integration-tests/` — Cross-package integration tests (@arkon/integration-tests)
 - `packages/engine-core/` — Rust high-performance utilities
+- `evals/` — Regression evaluation harness (@oppmon/evals — Arkon chat simple + graph)
 
 ---
 
@@ -90,7 +92,7 @@ Whenever `/init` is run:
 ## Known Dependencies
 <!-- Claude auto-updates this section on every /init — do not edit manually -->
 
-**Last synced:** 2026-05-11 (init sync)
+**Last synced:** 2026-05-12 (init sync)
 
 ### Reference Only (arkon-reference-only/) — DO NOT MODIFY
 | Package | Version | Category |
@@ -222,6 +224,28 @@ Whenever `/init` is run:
 | chokidar | ^3.6.0 | Skill registry file watching |
 | glob | ^10.3.10 | Skill discovery |
 
+### KnowledgeSearchBackend (apps/KnowledgeSearchBackend — Python FastAPI mindsearch v2)
+| Package | Version | Category |
+|---------|---------|----------|
+| fastapi | 0.115.6 | Framework |
+| uvicorn[standard] | 0.32.1 | ASGI Server |
+| sse-starlette | 2.1.3 | SSE Streaming |
+| pydantic | 2.10.4 | Validation |
+| pydantic-settings | 2.7.0 | Config |
+| anthropic | 0.42.0 | LLM |
+| openai | 1.59.6 | LLM |
+| httpx | 0.28.1 | HTTP Client |
+| ddgs | 9.0.0 | Web Search (DuckDuckGo) |
+| python-dotenv | 1.0.1 | Config |
+
+### Evals (evals — @oppmon/evals)
+| Package | Version | Category |
+|---------|---------|----------|
+| @anthropic-ai/sdk | ^0.39.0 | LLM judge |
+| dotenv | ^16.4.5 | Config |
+| tsx | ^4.19.0 | DevTools |
+| typescript | ^5.6.0 | DevTools |
+
 ### Monorepo (root)
 | Package | Version | Category |
 |---------|---------|----------|
@@ -264,9 +288,19 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **Logging:** Pino
 - **Testing:** Vitest + Supertest
 
+### Graph-Mode Backend (apps/KnowledgeSearchBackend/)
+- **Runtime:** Python 3.x
+- **Framework:** FastAPI 0.115 + Uvicorn
+- **Streaming:** SSE via sse-starlette
+- **LLM:** Anthropic + OpenAI SDKs
+- **Web Search:** DuckDuckGo (ddgs)
+- **Port:** 8002 (graph profile)
+- **Endpoint:** `POST /solve_v2` (SSE planner→searcher DAG)
+
 ### Infrastructure
-- **Containers:** Docker, Docker Compose
+- **Containers:** Docker, Docker Compose (profiles: dev, prod, full, graph)
 - **Database:** TimescaleDB (time-series extension for PostgreSQL)
+- **Production:** Docker Swarm (docker-stack.yml, v2.x image tag convention)
 
 ---
 
@@ -304,14 +338,28 @@ arkon-workstation/
 │   │   │   └── proxy.ts        # http-proxy-middleware wiring
 │   │   └── package.json
 │   │
+│   ├── KnowledgeSearchBackend/ # ✅ Python FastAPI mindsearch v2 (graph-mode chat)
+│   │   ├── mindsearch/
+│   │   │   ├── v2_server.py    # Uvicorn entry point (port 8002)
+│   │   │   └── agent_v2/       # app, config, orchestrator, llm, rag, memory, tools, guardrails
+│   │   ├── dockerfile          # ~250 MB v2-only image
+│   │   └── requirements-v2.txt
+│   │
 │   └── web/                    # ✅ Next.js frontend (@oppmon/web)
 │       ├── src/
-│       │   ├── app/            # App Router pages (incl. (dashboard) group)
-│       │   ├── components/     # Reusable components
+│       │   ├── app/            # App Router pages (incl. (dashboard) group + /api/graph/solve proxy)
+│       │   ├── components/     # Reusable components (incl. AgentGraphPanel)
 │       │   ├── schemas/        # Zod schemas
 │       │   ├── lib/            # Utilities, API client
 │       │   └── middleware.ts   # Auth middleware (jose)
 │       └── package.json
+│
+├── evals/                      # ✅ Regression eval harness (@oppmon/evals)
+│   ├── questions.json          # Evaluation question bank
+│   ├── references/             # Reference answers (chatgpt/, claude/)
+│   ├── runs/                   # Recorded eval runs + scores
+│   ├── scripts/                # run.ts, judge.ts, report.ts + lib/
+│   └── package.json
 │
 ├── packages/
 │   ├── cli/                    # ✅ CLI tool (@oppmon/cli)
@@ -518,9 +566,25 @@ arkon-workstation/
 | Security | `app/(dashboard)/security/page.tsx` | ThreatGuard |
 | Infrastructure | `app/(dashboard)/infrastructure/page.tsx` | Infrastructure nodes |
 | Journal | `app/(dashboard)/journal/page.tsx` | Agent journals |
-| Chat | `app/(dashboard)/chat/page.tsx` | RAG Chat interface |
+| Chat | `app/(dashboard)/chat/page.tsx` | RAG Chat interface (simple + graph modes) |
 | Notifications | `app/(dashboard)/notifications/page.tsx` | Notifications |
+| Agent Graph Panel | `components/AgentGraphPanel.tsx` | Live planner+searcher DAG visualization |
+| Graph Solve Proxy | `app/api/graph/solve/route.ts` | Same-origin proxy → KnowledgeSearchBackend `/solve_v2` |
+| Graph Docs Page | `app/docs/features/graph/page.tsx` | In-app docs for graph-mode feature |
 | API Client | `lib/api.ts` | Backend API calls |
+
+### KnowledgeSearchBackend Modules (apps/KnowledgeSearchBackend/mindsearch/)
+| Module | Location | Purpose |
+|--------|----------|---------|
+| Server entry | `v2_server.py` | Uvicorn ASGI entry (port 8002) |
+| FastAPI app | `agent_v2/app.py` | `mount_v2(app)` — exposes `/solve_v2` |
+| Config | `agent_v2/config.py` | Pydantic settings (env-driven) |
+| Orchestrator | `agent_v2/orchestrator/` | planner, searcher, loop, graph, sse |
+| LLM clients | `agent_v2/llm/` | anthropic, openai, fake clients + factory |
+| RAG | `agent_v2/rag/` | hybrid_search, retriever, web_search (ddgs), citation |
+| Memory | `agent_v2/memory/` | conversational, tool_log |
+| Tools | `agent_v2/tools/` | planner_tools, searcher_tools, registry |
+| Guardrails | `agent_v2/guardrails/` | constitution checks |
 
 ### Shared Packages
 | Package | Location | Purpose |
@@ -710,6 +774,7 @@ pnpm lint              # Lint all
 | Frontend | 3002 (dev), 3000 (container) |
 | Backend | 3001 |
 | PostgreSQL | 5433 (host), 5432 (container) |
+| KnowledgeSearchBackend | 8002 (graph profile) |
 
 ### Environment Files
 | File | Purpose |

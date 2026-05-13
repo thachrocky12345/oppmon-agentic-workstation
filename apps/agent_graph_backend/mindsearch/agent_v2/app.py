@@ -25,7 +25,14 @@ from .config import settings as default_settings
 from .guardrails import check_user_input
 from .llm import create_llm_client
 from .orchestrator.planner import PlannerAgent
-from .rag import DuckDuckGoWebSearch, GoogleWebSearch, Retriever, WebSearch
+from .rag import (
+    ChainedWebSearch,
+    DuckDuckGoWebSearch,
+    GoogleWebSearch,
+    Retriever,
+    TavilyWebSearch,
+    WebSearch,
+)
 from .rag.hybrid_search import NullCorpusSearch
 
 
@@ -41,41 +48,86 @@ class SolveV2Request(BaseModel):
     collection_ids: list[str] = Field(default_factory=list)
 
 
+def _try_tavily() -> WebSearch | None:
+    s = default_settings
+    if not s.tavily_api_key:
+        return None
+    try:
+        return TavilyWebSearch(
+            api_key=s.tavily_api_key,
+            timeout=s.tavily_search_timeout,
+            search_depth=s.tavily_search_depth,
+        )
+    except Exception as e:  # noqa: BLE001
+        log.warning("TavilyWebSearch init failed: %s", e)
+        return None
+
+
+def _try_ddg() -> WebSearch | None:
+    s = default_settings
+    try:
+        return DuckDuckGoWebSearch(timeout=s.google_search_timeout)
+    except Exception as e:  # noqa: BLE001
+        log.warning("DuckDuckGoWebSearch init failed: %s", e)
+        return None
+
+
+def _try_google() -> WebSearch | None:
+    s = default_settings
+    if not (s.google_search_api_key and s.google_search_engine_id):
+        return None
+    try:
+        return GoogleWebSearch(
+            api_key=s.google_search_api_key,
+            search_engine_id=s.google_search_engine_id,
+            timeout=s.google_search_timeout,
+        )
+    except Exception as e:  # noqa: BLE001
+        log.warning("GoogleWebSearch init failed: %s", e)
+        return None
+
+
+def _chain(*candidates: WebSearch | None) -> WebSearch | None:
+    """Wrap providers in a ChainedWebSearch so we try them in order at call time."""
+    real = [c for c in candidates if c is not None]
+    if not real:
+        return None
+    if len(real) == 1:
+        return real[0]
+    return ChainedWebSearch(real)
+
+
 def _build_web_search() -> WebSearch | None:
-    """Build a web search client.
+    """Build a web search client with fallback chaining.
 
-    Priority:
-      1. Google Custom Search (if keys set AND not flagged as broken).
-      2. DuckDuckGo (no key needed) — fallback so local dev works out of the box.
-      3. None — caller must handle gracefully.
+    Auto (WEB_SEARCH_PROVIDER unset or empty):
+      Chain = [Tavily (if key), Google (if keys), DuckDuckGo]
+      Tavily is tried first per request; if it returns no hits OR raises,
+      we fall through to Google, then DDG. This gives reliability under
+      Tavily quota exhaustion or upstream errors.
 
-    Set `WEB_SEARCH_PROVIDER=duckduckgo` to skip Google explicitly even when
-    keys are present (useful when the Google key is rate-limited).
+    Explicit overrides:
+      WEB_SEARCH_PROVIDER=tavily      -> [Tavily, DDG]    (DDG safety net)
+      WEB_SEARCH_PROVIDER=google      -> [Google, DDG]
+      WEB_SEARCH_PROVIDER=duckduckgo  -> [DDG]            (DDG only)
+
+    Returns None if no provider can be built (caller must handle gracefully).
     """
     s = default_settings
     provider = (s.web_search_provider or "").lower()
 
     if provider == "duckduckgo":
-        return DuckDuckGoWebSearch(timeout=s.google_search_timeout)
+        return _try_ddg()
 
-    if provider == "google" or (
-        provider == "" and s.google_search_api_key and s.google_search_engine_id
-    ):
-        try:
-            return GoogleWebSearch(
-                api_key=s.google_search_api_key,
-                search_engine_id=s.google_search_engine_id,
-                timeout=s.google_search_timeout,
-            )
-        except Exception as e:  # noqa: BLE001
-            log.warning("GoogleWebSearch init failed (%s) — falling back to DDG", e)
+    if provider == "tavily":
+        # Tavily explicit but keep DDG as a free safety net for quota / outages.
+        return _chain(_try_tavily(), _try_ddg())
 
-    # Default: DuckDuckGo (no API key required).
-    try:
-        return DuckDuckGoWebSearch(timeout=s.google_search_timeout)
-    except Exception as e:  # noqa: BLE001
-        log.warning("DuckDuckGoWebSearch unavailable: %s — web search disabled.", e)
-        return None
+    if provider == "google":
+        return _chain(_try_google(), _try_ddg())
+
+    # Auto: chain everything available in priority order.
+    return _chain(_try_tavily(), _try_google(), _try_ddg())
 
 
 def mount_v2(app: FastAPI) -> None:

@@ -253,7 +253,7 @@ services:
   # to work and the Graph toggle is hidden in the UI.
   graph-agent:
     build:
-      context: ./apps/KnowledgeSearchBackend
+      context: apps/agent_graph_backend
       dockerfile: dockerfile
     container_name: oppmon-graph-agent
     restart: unless-stopped
@@ -263,7 +263,7 @@ services:
     # API keys, search engine, loop limits). env_file pulls the file at deploy
     # time on the host machine and bakes the values into the container env.
     env_file:
-      - ./apps/KnowledgeSearchBackend/.env
+      - apps/agent_graph_backend/.env
     ports:
       # Host:Container — mindsearch hardcodes 8002 inside the container.
       - "${GRAPH_AGENT_PORT:-7002}:8002"

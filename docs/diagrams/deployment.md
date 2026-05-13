@@ -1,10 +1,10 @@
 # Deployment Architecture
 
-**Last Updated:** 2026-05-11 (init sync)
+**Last Updated:** 2026-05-12 (init sync)
 
 ## Overview
 
-This diagram reflects `docker-compose.yml` and the production `docker-stack.yml` for the OppMon platform. Containers are namespaced as `oppmon-*` and join the `oppmon-network` bridge. Profiles let you select db-only, dev (hot reload), prod (built images), or full (with Redis).
+This diagram reflects `docker-compose.yml` and the production `docker-stack.yml` (v2.x image tag convention) for the OppMon platform. Containers are namespaced as `oppmon-*` and join the `oppmon-network` bridge. Profiles let you select db-only, dev (hot reload), prod (built images), full (with Redis), or graph (adds KnowledgeSearchBackend on :8002).
 
 ```mermaid
 graph TB
@@ -24,6 +24,10 @@ graph TB
 
         subgraph RouterContainer["oppmon-router (LiteLLM proxy)"]
             RouterSvc["http-proxy-middleware<br/>Express :PORT"]
+        end
+
+        subgraph KSBContainer["oppmon-knowledge-search (graph profile)"]
+            KSBSvc["FastAPI mindsearch v2<br/>uvicorn :8002"]
         end
 
         subgraph LiteLLMSwarm["LiteLLM Tenant Containers (managed via dockerode)"]
@@ -48,6 +52,7 @@ graph TB
 
     User -->|HTTP :3002| NextJS
     NextJS -->|REST :3001| Express
+    NextJS -->|/api/graph/solve :8002| KSBSvc
     User -->|LLM proxy| RouterSvc
     RouterSvc -->|forward| LiteLLMSwarm
     Express -->|tcp 5432| Postgres
@@ -71,6 +76,7 @@ graph TB
 | web | `oppmon-web` | apps/web/Dockerfile | 3002→3000 | prod |
 | prisma-studio | `oppmon-prisma-studio` | packages/database/Dockerfile.studio | 5555 | dev |
 | router | (defined in `docker-stack.yml` for prod) | apps/router | env-driven | prod |
+| knowledge-search | `oppmon-knowledge-search` | apps/KnowledgeSearchBackend/dockerfile | 8002 | graph |
 
 ## Volumes
 
@@ -88,6 +94,7 @@ graph TB
 | dev | db, api-dev, web-dev, prisma-studio |
 | prod | db, api, web |
 | full | db, api, web, redis |
+| graph | knowledge-search (composes with `dev` or `prod`) |
 
 ## Production (docker-stack.yml)
 
