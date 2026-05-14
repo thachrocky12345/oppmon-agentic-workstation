@@ -1,4 +1,10 @@
 from .citation import Citation, SearchHit, Source
+from .embedding import (
+    EmbeddingProvider,
+    FakeEmbeddingProvider,
+    OpenAIEmbeddingProvider,
+    create_embedding_provider,
+)
 from .retriever import RetrievalResult, Retriever
 from .web_search import (
     ChainedWebSearch,
@@ -13,7 +19,10 @@ __all__ = [
     "ChainedWebSearch",
     "Citation",
     "DuckDuckGoWebSearch",
+    "EmbeddingProvider",
+    "FakeEmbeddingProvider",
     "GoogleWebSearch",
+    "OpenAIEmbeddingProvider",
     "RetrievalResult",
     "Retriever",
     "SearchHit",
@@ -21,4 +30,5 @@ __all__ = [
     "StubWebSearch",
     "TavilyWebSearch",
     "WebSearch",
+    "create_embedding_provider",
 ]

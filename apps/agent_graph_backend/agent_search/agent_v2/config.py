@@ -71,6 +71,22 @@ class Settings(BaseSettings):
     rag_score_threshold: float = 0.4
     rag_top_k: int = 5
 
+    # ---- Embeddings (TAG-60) ----
+    # Source of truth: apps/api/src/lib/embedding/index.ts:31-32 ships
+    # ``text-embedding-3-small`` @ 1536 dims by default. If the operator
+    # re-embeds onto a different model behind an existing corpus, flip
+    # both env vars together — `embedding.py` asserts dim on every call
+    # so a mismatch fails loud rather than returning junk hits.
+    embedding_provider: Literal["openai", "fake"] = "openai"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dim: int = 1536
+    # Embed-side key is intentionally separate from the chat-side key:
+    # embeddings are an operator-pool capability, not a per-user model.
+    # Factory falls back to ``openai_api_key`` when this is unset so a
+    # single-account dev box still works.
+    openai_embed_api_key: str = ""
+    openai_embed_api_base: str = ""
+
     # ---- Server / debug ----
     mindsearch_debug: bool = False
     mindsearch_port: int = 8002
