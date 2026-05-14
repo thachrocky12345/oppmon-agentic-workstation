@@ -7,6 +7,7 @@ on top of ``verify_jwt``.
 
 from .deps import get_current_user, require_role
 from .jwt import AuthError, verify_jwt
+from .resolve import resolve_llm_spec
 from .types import JWTClaims
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "JWTClaims",
     "get_current_user",
     "require_role",
+    "resolve_llm_spec",
     "verify_jwt",
 ]
