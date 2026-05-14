@@ -26,3 +26,6 @@ ddgs==9.0.0
 
 # --- .env loading ---
 python-dotenv==1.0.1
+
+# --- Postgres (TAG-51) — async driver for JWT verify, model registry, corpus search ---
+asyncpg==0.30.0

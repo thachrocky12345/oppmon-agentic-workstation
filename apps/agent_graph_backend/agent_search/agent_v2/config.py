@@ -12,7 +12,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-Provider = Literal["anthropic", "openai", "fake"]
+Provider = Literal["anthropic", "openai", "cerebras", "fake"]
 
 
 class Settings(BaseSettings):
@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_api_base: str = "https://api.openai.com/v1"
     openai_max_tokens: int = 4096
+
+    # ---- Cerebras (OpenAI-compatible API at api.cerebras.ai) ----
+    # Reuses the openai SDK with a different base_url. Confirmed-working models:
+    #   llama3.1-8b, gpt-oss-120b, qwen-3-235b-a22b-instruct-2507, zai-glm-4.7
+    cerebras_api_key: str = ""
+    cerebras_model: str = "llama3.1-8b"
+    cerebras_api_base: str = "https://api.cerebras.ai/v1"
+    cerebras_max_tokens: int = 4096
 
     # ---- Shared LLM tuning ----
     llm_temperature: float = 0.1
@@ -67,6 +75,23 @@ class Settings(BaseSettings):
     mindsearch_debug: bool = False
     mindsearch_port: int = 8002
 
+    # ---- Database (TAG-51) ----
+    # postgres://user:pass@host:port/db — empty means "no DB attached".
+    # /solve_v2 must still boot with database_url unset; only consumers
+    # that actually need the pool call `require_db()`.
+    database_url: str = ""
+    db_pool_min_size: int = 1
+    db_pool_max_size: int = 10
+    db_pool_timeout_s: float = 5.0
+
+    def require_db(self) -> None:
+        """Raise if no DATABASE_URL is configured. Call from pool consumers."""
+        if not self.database_url:
+            raise RuntimeError(
+                "DATABASE_URL not set. agent_search requires Postgres for "
+                "JWT verify / model registry / corpus search. Add it to .env."
+            )
+
     def require_llm_credentials(self) -> None:
         """Raise if the configured provider is missing credentials."""
         if self.llm_provider == "anthropic" and not self.anthropic_api_key:
@@ -78,6 +103,11 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "LLM_PROVIDER=openai but OPENAI_API_KEY is unset. "
                 "Add it to .env or set the env var."
+            )
+        if self.llm_provider == "cerebras" and not self.cerebras_api_key:
+            raise RuntimeError(
+                "LLM_PROVIDER=cerebras but CEREBRAS_API_KEY is unset. "
+                "Get a key at https://cloud.cerebras.ai and add it to .env."
             )
 
 

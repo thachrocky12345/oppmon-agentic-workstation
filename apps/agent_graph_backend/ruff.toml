@@ -1,0 +1,22 @@
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "I",   # isort
+]
+ignore = [
+    "E501",  # line length — handled by formatter
+]
+
+[lint.per-file-ignores]
+"agent_search/tests/**" = ["B018", "F841"]
+
+[format]
+quote-style = "double"

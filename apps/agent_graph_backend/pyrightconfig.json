@@ -1,0 +1,10 @@
+{
+  "include": ["agent_search"],
+  "exclude": ["**/__pycache__", "**/.venv"],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "useLibraryCodeForTypes": true,
+  "reportMissingImports": "error",
+  "reportMissingTypeStubs": "warning",
+  "reportPrivateImportUsage": "warning"
+}

@@ -131,7 +131,18 @@ def _build_web_search() -> WebSearch | None:
 
 
 def mount_v2(app: FastAPI) -> None:
-    """Add /solve_v2 to an existing FastAPI app."""
+    """Add /solve_v2 to an existing FastAPI app.
+
+    Also registers a shutdown handler that closes the asyncpg pool if it
+    was lazily opened during the process lifetime. The pool is NOT eagerly
+    opened — `/solve_v2` must still run when `DATABASE_URL` is empty.
+    """
+
+    @app.on_event("shutdown")
+    async def _close_db_pool() -> None:  # noqa: ANN202
+        from .db.pool import close_pool
+
+        await close_pool()
 
     @app.post("/solve_v2")
     async def solve_v2(request: SolveV2Request):  # noqa: ANN201
