@@ -84,6 +84,15 @@ class Settings(BaseSettings):
     db_pool_max_size: int = 10
     db_pool_timeout_s: float = 5.0
 
+    # ---- Auth / JWT (TAG-52) ----
+    # MUST equal apps/api's JWT_SECRET for cross-service login parity.
+    # Empty default lets /solve_v2 boot in dev without auth wired; any call
+    # to `verify_jwt()` with an unset secret raises RuntimeError loudly.
+    jwt_secret: str = ""
+    # Issuer string baked into apps/api/src/lib/jwt.ts. Don't change unless
+    # the Express signer changes first.
+    jwt_issuer: str = "oppmon"
+
     def require_db(self) -> None:
         """Raise if no DATABASE_URL is configured. Call from pool consumers."""
         if not self.database_url:

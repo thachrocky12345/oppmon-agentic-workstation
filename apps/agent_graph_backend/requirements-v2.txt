@@ -29,3 +29,6 @@ python-dotenv==1.0.1
 
 # --- Postgres (TAG-51) — async driver for JWT verify, model registry, corpus search ---
 asyncpg==0.30.0
+
+# --- JWT (TAG-52) — HS256 token verification matching apps/api (jsonwebtoken) ---
+PyJWT==2.10.1
