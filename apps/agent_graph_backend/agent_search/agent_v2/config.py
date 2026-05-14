@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     mindsearch_debug: bool = False
     mindsearch_port: int = 8002
 
+    # ---- Feature flags ----
+    # TAG-58 gates the authenticated ``POST /solve`` route. When False
+    # (the default until the route stabilises), ``mount_v2`` skips the
+    # router registration entirely and an external request gets a clean
+    # 404 — a rollback is a single env-flip without redeploying.
+    enable_solve_v3: bool = False
+
     # ---- Database (TAG-51) ----
     # postgres://user:pass@host:port/db — empty means "no DB attached".
     # /solve_v2 must still boot with database_url unset; only consumers

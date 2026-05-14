@@ -136,6 +136,11 @@ def mount_v2(app: FastAPI) -> None:
     Also registers a shutdown handler that closes the asyncpg pool if it
     was lazily opened during the process lifetime. The pool is NOT eagerly
     opened — `/solve_v2` must still run when `DATABASE_URL` is empty.
+
+    TAG-58: when ``ENABLE_SOLVE_V3=true`` we additionally mount the
+    authenticated ``POST /solve`` router. The flag is read at mount
+    time so tests can flip it via env or by monkeypatching
+    ``settings.enable_solve_v3`` before constructing the app.
     """
 
     @app.on_event("shutdown")
@@ -143,6 +148,13 @@ def mount_v2(app: FastAPI) -> None:
         from .db.pool import close_pool
 
         await close_pool()
+
+    if default_settings.enable_solve_v3:
+        # Imported lazily so a mount with the flag off doesn't drag
+        # the auth / resolver / orchestrator graph into import scope.
+        from .api import solve_router
+
+        app.include_router(solve_router)
 
     @app.post("/solve_v2")
     async def solve_v2(request: SolveV2Request):  # noqa: ANN201
