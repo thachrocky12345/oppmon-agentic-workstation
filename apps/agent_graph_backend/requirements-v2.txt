@@ -32,3 +32,6 @@ asyncpg==0.30.0
 
 # --- JWT (TAG-52) — HS256 token verification matching apps/api (jsonwebtoken) ---
 PyJWT==2.10.1
+
+# --- Secret vault (TAG-54) — XSalsa20-Poly1305 matching apps/api (tweetnacl) ---
+PyNaCl==1.5.0

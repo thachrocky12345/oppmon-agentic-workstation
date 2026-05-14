@@ -93,6 +93,17 @@ class Settings(BaseSettings):
     # the Express signer changes first.
     jwt_issuer: str = "oppmon"
 
+    # ---- Secret vault (TAG-54) ----
+    # Base64 of 32 bytes. MUST equal apps/api's TAG_ENCRYPTION_MASTER_KEY
+    # so ciphertext written by Express decrypts here. Empty default lets
+    # /solve_v2 boot without vault configured; only consumers that actually
+    # call `decrypt_secret()` care.
+    tag_encryption_master_key: str = ""
+    # Comma-separated base64 keys, tried after the primary on decrypt
+    # failure. Mirrors apps/api's TAG_ENCRYPTION_LEGACY_KEYS rotation
+    # protocol. Oldest first, newest last (matches TS comment).
+    tag_encryption_legacy_keys: str = ""
+
     def require_db(self) -> None:
         """Raise if no DATABASE_URL is configured. Call from pool consumers."""
         if not self.database_url:
