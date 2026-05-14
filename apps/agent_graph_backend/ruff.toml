@@ -18,5 +18,22 @@ ignore = [
 [lint.per-file-ignores]
 "agent_search/tests/**" = ["B018", "F841"]
 
+[lint.flake8-bugbear]
+# FastAPI / Pydantic idioms that intentionally use function-call defaults.
+# `Depends(...)`, `Header(...)`, `Query(...)`, `Path(...)`, `Body(...)`,
+# `Form(...)`, `File(...)`, `Cookie(...)`, `Security(...)` are all
+# canonical and ruff's B008 should not flag them.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Header",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Cookie",
+    "fastapi.Security",
+]
+
 [format]
 quote-style = "double"
