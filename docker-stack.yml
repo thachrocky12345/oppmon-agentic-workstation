@@ -71,6 +71,7 @@ services:
         order: start-first
         failure_action: rollback
 
+
   web:
     image: thachrocky/oppmon-web:webs.v2
     networks:
