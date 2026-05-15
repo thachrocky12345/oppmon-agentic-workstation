@@ -1,0 +1,222 @@
+# TAG-71 — Preliminary prompt-slug schema.
+#
+# This file is the machine-readable companion to docs/prompts/inventory.md.
+# It is intentionally minimal: a flat list of slugs with their location
+# and placeholders. TAG-72 will replace it with the canonical schema
+# that ALSO carries frontmatter fields (version, status, owner, etc.).
+#
+# Read order: this file -> inventory.md (§ section number) -> the source
+# file:line listed under `location`.
+#
+# Conventions:
+#   slug         <kind>.<scope>.<name>[.<arg>]  (see inventory.md §1)
+#   kind         one of: system | template | tool_description | tool_param
+#   location     file:line[-end] relative to apps/agent_graph_backend/
+#   placeholders list of {name} placeholders the body interpolates at runtime
+#                ([] means no placeholders)
+#   notes        optional free text — only for blockers / cross-refs
+
+version: 0  # TAG-72 promotes to 1 when frontmatter contract is locked
+
+slugs:
+
+  # --- System prompts --------------------------------------------------
+
+  - slug: system.web_planner
+    kind: system
+    location: agent_search/agent_v2/orchestrator/planner.py:30-43
+    placeholders: []
+
+  - slug: system.searcher
+    kind: system
+    location: agent_search/agent_v2/orchestrator/searcher.py:23-30
+    placeholders: []
+
+  - slug: system.rag_planner
+    kind: system
+    location: agent_search/agent_v2/orchestrator/rag_planner_prompt.py:19-42
+    placeholders: []
+    notes: |
+      Already has TAG-73 indirection seam via _rag_planner_system().
+      TAG-73 swap is a one-line change inside that helper.
+
+  # --- Templates (user-side strings) -----------------------------------
+
+  - slug: template.searcher_simple_user
+    kind: template
+    location: agent_search/agent_v2/orchestrator/searcher.py:84-88
+    placeholders: [question, context]
+
+  - slug: template.searcher_tools_user
+    kind: template
+    location: agent_search/agent_v2/orchestrator/searcher.py:124-128
+    placeholders: [question]
+
+  - slug: template.rag_refusal
+    kind: template
+    location: agent_search/agent_v2/orchestrator/rag_planner_prompt.py:48-50
+    placeholders: []
+    notes: |
+      Verbatim refusal sentence. Also embedded inside the body of
+      tool.rag_planner.finalize.description — see inventory.md §10
+      decision #2 for the sync strategy.
+
+  - slug: template.history_summarizer
+    kind: template
+    location: agent_search/agent_v2/memory/history.py:63-67
+    placeholders: []
+    notes: |
+      Concatenated with the transcript at history.py:182 — the slug body
+      stores only the instruction, concatenation stays in code.
+
+  - slug: template.history_summary_prefix
+    kind: template
+    location: agent_search/agent_v2/memory/history.py:69
+    placeholders: []
+    notes: |
+      Short label, borderline. May be downgraded to a code constant in
+      TAG-73 — see inventory.md §10 decision #3.
+
+  # --- Web planner tool descriptions -----------------------------------
+
+  - slug: tool.web_planner.add_node.description
+    kind: tool_description
+    location: agent_search/agent_v2/tools/planner_tools.py:155-164
+    placeholders: []
+
+  - slug: tool.web_planner.link_nodes.description
+    kind: tool_description
+    location: agent_search/agent_v2/tools/planner_tools.py:165-173
+    placeholders: []
+
+  - slug: tool.web_planner.search_node.description
+    kind: tool_description
+    location: agent_search/agent_v2/tools/planner_tools.py:174-183
+    placeholders: []
+
+  - slug: tool.web_planner.read_node_answer.description
+    kind: tool_description
+    location: agent_search/agent_v2/tools/planner_tools.py:184-191
+    placeholders: []
+
+  - slug: tool.web_planner.finalize.description
+    kind: tool_description
+    location: agent_search/agent_v2/tools/planner_tools.py:192-201
+    placeholders: []
+
+  # --- Web planner tool params (LLM-facing arg descriptions) -----------
+
+  - slug: tool.web_planner.add_node.params.question
+    kind: tool_param
+    location: agent_search/agent_v2/tools/planner_tools.py:23-26
+    placeholders: []
+
+  - slug: tool.web_planner.add_node.params.node_id
+    kind: tool_param
+    location: agent_search/agent_v2/tools/planner_tools.py:27-33
+    placeholders: []
+
+  - slug: tool.web_planner.add_node.params.depends_on
+    kind: tool_param
+    location: agent_search/agent_v2/tools/planner_tools.py:34-40
+    placeholders: []
+
+  - slug: tool.web_planner.search_node.params.node_id
+    kind: tool_param
+    location: agent_search/agent_v2/tools/planner_tools.py:56-60
+    placeholders: []
+
+  - slug: tool.web_planner.finalize.params.answer
+    kind: tool_param
+    location: agent_search/agent_v2/tools/planner_tools.py:74-80
+    placeholders: []
+
+  - slug: tool.web_planner.finalize.params.citations
+    kind: tool_param
+    location: agent_search/agent_v2/tools/planner_tools.py:81-88
+    placeholders: []
+
+  # --- RAG planner tool descriptions -----------------------------------
+
+  - slug: tool.rag_planner.add_node.description
+    kind: tool_description
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:263-271
+    placeholders: []
+
+  - slug: tool.rag_planner.search_corpus_node.description
+    kind: tool_description
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:272-283
+    placeholders: []
+
+  - slug: tool.rag_planner.read_node_answer.description
+    kind: tool_description
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:284-292
+    placeholders: []
+
+  - slug: tool.rag_planner.finalize.description
+    kind: tool_description
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:293-304
+    placeholders: []
+    notes: |
+      Body embeds template.rag_refusal verbatim. See inventory.md §10
+      decision #2.
+
+  # --- RAG planner tool params -----------------------------------------
+
+  - slug: tool.rag_planner.add_node.params.question
+    kind: tool_param
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:23-30
+    placeholders: []
+
+  - slug: tool.rag_planner.add_node.params.node_id
+    kind: tool_param
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:31-37
+    placeholders: []
+
+  - slug: tool.rag_planner.add_node.params.depends_on
+    kind: tool_param
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:38-45
+    placeholders: []
+
+  - slug: tool.rag_planner.search_corpus_node.params.node_id
+    kind: tool_param
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:50-55
+    placeholders: []
+
+  - slug: tool.rag_planner.read_node_answer.params.node_id
+    kind: tool_param
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:60-64
+    placeholders: []
+
+  - slug: tool.rag_planner.finalize.params.answer
+    kind: tool_param
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:70-78
+    placeholders: []
+
+  - slug: tool.rag_planner.finalize.params.citations
+    kind: tool_param
+    location: agent_search/agent_v2/orchestrator/rag_tools.py:79-86
+    placeholders: []
+
+  # --- Searcher tool descriptions --------------------------------------
+
+  - slug: tool.searcher.web_search.description
+    kind: tool_description
+    location: agent_search/agent_v2/tools/searcher_tools.py:79-87
+    placeholders: []
+
+  - slug: tool.searcher.advanced_retrieve.description
+    kind: tool_description
+    location: agent_search/agent_v2/tools/searcher_tools.py:88-97
+    placeholders: []
+
+  - slug: tool.searcher.answer.description
+    kind: tool_description
+    location: agent_search/agent_v2/tools/searcher_tools.py:98-107
+    placeholders: []
+
+# Total: 33 slugs.  Counts by kind:
+#   system           : 3
+#   template         : 5
+#   tool_description : 12
+#   tool_param       : 13

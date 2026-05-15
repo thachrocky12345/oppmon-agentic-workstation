@@ -14,20 +14,16 @@ from typing import Any
 from ..llm.base import ChatMessage, LLMClient
 from ..memory.conversational import ConversationalMemory
 from ..memory.tool_log import ToolLog
+from ..prompts import get_prompt, render_prompt
 from ..rag.retriever import Retriever
 from ..tools.registry import ToolContext, ToolRegistry
 from ..tools.searcher_tools import register_searcher_tools
 from .loop import run_reactive_loop
 
 
-SEARCHER_SYSTEM = """You answer a single focused sub-question using the provided grounding.
-
-Rules:
-- Stick to facts that appear in the grounding. If the grounding is empty or contradictory, say so plainly — do not invent.
-- Use inline [[N]] markers to cite the numbered grounding items you used.
-- Keep the answer tight: 1-3 sentences for simple questions, a short paragraph for compound ones.
-- Never fabricate URLs or sources.
-"""
+_SEARCHER_SYSTEM_SLUG = "system.searcher"
+_SIMPLE_USER_SLUG = "template.searcher_simple_user"
+_TOOLS_USER_SLUG = "template.searcher_tools_user"
 
 
 class SearcherAgent:
@@ -81,14 +77,12 @@ class SearcherAgent:
             collection_ids=collection_ids,
         )
         context = retrieval.context_block()
-        user_prompt = (
-            f"Question: {question}\n\n"
-            f"Grounding (cite as [[N]]):\n{context}\n\n"
-            f"Write the answer now."
+        user_prompt = render_prompt(
+            _SIMPLE_USER_SLUG, question=question, context=context
         )
         resp = await self._llm.chat(
             messages=[
-                ChatMessage(role="system", content=SEARCHER_SYSTEM),
+                ChatMessage(role="system", content=get_prompt(_SEARCHER_SYSTEM_SLUG)),
                 ChatMessage(role="user", content=user_prompt),
             ],
             tools=[],
@@ -117,15 +111,13 @@ class SearcherAgent:
         register_searcher_tools(registry)
 
         memory = ConversationalMemory()
-        memory.append(ChatMessage(role="system", content=SEARCHER_SYSTEM))
+        memory.append(
+            ChatMessage(role="system", content=get_prompt(_SEARCHER_SYSTEM_SLUG))
+        )
         memory.append(
             ChatMessage(
                 role="user",
-                content=(
-                    f"Question: {question}\n\n"
-                    f"Use the available tools to gather grounding, then call "
-                    f"`answer` with your final result. Cite hits as [[N]]."
-                ),
+                content=render_prompt(_TOOLS_USER_SLUG, question=question),
             )
         )
 

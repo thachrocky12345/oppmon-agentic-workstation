@@ -12,35 +12,46 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..prompts import get_prompt
 from .registry import ToolContext, ToolRegistry
 
 
 # ---- JSON-Schema parameter blocks ----
+#
+# TAG-73: tool/parameter description strings now live in the filesystem
+# prompt catalog under ``prompts/tool/web_planner/...``. The schema
+# dicts are built fresh on each ``register_planner_tools`` call so the
+# loader's lru_cache absorbs the disk reads, and a hot-swap of any
+# description does not require a module reload.
 
-_ADD_NODE_PARAMS = {
-    "type": "object",
-    "properties": {
-        "question": {
-            "type": "string",
-            "description": "The sub-question this node should answer.",
+
+def _add_node_params() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": get_prompt(
+                    "tool.web_planner.add_node.params.question"
+                ),
+            },
+            "node_id": {
+                "type": "string",
+                "description": get_prompt(
+                    "tool.web_planner.add_node.params.node_id"
+                ),
+            },
+            "depends_on": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": get_prompt(
+                    "tool.web_planner.add_node.params.depends_on"
+                ),
+            },
         },
-        "node_id": {
-            "type": "string",
-            "description": (
-                "Optional explicit id like 'n1', 'pricing'. If omitted, "
-                "an auto id is assigned."
-            ),
-        },
-        "depends_on": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": (
-                "Parent node ids this depends on. Defaults to ['root']."
-            ),
-        },
-    },
-    "required": ["question"],
-}
+        "required": ["question"],
+    }
+
 
 _LINK_NODES_PARAMS = {
     "type": "object",
@@ -51,16 +62,21 @@ _LINK_NODES_PARAMS = {
     "required": ["parent", "child"],
 }
 
-_SEARCH_NODE_PARAMS = {
-    "type": "object",
-    "properties": {
-        "node_id": {
-            "type": "string",
-            "description": "Id of a previously added searcher node.",
+
+def _search_node_params() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "node_id": {
+                "type": "string",
+                "description": get_prompt(
+                    "tool.web_planner.search_node.params.node_id"
+                ),
+            },
         },
-    },
-    "required": ["node_id"],
-}
+        "required": ["node_id"],
+    }
+
 
 _READ_NODE_ANSWER_PARAMS = {
     "type": "object",
@@ -68,27 +84,27 @@ _READ_NODE_ANSWER_PARAMS = {
     "required": ["node_id"],
 }
 
-_FINALIZE_PARAMS = {
-    "type": "object",
-    "properties": {
-        "answer": {
-            "type": "string",
-            "description": (
-                "The final answer to the user's original question. "
-                "Use [[N]] inline citations referencing prior searcher results."
-            ),
+
+def _finalize_params() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "answer": {
+                "type": "string",
+                "description": get_prompt(
+                    "tool.web_planner.finalize.params.answer"
+                ),
+            },
+            "citations": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": get_prompt(
+                    "tool.web_planner.finalize.params.citations"
+                ),
+            },
         },
-        "citations": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": (
-                "Citation numbers to surface (as strings). Optional if [[N]] "
-                "markers already cover the answer."
-            ),
-        },
-    },
-    "required": ["answer"],
-}
+        "required": ["answer"],
+    }
 
 
 # ---- handlers ----
@@ -154,49 +170,32 @@ async def _finalize(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
 def register_planner_tools(registry: ToolRegistry) -> None:
     registry.register(
         name="add_node",
-        description=(
-            "Add a new searcher sub-question node to the search graph. "
-            "Use this to decompose the user's question into atomic searchable parts. "
-            "Returns the node_id you can use with search_node."
-        ),
-        parameters=_ADD_NODE_PARAMS,
+        description=get_prompt("tool.web_planner.add_node.description"),
+        parameters=_add_node_params(),
         handler=_add_node,
     )
     registry.register(
         name="link_nodes",
-        description=(
-            "Create a dependency edge from parent → child. Use only when an "
-            "existing node should depend on another existing node."
-        ),
+        description=get_prompt("tool.web_planner.link_nodes.description"),
         parameters=_LINK_NODES_PARAMS,
         handler=_link_nodes,
     )
     registry.register(
         name="search_node",
-        description=(
-            "Execute the searcher for an existing node. Runs retrieval (RAG and/or "
-            "web depending on request) and produces an answer. Safe to call in "
-            "parallel for independent nodes."
-        ),
-        parameters=_SEARCH_NODE_PARAMS,
+        description=get_prompt("tool.web_planner.search_node.description"),
+        parameters=_search_node_params(),
         handler=_search_node,
     )
     registry.register(
         name="read_node_answer",
-        description=(
-            "Read the answer + citations for a node that has already been searched."
-        ),
+        description=get_prompt("tool.web_planner.read_node_answer.description"),
         parameters=_READ_NODE_ANSWER_PARAMS,
         handler=_read_node_answer,
     )
     registry.register(
         name="finalize",
-        description=(
-            "Emit the final answer to the user's original question. Call this "
-            "exactly once when you have enough information. Use [[N]] markers "
-            "in the answer to cite searcher results."
-        ),
-        parameters=_FINALIZE_PARAMS,
+        description=get_prompt("tool.web_planner.finalize.description"),
+        parameters=_finalize_params(),
         handler=_finalize,
     )
 

@@ -14,29 +14,92 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from .config import settings as default_settings
+from .config import Settings, settings as default_settings
 from .guardrails import check_user_input
 from .llm import create_llm_client
 from .orchestrator.planner import PlannerAgent
-from .rag import (
-    ChainedWebSearch,
-    DuckDuckGoWebSearch,
-    GoogleWebSearch,
-    Retriever,
-    TavilyWebSearch,
-    WebSearch,
-)
+from .prompts import warm_cache as warm_prompt_cache
+from .rag import Retriever
 from .rag.hybrid_search import NullCorpusSearch
+from .rag.web_search_factory import build_web_search
 
 
 log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# TAG-65 — fail-fast container init.
+#
+# When the operator deploys with ``ENABLE_SOLVE_V3=true`` (the prod
+# default), the authenticated ``POST /solve`` route depends on four
+# secrets that *must* be present and non-empty:
+#
+#   * ``JWT_SECRET`` (parity with apps/api — verified by
+#     ``scripts/check-jwt-parity.sh``).
+#   * ``TAG_ENCRYPTION_MASTER_KEY`` (parity with apps/api — required to
+#     decrypt model-registry rows written by Express).
+#   * ``DATABASE_URL`` (asyncpg pool target).
+#   * ``OPENAI_EMBED_API_KEY`` *or* ``OPENAI_API_KEY`` (embedding fallback
+#     chain matches ``rag/embedding.py``).
+#
+# When any of those are missing, ``check_required_env`` raises
+# ``SystemExit`` so the container CrashLoopBackOffs with a single clear
+# line in ``docker service ps``. This is the contract the
+# ``swarm-debug`` skill's ``solve-v3-check`` subroutine relies on.
+#
+# The flag-off path (``ENABLE_SOLVE_V3=false``) is treated as a
+# rollback: only the legacy ``/solve_v2`` route is mounted, no secrets
+# are required, and the function is a no-op.
+# ---------------------------------------------------------------------------
+
+
+# Keep the field list outside the function so tests can pin/inspect it.
+SOLVE_V3_REQUIRED_ENV = (
+    "JWT_SECRET",
+    "TAG_ENCRYPTION_MASTER_KEY",
+    "DATABASE_URL",
+    # Special-cased below: OPENAI_EMBED_API_KEY can fall back to OPENAI_API_KEY.
+    "OPENAI_EMBED_API_KEY",
+)
+
+
+def check_required_env(s: Settings | None = None) -> None:
+    """Fail loudly if ``ENABLE_SOLVE_V3=true`` and any secret is empty.
+
+    The check is deliberately a ``SystemExit`` (not a logger warning)
+    because the failure mode in production is silent rejection of every
+    request — a CrashLoopBackOff is strictly preferable to a service
+    that accepts traffic but returns 401/500 on every call.
+
+    Tests pass ``s=Settings(...)`` to exercise both branches without
+    monkeypatching the module-level singleton.
+    """
+    cfg = s if s is not None else default_settings
+    if not cfg.enable_solve_v3:
+        return
+
+    missing: list[str] = []
+    if not cfg.jwt_secret:
+        missing.append("JWT_SECRET")
+    if not cfg.tag_encryption_master_key:
+        missing.append("TAG_ENCRYPTION_MASTER_KEY")
+    if not cfg.database_url:
+        missing.append("DATABASE_URL")
+    # The embedding factory accepts either; only fail when *both* are unset.
+    if not cfg.openai_embed_api_key and not cfg.openai_api_key:
+        missing.append("OPENAI_EMBED_API_KEY")
+
+    if missing:
+        raise SystemExit(
+            "ENABLE_SOLVE_V3=true but required env vars are missing or empty: "
+            f"{missing}. See .claude/skills/swarm-debug/SKILL.md#solve-v3-check."
+        )
 
 
 class SolveV2Request(BaseModel):
@@ -46,88 +109,6 @@ class SolveV2Request(BaseModel):
     enable_tools: bool = False
     web_fallback: bool = False
     collection_ids: list[str] = Field(default_factory=list)
-
-
-def _try_tavily() -> WebSearch | None:
-    s = default_settings
-    if not s.tavily_api_key:
-        return None
-    try:
-        return TavilyWebSearch(
-            api_key=s.tavily_api_key,
-            timeout=s.tavily_search_timeout,
-            search_depth=s.tavily_search_depth,
-        )
-    except Exception as e:  # noqa: BLE001
-        log.warning("TavilyWebSearch init failed: %s", e)
-        return None
-
-
-def _try_ddg() -> WebSearch | None:
-    s = default_settings
-    try:
-        return DuckDuckGoWebSearch(timeout=s.google_search_timeout)
-    except Exception as e:  # noqa: BLE001
-        log.warning("DuckDuckGoWebSearch init failed: %s", e)
-        return None
-
-
-def _try_google() -> WebSearch | None:
-    s = default_settings
-    if not (s.google_search_api_key and s.google_search_engine_id):
-        return None
-    try:
-        return GoogleWebSearch(
-            api_key=s.google_search_api_key,
-            search_engine_id=s.google_search_engine_id,
-            timeout=s.google_search_timeout,
-        )
-    except Exception as e:  # noqa: BLE001
-        log.warning("GoogleWebSearch init failed: %s", e)
-        return None
-
-
-def _chain(*candidates: WebSearch | None) -> WebSearch | None:
-    """Wrap providers in a ChainedWebSearch so we try them in order at call time."""
-    real = [c for c in candidates if c is not None]
-    if not real:
-        return None
-    if len(real) == 1:
-        return real[0]
-    return ChainedWebSearch(real)
-
-
-def _build_web_search() -> WebSearch | None:
-    """Build a web search client with fallback chaining.
-
-    Auto (WEB_SEARCH_PROVIDER unset or empty):
-      Chain = [Tavily (if key), Google (if keys), DuckDuckGo]
-      Tavily is tried first per request; if it returns no hits OR raises,
-      we fall through to Google, then DDG. This gives reliability under
-      Tavily quota exhaustion or upstream errors.
-
-    Explicit overrides:
-      WEB_SEARCH_PROVIDER=tavily      -> [Tavily, DDG]    (DDG safety net)
-      WEB_SEARCH_PROVIDER=google      -> [Google, DDG]
-      WEB_SEARCH_PROVIDER=duckduckgo  -> [DDG]            (DDG only)
-
-    Returns None if no provider can be built (caller must handle gracefully).
-    """
-    s = default_settings
-    provider = (s.web_search_provider or "").lower()
-
-    if provider == "duckduckgo":
-        return _try_ddg()
-
-    if provider == "tavily":
-        # Tavily explicit but keep DDG as a free safety net for quota / outages.
-        return _chain(_try_tavily(), _try_ddg())
-
-    if provider == "google":
-        return _chain(_try_google(), _try_ddg())
-
-    # Auto: chain everything available in priority order.
-    return _chain(_try_tavily(), _try_google(), _try_ddg())
 
 
 def mount_v2(app: FastAPI) -> None:
@@ -142,6 +123,19 @@ def mount_v2(app: FastAPI) -> None:
     time so tests can flip it via env or by monkeypatching
     ``settings.enable_solve_v3`` before constructing the app.
     """
+
+    # TAG-65: fail-fast at mount time so a misconfigured prod deploy
+    # CrashLoopBackOffs immediately rather than serving traffic that
+    # 401s/500s. The check is a no-op when ENABLE_SOLVE_V3=false (the
+    # rollback knob).
+    check_required_env()
+
+    # TAG-72: eagerly resolve every prompt-catalog slug so a malformed
+    # .md / _schema.yaml drift crashes the container at boot with the
+    # offending slug in the traceback. Runs unconditionally (the
+    # ENABLE_SOLVE_V3 flag is about request-path auth, not prompts —
+    # a broken /solve_v2 turn fails just as hard as a /solve turn).
+    warm_prompt_cache()
 
     @app.on_event("shutdown")
     async def _close_db_pool() -> None:  # noqa: ANN202
@@ -178,7 +172,7 @@ def mount_v2(app: FastAPI) -> None:
         llm = create_llm_client()
         retriever = Retriever(
             rag=NullCorpusSearch(),  # swap for real CorpusSearch when corpus exists
-            web=_build_web_search(),
+            web=build_web_search(),
             score_threshold=default_settings.rag_score_threshold,
             topk=default_settings.rag_top_k,
         )
@@ -210,4 +204,9 @@ def mount_v2(app: FastAPI) -> None:
         return EventSourceResponse(event_stream())
 
 
-__all__ = ["SolveV2Request", "mount_v2"]
+__all__ = [
+    "SOLVE_V3_REQUIRED_ENV",
+    "SolveV2Request",
+    "check_required_env",
+    "mount_v2",
+]

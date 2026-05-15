@@ -301,6 +301,84 @@ curl -fsS http://192.168.1.105/                       >/dev/null && echo " web O
 
 ---
 
+## Subroutine: solve-v3-check  (TAG-65 — authenticated `/solve` endpoint deploy validation)
+
+Use this whenever `POST /api/graph/solve` returns 401/403/500 for what looks like a valid login, or whenever `graph-agent` CrashLoopBackOffs after a fresh deploy.
+
+The authenticated `/solve` route (TAG-50 epic) adds four hard requirements on the graph-agent container beyond the ones the legacy `/solve_v2` route needed:
+
+| Env var | Must equal | Symptom if drifted |
+|---|---|---|
+| `JWT_SECRET` | `oppmon_api`'s `JWT_SECRET` | every `/solve` request returns 401 with a valid-looking cookie |
+| `TAG_ENCRYPTION_MASTER_KEY` | `oppmon_api`'s `TAG_ENCRYPTION_MASTER_KEY` | `/solve` returns 500 "secret decrypt failed" or AEAD-tag-mismatch in logs |
+| `DATABASE_URL` | host LAN DSN (NOT `localhost`) | `/solve` 500 with asyncpg connection refused; CrashLoopBackOff on boot |
+| `OPENAI_EMBED_API_KEY` (or `OPENAI_API_KEY` fallback) | non-empty | corpus mode returns empty hits; embed factory raises on boot |
+
+`ENABLE_SOLVE_V3=true` (default) is what mounts the route. Flip to `false` and redeploy to roll back without touching code.
+
+### Step 1 — Did the container even start?
+
+```bash
+docker service ps oppmon_graph-agent --no-trunc | head -5
+```
+
+Look for `ENABLE_SOLVE_V3=true but required env vars are missing or empty: [...]` in the error column. That's `check_required_env()` (in `agent_search/agent_v2/app.py`) doing its job — the deploy operator forgot to `set -a && . apps/api/.env && set +a` before `docker stack deploy`. Fix:
+
+```bash
+cd ~/oppmon-agentic-workstation
+set -a && . apps/api/.env && set +a
+echo "${JWT_SECRET:0:6}... ${TAG_ENCRYPTION_MASTER_KEY:0:6}... ${DATABASE_URL:0:20}..."   # confirm non-empty
+docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
+```
+
+### Step 2 — Are the four vars actually in the running service spec?
+
+```bash
+docker service inspect oppmon_graph-agent \
+  --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}' \
+  | grep -E '^(JWT_SECRET|TAG_ENCRYPTION_MASTER_KEY|DATABASE_URL|OPENAI_EMBED_API_KEY|ENABLE_SOLVE_V3)='
+```
+
+Each should print `<KEY>=<non-empty>`. Empty value on the right of `=` means the shell that ran `docker stack deploy` didn't have the var exported — same fix as Step 1.
+
+### Step 3 — JWT parity with `oppmon_api`
+
+```bash
+./scripts/check-jwt-parity.sh
+# OK: JWT_SECRET parity confirmed (len=64) between oppmon_api and oppmon_graph-agent.
+```
+
+Exit 0 = parity. Exit 1 = mismatch or empty on one side; the script tells you which. Exit 2 = `docker service inspect` failed (re-check the deploy landed).
+
+If mismatched: drift between `apps/api/.env` on the manager and the shell that deployed graph-agent. Re-source and redeploy as in Step 1.
+
+### Step 4 — Master-key drift
+
+There is no parity script for `TAG_ENCRYPTION_MASTER_KEY` because we never want to compare cleartext copies. Instead, if `/solve` returns 500 with "secret decrypt failed" or similar in `oppmon_graph-agent` logs:
+
+- Confirm the env var is present (Step 2).
+- Compare against the master key in the operator's password store. **Do not** rotate the master key here — every model-registry row in Postgres is AEAD-encrypted under the *previous* master, so rotation requires a coordinated re-encrypt pass (out of scope for this runbook).
+- If the key is wrong, restore from the secrets store and redeploy. If the key is right, the ciphertext is wrong — re-mint the affected model rows from `apps/api`.
+
+### Step 5 — End-to-end smoke
+
+```bash
+# Replace COOKIE with a logged-in session cookie copied from browser devtools.
+curl -N -X POST http://192.168.1.195/api/graph/solve \
+  -H 'Content-Type: application/json' \
+  -H "Cookie: $COOKIE" \
+  -d '{"inputs":"hello","enable_tools":false,"web_fallback":true,"collection_ids":[]}'
+```
+
+200 + SSE event stream = working. 401 = JWT drift (Step 3). 403 = tenant mismatch on the requested resource. 500 = master-key or DB drift (Step 4).
+
+### Anti-patterns specific to this subroutine
+
+- **Never log the JWT or master-key contents** while debugging. The parity script prints lengths, not values, on purpose.
+- **Don't bypass `check_required_env`** by setting `ENABLE_SOLVE_V3=false` to "make it boot" in prod — that just hides the missing-secret symptom and leaves `/solve` un-mounted. Fix the env, don't disable the check.
+
+---
+
 ## Anti-patterns (do NOT do these)
 
 1. **Don't restart the swarm to "fix" missing env.** Restarting won't re-resolve `${VAR:-}` placeholders — only `docker stack deploy` with the var exported in shell will.

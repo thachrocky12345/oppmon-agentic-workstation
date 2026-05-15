@@ -84,6 +84,51 @@ This directory contains 42 detailed JIRA-style tickets for the Team AI Gateway b
 | 47 | [TAG-47: Security & Ethics Guardrails](./jira_day47.md) | 8 | Scope boundaries, content filtering, audit |
 | 48 | [TAG-48: Week 7 Integration & Final Docs](./jira_day48.md) | 3 | Complete system validation, demo ready |
 
+## Hardening Phase — Residency & Governance (TAG-78..TAG-88)
+
+Foundation: [ADR-0012 Residency Model](../decisions/ADR-0012-residency-model.md),
+[ADR-0013 BYO-VPC Upgrade Channel](../decisions/ADR-0013-byo-vpc-upgrade-channel.md),
+and [docs/residency/](../residency/index.md).
+
+Closes the gap between "we have a residency story on paper" and "a
+regulated-sector buyer can sign a contract on it." Pillar status is
+tracked live in [docs/residency/architecture.md](../residency/architecture.md)
+§ "Current status at a glance".
+
+### Epic
+
+| Ticket | Title | Points |
+|---|---|---|
+| [TAG-78](./TAG-78-residency-governance-hardening-epic.md) | Residency & Governance Hardening (EPIC) | 34 |
+
+### Required stories
+
+| Ticket | Title | Points | Layer |
+|---|---|---|---|
+| [TAG-79](./TAG-79-region-pinned-storage.md) | Pluggable region-pinned storage (S3 + AzureBlob) | 5 | Backend / Infra |
+| [TAG-80](./TAG-80-ts-embedding-baseurl-parity.md) | TS embedding base_url + dim guard parity | 3 | Backend |
+| [TAG-81](./TAG-81-ts-rag-cross-tenant-audit.md) | TS RAG cross-tenant audit + negative test | 3 | Backend / Security |
+| [TAG-82](./TAG-82-collection-scope-enforcement.md) | Collection scope enforcement (API 403 + UI) | 5 | Backend + Frontend |
+| [TAG-83](./TAG-83-azure-bedrock-llm-clients.md) | Azure OpenAI + Bedrock LLM clients | 5 | Backend |
+| [TAG-84](./TAG-84-telemetry-redaction-layer.md) | Telemetry redaction layer + CI lint | 5 | Observability / CI |
+| [TAG-85](./TAG-85-byo-vpc-deployment-package.md) | BYO-VPC deployment package + runbook | 5 | DevOps / CLI |
+| [TAG-86](./TAG-86-ui-residency-surface.md) | UI residency surface (badge + docs page) | 3 | Frontend |
+
+### Stretch stories
+
+| Ticket | Title | Points | Layer |
+|---|---|---|---|
+| [TAG-87](./TAG-87-soc2-hipaa-evidence-pack.md) | SOC2 / HIPAA evidence pack generator | 5 | Compliance |
+| [TAG-88](./TAG-88-tenant-export-purge.md) | Tenant data export + purge (GDPR Art. 17) | 5 | Backend / Compliance |
+
+### Non-negotiables for this phase
+
+1. **No app code lands in the planning sprint** — only the epic + stories + ADRs + framing docs.
+2. **Every retrieval surface has its own cross-tenant negative test** (TAG-59 ✅, TAG-81 🟡).
+3. **Telemetry redaction is allowlist + lint + ripgrep** — fail closed at three layers (TAG-84).
+4. **BYO-VPC uses customer-pulled semver-pinned image tags** — no `:latest`, no auto-update (ADR-0013).
+5. **Every merged story flips its pillar row in `docs/residency/architecture.md` from 🟡/🔴 to ✅** with the commit SHA — drift is detected on every quarter-close audit.
+
 ## Non-Negotiable Rules
 
 These rules are architectural commitments that must be enforced:

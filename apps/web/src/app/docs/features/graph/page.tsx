@@ -48,12 +48,30 @@ export default function GraphPage() {
         <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
           <p className="text-amber-300 font-medium text-sm">Graph mode is opt-in</p>
           <p className="text-gray-400 text-xs mt-1">
-            It depends on an external service (KnowledgeSearchBackend) and is
-            disabled by default. The toggle in the chat header only renders when{' '}
+            It depends on the FastAPI service{' '}
+            <code className="px-1 py-0.5 bg-black/40 rounded text-amber-200">apps/agent_graph_backend</code>
+            {' '}(formerly{' '}
+            <code className="px-1 py-0.5 bg-black/40 rounded text-amber-200">apps/KnowledgeSearchBackend</code>)
+            {' '}and is disabled by default. The toggle in the chat header only renders when{' '}
             <code className="px-1 py-0.5 bg-black/40 rounded text-amber-200">
               NEXT_PUBLIC_GRAPH_ENABLED=true
             </code>{' '}
             is baked into the web image at build time.
+          </p>
+        </div>
+
+        <div className="mt-3 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
+          <p className="text-indigo-300 font-medium text-sm">New: authenticated /solve route (TAG-50 epic)</p>
+          <p className="text-gray-400 text-xs mt-1">
+            Behind the feature flag{' '}
+            <code className="px-1 py-0.5 bg-black/40 rounded text-indigo-200">ENABLE_SOLVE_V3=true</code>,
+            the Python service exposes a tenant-aware{' '}
+            <code className="px-1 py-0.5 bg-black/40 rounded text-indigo-200">POST /solve</code>{' '}
+            that verifies the user&apos;s JWT, opens an asyncpg pool with row-level security GUCs,
+            and resolves per-tenant LLM credentials via a PyNaCl-encrypted vault. The legacy
+            unauthenticated{' '}
+            <code className="px-1 py-0.5 bg-black/40 rounded text-indigo-200">POST /solve_v2</code>{' '}
+            remains available for backwards compatibility.
           </p>
         </div>
       </div>
@@ -129,7 +147,7 @@ export default function GraphPage() {
           <FeatureCard
             icon={<span className="text-2xl">📡</span>}
             title="SSE streaming"
-            description="One persistent POST, many JSON events. Same-origin proxy at /api/graph/solve forwards to the KnowledgeSearchBackend container."
+            description="One persistent POST, many JSON events. Same-origin proxy at /api/graph/solve forwards to the agent_graph_backend FastAPI container."
           />
           <FeatureCard
             icon={<span className="text-2xl">📈</span>}
@@ -209,32 +227,51 @@ export default function GraphPage() {
         description="One external service, one same-origin proxy, one feature flag."
       >
         <div className="rounded-lg border border-white/10 bg-black/30 p-5 font-mono text-xs text-gray-300 overflow-x-auto">
-{`Browser  ──POST /api/graph/solve──▶  apps/web (Next.js proxy)  ──▶  KnowledgeSearchBackend
-              ▲                            │                              POST /solve_v2 (SSE, :7002)
-              └────────── SSE ─────────────┘  pipes ReadableStream straight through`}
+{`Browser  ──POST /api/graph/solve──▶  apps/web (Next.js proxy)  ──▶  apps/agent_graph_backend
+              ▲                            │                          (FastAPI · Python 3.11)
+              │                            │
+              │                            │ ENABLE_SOLVE_V3=true  → POST /solve     (SSE, JWT auth)
+              │                            └ legacy / public       → POST /solve_v2  (SSE, no auth)
+              └────────── SSE ─────────────┘  container :8002 · host :7002 (graph profile)`}
         </div>
 
         <ul className="text-sm text-gray-400 space-y-2 mt-4">
           <li>•{' '}
-            <span className="text-white font-medium">KnowledgeSearchBackend</span>{' '}
-            is the external service. It is NOT built from this repo — it lives in a
-            separate Python codebase and runs as its own container.
+            <span className="text-white font-medium">agent_graph_backend</span>{' '}
+            is a first-class service in this repo at{' '}
+            <code className="text-cyan-300">apps/agent_graph_backend/</code>. Python module{' '}
+            <code className="text-cyan-300">agent_search/agent_v2/</code>. Built and shipped
+            alongside <code className="text-cyan-300">oppmon-api</code> and{' '}
+            <code className="text-cyan-300">oppmon-web</code> (image tag convention{' '}
+            <code className="text-cyan-300">v2.x</code>).
           </li>
           <li>•{' '}
             <span className="text-white font-medium">The Next.js proxy</span> at{' '}
             <code className="text-cyan-300">apps/web/src/app/api/graph/solve/route.ts</code>{' '}
-            forwards POSTs from the browser to <code className="text-cyan-300">${'{'}GRAPH_BACKEND_URL{'}'}/solve_v2</code>
-            {' '}and pipes the SSE stream back unmodified.
+            forwards POSTs from the browser to{' '}
+            <code className="text-cyan-300">${'{'}GRAPH_BACKEND_URL{'}'}/solve</code>{' '}
+            (or <code className="text-cyan-300">/solve_v2</code> for the legacy path) and pipes
+            the SSE stream back unmodified.
+          </li>
+          <li>•{' '}
+            <span className="text-white font-medium">JWT bearer forwarding</span> —{' '}
+            when <code className="text-cyan-300">ENABLE_SOLVE_V3=true</code>, the proxy reads the
+            user&apos;s JWT from the{' '}
+            <code className="text-cyan-300">Authorization: Bearer ...</code> header (preferred)
+            or the <code className="text-cyan-300">auth_token</code> cookie (fallback) and
+            forwards it to the FastAPI service. Requests without a valid JWT get 401.
           </li>
           <li>•{' '}
             <span className="text-white font-medium">No CORS, no exposed backend URL</span> —
             the browser only ever sees <code className="text-cyan-300">/api/graph/solve</code>.
           </li>
           <li>•{' '}
-            <span className="text-white font-medium">Optional bearer token</span> —{' '}
-            set <code className="text-cyan-300">GRAPH_BACKEND_TOKEN</code> on the web service
-            and the proxy injects <code className="text-cyan-300">Authorization: Bearer ...</code>{' '}
-            upstream. Never reaches the browser.
+            <span className="text-white font-medium">Stateless service</span> — the FastAPI
+            container does not write to Postgres for the legacy{' '}
+            <code className="text-cyan-300">/solve_v2</code> path. The new{' '}
+            <code className="text-cyan-300">/solve</code> path opens a read-only asyncpg pool to
+            resolve the tenant model registry under RLS, but does not persist conversation
+            state.
           </li>
         </ul>
       </TutorialSection>
@@ -250,8 +287,12 @@ export default function GraphPage() {
         }
         iconBg="bg-yellow-500/20"
         title="Configuration"
-        description="Three env vars on the web service. One build-time, two runtime."
+        description="Env vars split between the web proxy and the FastAPI agent_graph_backend service."
       >
+        <p className="text-sm text-gray-400 mb-3">
+          <span className="text-white font-medium">Web (apps/web)</span> —
+          controls whether the proxy is wired up and where it points.
+        </p>
         <div className="overflow-x-auto rounded-lg border border-white/10">
           <table className="min-w-full text-xs">
             <thead>
@@ -270,12 +311,71 @@ export default function GraphPage() {
               <tr className="border-t border-white/10">
                 <td className="px-4 py-2 text-cyan-300">GRAPH_BACKEND_URL</td>
                 <td className="px-4 py-2 text-purple-300">runtime (server)</td>
-                <td className="px-4 py-2 text-gray-400 font-sans">Where the proxy forwards. e.g. <code className="text-cyan-300">http://graph-agent:7002</code>. Empty = proxy returns 503.</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">Where the proxy forwards. e.g. <code className="text-cyan-300">http://graph-agent:8002</code> (overlay) or <code className="text-cyan-300">http://localhost:7002</code> (host). Empty = proxy returns 503.</td>
               </tr>
               <tr className="border-t border-white/10">
                 <td className="px-4 py-2 text-cyan-300">GRAPH_BACKEND_TOKEN</td>
                 <td className="px-4 py-2 text-purple-300">runtime (server)</td>
-                <td className="px-4 py-2 text-gray-400 font-sans">Optional bearer token injected upstream. Hidden from the browser.</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">Optional shared-secret bearer token for the legacy <code className="text-cyan-300">/solve_v2</code> path. Ignored when the proxy forwards the user&apos;s JWT to <code className="text-cyan-300">/solve</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-sm text-gray-400 mt-6 mb-3">
+          <span className="text-white font-medium">FastAPI (apps/agent_graph_backend)</span> —
+          required when <code className="text-cyan-300">ENABLE_SOLVE_V3=true</code>; the
+          container fails fast on boot (TAG-65) if any of these are missing.
+        </p>
+        <div className="overflow-x-auto rounded-lg border border-white/10">
+          <table className="min-w-full text-xs">
+            <thead>
+              <tr className="bg-white/[0.04] text-gray-400 text-left">
+                <th className="px-4 py-2 font-mono">Var</th>
+                <th className="px-4 py-2 font-medium">Required for</th>
+                <th className="px-4 py-2 font-medium">Purpose</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-300 font-mono">
+              <tr className="border-t border-white/10">
+                <td className="px-4 py-2 text-cyan-300">ENABLE_SOLVE_V3</td>
+                <td className="px-4 py-2 text-emerald-300">flag</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">Mounts the authenticated <code className="text-cyan-300">POST /solve</code> router. Default <code className="text-cyan-300">false</code>.</td>
+              </tr>
+              <tr className="border-t border-white/10">
+                <td className="px-4 py-2 text-cyan-300">JWT_SECRET</td>
+                <td className="px-4 py-2 text-amber-300">/solve</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">HS256 secret shared with the Express API and the Next.js middleware. PyJWT verifies the incoming bearer.</td>
+              </tr>
+              <tr className="border-t border-white/10">
+                <td className="px-4 py-2 text-cyan-300">DATABASE_URL</td>
+                <td className="px-4 py-2 text-amber-300">/solve</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">Postgres DSN. The asyncpg pool sets <code className="text-cyan-300">app.tenant_id</code> + <code className="text-cyan-300">app.current_actor_id</code> GUCs so RLS policies apply.</td>
+              </tr>
+              <tr className="border-t border-white/10">
+                <td className="px-4 py-2 text-cyan-300">TAG_ENCRYPTION_MASTER_KEY</td>
+                <td className="px-4 py-2 text-amber-300">/solve</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">32-byte (base64) master key. PyNaCl XSalsa20-Poly1305 derives per-tenant data keys to decrypt provider API keys from the vault. Must match the Express API&apos;s value.</td>
+              </tr>
+              <tr className="border-t border-white/10">
+                <td className="px-4 py-2 text-cyan-300">OPENAI_EMBED_API_KEY</td>
+                <td className="px-4 py-2 text-amber-300">/solve</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">Dedicated embedding key (falls back to <code className="text-cyan-300">OPENAI_API_KEY</code>). Used by the prompt-warmup cache (TAG-72) and corpus search.</td>
+              </tr>
+              <tr className="border-t border-white/10">
+                <td className="px-4 py-2 text-cyan-300">ANTHROPIC_API_KEY</td>
+                <td className="px-4 py-2 text-gray-500">optional</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">Default planner/searcher LLM. Per-tenant overrides resolved from the vault.</td>
+              </tr>
+              <tr className="border-t border-white/10">
+                <td className="px-4 py-2 text-cyan-300">CEREBRAS_API_KEY</td>
+                <td className="px-4 py-2 text-gray-500">optional</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">Alternative LLM provider (OpenAI-compatible SDK against <code className="text-cyan-300">api.cerebras.ai</code>).</td>
+              </tr>
+              <tr className="border-t border-white/10">
+                <td className="px-4 py-2 text-cyan-300">WEB_SEARCH_PROVIDER</td>
+                <td className="px-4 py-2 text-gray-500">optional</td>
+                <td className="px-4 py-2 text-gray-400 font-sans">One of <code className="text-cyan-300">tavily</code>, <code className="text-cyan-300">google</code>, <code className="text-cyan-300">ddg</code>. The chain falls through on failure.</td>
               </tr>
             </tbody>
           </table>
@@ -284,7 +384,10 @@ export default function GraphPage() {
         <p className="text-xs text-gray-500 mt-3">
           <code className="text-cyan-300">NEXT_PUBLIC_*</code> is baked in at{' '}
           <code className="text-cyan-300">docker build</code> time — flipping it requires a
-          rebuild of the web image. Runtime env changes are not enough.
+          rebuild of the web image. Runtime env changes are not enough. The FastAPI service
+          reads its env at container start; see{' '}
+          <code className="text-cyan-300">agent_search/agent_v2/config.py</code>{' '}
+          (<code className="text-cyan-300">Settings</code>) for the canonical list.
         </p>
       </TutorialSection>
 
@@ -308,14 +411,23 @@ export default function GraphPage() {
               <CodeSnippet
                 language="bash"
                 code={`# bash / zsh
-export GRAPH_AGENT_IMAGE=thachrocky/knowledge-search:latest
-export GRAPH_BACKEND_URL=http://graph-agent:7002
-export NEXT_PUBLIC_GRAPH_ENABLED=true`}
+export GRAPH_AGENT_IMAGE=thachrocky/agent-graph-backend:latest
+export GRAPH_BACKEND_URL=http://graph-agent:8002   # overlay DNS inside compose
+export NEXT_PUBLIC_GRAPH_ENABLED=true
+
+# Optional: enable the authenticated /solve route
+export ENABLE_SOLVE_V3=true
+export JWT_SECRET=<same value as apps/api/.env>
+export DATABASE_URL=postgres://oppmon:oppmon@db:5432/oppmon
+export TAG_ENCRYPTION_MASTER_KEY=<base64 32-byte key, same as apps/api/.env>`}
               />
               <p className="text-xs text-gray-500 mt-2">
-                Pick a real tag. The default placeholder won&apos;t pull. The graph-agent service
-                listens on <code className="text-cyan-300">7002</code> — <strong>not</strong> 8002,
-                which is already in use by another local tool.
+                The graph-agent container listens on <code className="text-cyan-300">8002</code>{' '}
+                internally and is mapped to host <code className="text-cyan-300">7002</code> by
+                <code className="text-cyan-300"> docker-compose.override.yml</code> (graph profile).
+                Use the overlay name <code className="text-cyan-300">graph-agent:8002</code>{' '}
+                from inside the compose network and{' '}
+                <code className="text-cyan-300">localhost:7002</code> from your host shell.
               </p>
             </div>
           </li>
@@ -433,12 +545,44 @@ export NEXT_PUBLIC_GRAPH_ENABLED=true`}
               ),
             },
             {
-              q: 'Port 8002 already allocated',
+              q: 'Port 7002 already allocated on host',
               a: (
                 <>
-                  Graph-agent uses <strong className="text-amber-300">7002</strong>, not 8002.
-                  Pull the latest config — old branches may still reference 8002. If you see
-                  this in prod, the docker-stack.yml on the swarm manager is stale.
+                  The graph-agent container listens on <strong className="text-amber-300">8002</strong>{' '}
+                  internally and is exposed on host port <strong className="text-amber-300">7002</strong>{' '}
+                  by the compose override. If host 7002 is taken by another local tool, edit{' '}
+                  <code className="text-cyan-300">docker-compose.override.yml</code> to map a
+                  different host port — the container port (8002) and the in-network DNS
+                  (<code className="text-cyan-300">graph-agent:8002</code>) stay the same.
+                </>
+              ),
+            },
+            {
+              q: '“agent_graph_backend exited with code 1 on startup”',
+              a: (
+                <>
+                  Fail-fast init (TAG-65) — when <code className="text-cyan-300">ENABLE_SOLVE_V3=true</code>,
+                  the container refuses to start if{' '}
+                  <code className="text-cyan-300">JWT_SECRET</code>,{' '}
+                  <code className="text-cyan-300">DATABASE_URL</code>,{' '}
+                  <code className="text-cyan-300">TAG_ENCRYPTION_MASTER_KEY</code>, or an
+                  embedding key is missing. Check the logs — the error names the missing var.
+                  Either export the missing var and redeploy, or temporarily unset{' '}
+                  <code className="text-cyan-300">ENABLE_SOLVE_V3</code> to fall back to the
+                  public <code className="text-cyan-300">/solve_v2</code> path.
+                </>
+              ),
+            },
+            {
+              q: '"/solve returns 401 invalid_token" but I\'m logged in',
+              a: (
+                <>
+                  <code className="text-cyan-300">JWT_SECRET</code> on the FastAPI container
+                  doesn&apos;t match the one used by the Express API to sign the cookie. Compare{' '}
+                  <code className="text-cyan-300">docker service inspect oppmon_api</code>{' '}
+                  vs <code className="text-cyan-300">oppmon_graph-agent</code> — both must be
+                  byte-identical. Same fix applies to the web middleware{' '}
+                  <code className="text-cyan-300">jose</code> verifier.
                 </>
               ),
             },

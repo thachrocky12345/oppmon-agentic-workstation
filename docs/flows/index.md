@@ -1,6 +1,6 @@
 # Flow Diagrams
 
-**Last Updated:** 2026-05-11 (init sync)
+**Last Updated:** 2026-05-15 (init sync)
 
 This directory contains Mermaid flow diagrams showing how data and processes move through the OppMon (Arkon) system.
 
@@ -8,10 +8,10 @@ This directory contains Mermaid flow diagrams showing how data and processes mov
 
 | File | Description | Last Updated |
 |------|-------------|--------------|
-| [request-flow.md](request-flow.md) | API request lifecycle with middleware chain (incl. tenant-context, access, idempotency) | 2026-05-11 (init sync) |
-| [auth-flow.md](auth-flow.md) | JWT + GitHub OAuth authentication | 2026-05-11 (init sync) |
-| [data-flow.md](data-flow.md) | Data pipeline with LLM/RAG/embeddings | 2026-05-11 (init sync) |
-| [error-flow.md](error-flow.md) | Error propagation and handling | 2026-05-11 (init sync) |
+| [request-flow.md](request-flow.md) | API request lifecycle with middleware chain (incl. tenant-context, access, idempotency) | 2026-05-15 (init sync) |
+| [auth-flow.md](auth-flow.md) | JWT + GitHub OAuth authentication (now also feeds graph-agent `/solve` per ADR-0014) | 2026-05-15 (init sync) |
+| [data-flow.md](data-flow.md) | Data pipeline with LLM/RAG/embeddings | 2026-05-15 (init sync) |
+| [error-flow.md](error-flow.md) | Error propagation and handling | 2026-05-15 (init sync) |
 
 ## Cross-Domain Flows
 
@@ -22,7 +22,7 @@ End-to-end sequence diagrams covering single user actions that touch multiple do
 | [cross-domain/chat-message-end-to-end.md](cross-domain/chat-message-end-to-end.md) | POST /api/llm/chat → llm_sessions → llm_messages → usage_events → events → audit_log_v2 → event_outbox → outbox-publisher | 2026-05-10 |
 | [cross-domain/incident-creation.md](cross-domain/incident-creation.md) | Agent → incidents → audit_log_v2 → event_outbox → notifications fanout to all tenant admins | 2026-05-10 |
 | [cross-domain/tenant-deletion.md](cross-domain/tenant-deletion.md) | Admin DELETE /admin/tenants/:id → BEFORE DELETE trigger → tenant_archives + tenant_deletion_audit → ON DELETE CASCADE | 2026-05-10 |
-| [../solve-v2.md](../solve-v2.md) | Graph-mode chat: web → KnowledgeSearchBackend `/solve_v2` (SSE) → live planner+searcher DAG → final synthesis | 2026-05-12 |
+| [../solve-v2.md](../solve-v2.md) | Graph-mode chat: web → agent_graph_backend `/solve_v2` (SSE, public) or `/solve` (SSE, JWT-auth) → live planner+searcher DAG → final synthesis | 2026-05-15 |
 
 ## Flow Types
 

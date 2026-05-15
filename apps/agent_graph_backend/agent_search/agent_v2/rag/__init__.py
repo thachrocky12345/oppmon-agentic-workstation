@@ -1,4 +1,5 @@
 from .citation import Citation, SearchHit, Source
+from .corpus_search import CorpusHit, CorpusSearch, PgCorpusSearch
 from .embedding import (
     EmbeddingProvider,
     FakeEmbeddingProvider,
@@ -18,11 +19,14 @@ from .web_search import (
 __all__ = [
     "ChainedWebSearch",
     "Citation",
+    "CorpusHit",
+    "CorpusSearch",
     "DuckDuckGoWebSearch",
     "EmbeddingProvider",
     "FakeEmbeddingProvider",
     "GoogleWebSearch",
     "OpenAIEmbeddingProvider",
+    "PgCorpusSearch",
     "RetrievalResult",
     "Retriever",
     "SearchHit",

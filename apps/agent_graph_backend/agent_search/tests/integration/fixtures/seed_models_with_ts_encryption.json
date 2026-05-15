@@ -1,0 +1,42 @@
+{
+  "$comment": [
+    "TAG-64 — model_secrets rows whose payload was encrypted by the",
+    "TS-side vault helper at apps/api/src/crypto/secret-vault.ts.",
+    "",
+    "Format: { id, encrypted_payload_b64, nonce_b64, version,",
+    "         plaintext_for_oracle_only }. The plaintext field is for",
+    "the QA reviewer to confirm the round-trip; the integration suite",
+    "never reads it.",
+    "",
+    "Regenerate via: pnpm --filter @oppmon/api exec tsx scripts/encrypt-test-fixture.ts",
+    "(committed in TAG-54). The script reads TAG_ENCRYPTION_MASTER_KEY",
+    "from the local .env so the resulting ciphertext is decryptable by",
+    "the Python vault helper using the SAME master key in CI.",
+    "",
+    "The ciphertext below is a stable placeholder produced with the",
+    "fixture master key b64('A'*32) so reviewers can verify the JSON",
+    "shape without leaking a real key. CI generates fresh bytes."
+  ],
+  "version": 1,
+  "master_key_label": "TAG_ENCRYPTION_FIXTURE_KEY",
+  "rows": [
+    {
+      "id": "msec_alpha",
+      "version": 1,
+      "encrypted_payload_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "nonce_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "plaintext_for_oracle_only": {
+        "api_key": "fake-key-alpha-not-real"
+      }
+    },
+    {
+      "id": "msec_beta",
+      "version": 1,
+      "encrypted_payload_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "nonce_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "plaintext_for_oracle_only": {
+        "api_key": "fake-key-beta-not-real"
+      }
+    }
+  ]
+}

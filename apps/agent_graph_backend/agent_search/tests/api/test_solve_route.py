@@ -67,10 +67,24 @@ def _mint(
 
 @pytest.fixture(autouse=True)
 def _enable_flag_and_jwt(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Default: flag ON, JWT secret set. Individual tests override."""
+    """Default: flag ON, all TAG-65 required env vars populated.
+
+    The four `check_required_env()` vars (JWT_SECRET, TAG_ENCRYPTION_MASTER_KEY,
+    DATABASE_URL, OPENAI_EMBED_API_KEY-or-fallback) MUST be non-empty when
+    `enable_solve_v3=True`, otherwise `mount_v2()` raises SystemExit at app
+    construction time. Tests pass test-only sentinels here so the app boots;
+    individual tests override values as needed.
+    """
     monkeypatch.setattr(config_mod.settings, "enable_solve_v3", True)
     monkeypatch.setattr(config_mod.settings, "jwt_secret", _SECRET)
     monkeypatch.setattr(config_mod.settings, "jwt_issuer", "oppmon")
+    monkeypatch.setattr(
+        config_mod.settings, "tag_encryption_master_key", "test-master-key"
+    )
+    monkeypatch.setattr(config_mod.settings, "database_url", "postgresql://test")
+    # openai_api_key is already set in tests/conftest.py session fixture, but
+    # pin it here so the order-of-monkeypatch doesn't matter.
+    monkeypatch.setattr(config_mod.settings, "openai_api_key", "test-openai-key")
 
 
 @pytest.fixture

@@ -137,7 +137,18 @@ services:
     # WEB_SEARCH_PROVIDER, TAVILY_API_KEY, TAVILY_SEARCH_TIMEOUT,
     # TAVILY_SEARCH_DEPTH, PLANNER_MAX_ITERATIONS, SEARCHER_MAX_ITERATIONS,
     # MINDSEARCH_DEBUG.
-    # Source `apps/api/.env` before deploy: `set -a && . apps/api/.env && set +a`
+    #
+    # TAG-65: the authenticated /solve route (TAG-50 epic) needs four
+    # additional secrets — DATABASE_URL, JWT_SECRET, TAG_ENCRYPTION_MASTER_KEY,
+    # OPENAI_EMBED_API_KEY — plus the embedding model/dim pair so the boot-
+    # time dim guard agrees with the Express side. `mount_v2()` runs
+    # `check_required_env()` at startup and CrashLoopBackOffs if any of
+    # these are empty while ENABLE_SOLVE_V3=true.
+    #
+    # IMPORTANT: every `${VAR:-}` resolves from the SHELL that runs
+    # `docker stack deploy`, not from any .env file. Source apps/api/.env
+    # first:  `set -a && . apps/api/.env && set +a`. See
+    # .claude/skills/swarm-debug/SKILL.md §solve-v3-check.
     environment:
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -151,6 +162,25 @@ services:
       TAVILY_SEARCH_DEPTH: ${TAVILY_SEARCH_DEPTH:-basic}
       PLANNER_MAX_ITERATIONS: ${PLANNER_MAX_ITERATIONS:-6}
       SEARCHER_MAX_ITERATIONS: ${SEARCHER_MAX_ITERATIONS:-3}
+      # ----- TAG-65: authenticated /solve route -----
+      # MUST equal services.api.environment.JWT_SECRET (env_file: apps/api/.env).
+      # Mismatch = every JWT rejected; verify with scripts/check-jwt-parity.sh.
+      JWT_SECRET: ${JWT_SECRET:-}
+      # MUST equal apps/api's TAG_ENCRYPTION_MASTER_KEY — ciphertext written
+      # by Express decrypts here. Empty value triggers CrashLoopBackOff.
+      TAG_ENCRYPTION_MASTER_KEY: ${TAG_ENCRYPTION_MASTER_KEY:-}
+      # Rotation chain (oldest first). Optional; empty is fine.
+      TAG_ENCRYPTION_LEGACY_KEYS: ${TAG_ENCRYPTION_LEGACY_KEYS:-}
+      # Direct asyncpg URL — host LAN IP, NOT localhost.
+      DATABASE_URL: ${DATABASE_URL:-}
+      # Embed-side key (operator pool, NOT a per-user model).
+      OPENAI_EMBED_API_KEY: ${OPENAI_EMBED_API_KEY:-}
+      OPENAI_EMBED_API_BASE: ${OPENAI_EMBED_API_BASE:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
+      # Rollback knob: flip to "false" and redeploy to un-mount /solve
+      # without removing code or rotating any secret.
+      ENABLE_SOLVE_V3: ${ENABLE_SOLVE_V3:-true}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/healthz"]
       interval: 30s

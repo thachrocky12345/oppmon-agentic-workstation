@@ -4,6 +4,8 @@
 
 **Status:** Accepted
 
+**Update 2026-05-15:** The service directory was renamed `apps/KnowledgeSearchBackend/` → `apps/agent_graph_backend/`, and the Python package was renamed `mindsearch/` → `agent_search/`. The wire contract, the ADR-0011 decision, and the consequences are unchanged — only the path/package name changed for clarity. The Docker image entrypoint (`python -m mindsearch.v2_server`) is still being aligned with the new package name; see TAG-50 epic for the full rename arc.
+
 ## Context
 
 Arkon's chat experience needed an interactive **graph-mode** that visualizes a live planner→searcher DAG to the user (via the `AgentGraphPanel` component on the chat page). Implementing this purely inside the existing Express backend posed several constraints:

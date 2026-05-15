@@ -1,10 +1,10 @@
 # System Architecture
 
-**Last Updated:** 2026-05-12 (init sync)
+**Last Updated:** 2026-05-15 (init sync — KnowledgeSearchBackend renamed to agent_graph_backend, added authenticated `/solve` path + DB/Vault/JWT modules)
 
 ## Overview
 
-This diagram shows the high-level architecture of the OppMon (Arkon) AI Gateway platform. The platform is a pnpm + Turborepo monorepo with a Next.js frontend, an Express API, a dedicated LiteLLM proxy router, a Python FastAPI KnowledgeSearchBackend for graph-mode chat (`/solve_v2`), PostgreSQL with TimescaleDB and pgvector for storage, and a layered agent subsystem with guardrails and observability packages.
+This diagram shows the high-level architecture of the OppMon (Arkon) AI Gateway platform. The platform is a pnpm + Turborepo monorepo with a Next.js frontend, an Express API, a dedicated LiteLLM proxy router, a Python FastAPI `agent_graph_backend` (formerly `KnowledgeSearchBackend`) for graph-mode chat (`/solve_v2` + authenticated `/solve` per ADR-0014), PostgreSQL with TimescaleDB and pgvector for storage, and a layered agent subsystem with guardrails and observability packages.
 
 ```mermaid
 graph TD
@@ -32,14 +32,18 @@ graph TD
         VKResolve["Virtual Key Resolution"]
     end
 
-    subgraph KSB["KnowledgeSearchBackend (Python FastAPI v2 :8002)"]
+    subgraph KSB["agent_graph_backend (Python FastAPI v2 :8002)"]
         Uvicorn["uvicorn ASGI"]
-        SolveV2["/solve_v2 (SSE)"]
+        SolveV2["/solve_v2 (SSE, public)"]
+        SolveV3["/solve (SSE, JWT auth)<br/>ENABLE_SOLVE_V3"]
         Planner["planner"]
-        Searcher["searcher"]
-        HybridSearch["hybrid_search"]
-        WebSearch["web_search (ddgs)"]
-        LLMv2["anthropic / openai clients"]
+        Searcher["searcher (+ modes:<br/>hybrid / web / rag)"]
+        HybridSearch["hybrid_search + corpus_search"]
+        WebSearch["web_search (Tavily/Google/DDG)"]
+        LLMv2["anthropic / openai /<br/>cerebras / fake clients"]
+        DBPool["asyncpg pool +<br/>model registry"]
+        VaultPy["PyNaCl secret vault"]
+        JWTVerify["PyJWT HS256 verify"]
         ConstitutionPy["guardrails: constitution"]
     end
 
@@ -145,12 +149,19 @@ graph TD
     DashGroup --> AgentGraphPanel
     AgentGraphPanel -->|same-origin SSE| GraphProxy
     GraphProxy -->|POST /solve_v2| SolveV2
+    GraphProxy -->|POST /solve + Bearer| SolveV3
     SolveV2 --> Planner
+    SolveV3 --> JWTVerify
+    JWTVerify --> DBPool
+    DBPool --> VaultPy
+    VaultPy --> Planner
     Planner --> Searcher
     Searcher --> HybridSearch
     Searcher --> WebSearch
     SolveV2 --> LLMv2
+    SolveV3 --> LLMv2
     SolveV2 --> ConstitutionPy
+    PG -.->|model_registry| DBPool
     CLI --> Backend
     AIAgents --> Router
     Router --> ProxyMW
@@ -190,8 +201,10 @@ graph TD
 | Frontend Auth Middleware | jose 5.2 | JWT verification at the edge |
 | Express API | Express 4.21 | REST API, business logic |
 | Router | http-proxy-middleware 3.0 | Per-tenant LiteLLM proxy |
-| KnowledgeSearchBackend | FastAPI 0.115 + Uvicorn 0.32 | Graph-mode planner+searcher DAG, `/solve_v2` SSE |
-| Graph Proxy (web) | Next.js Route Handler | Same-origin SSE proxy → KnowledgeSearchBackend |
+| Agent Graph Backend | FastAPI 0.115 + Uvicorn 0.32 | Graph-mode planner+searcher DAG, `/solve_v2` (public) + `/solve` (JWT auth, behind `ENABLE_SOLVE_V3`) |
+| Graph Proxy (web) | Next.js Route Handler | Same-origin SSE proxy → agent_graph_backend |
+| Agent Graph Auth | PyJWT 2.10 + asyncpg 0.30 | HS256 verify, tenant-scoped model registry (TAG-51/52/57) |
+| Agent Graph Vault | PyNaCl 1.5 (XSalsa20-Poly1305) | Cross-language parity with `apps/api`'s `tweetnacl` vault (TAG-54) |
 | Agent Graph Panel | @xyflow/react | Live DAG visualization for graph-mode chat |
 | PostgreSQL | PostgreSQL 15 | Relational data |
 | TimescaleDB | TimescaleDB extension | Time-series events |

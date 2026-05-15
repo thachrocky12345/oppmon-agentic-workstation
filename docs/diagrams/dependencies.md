@@ -1,10 +1,10 @@
 # Dependency Graph
 
-**Last Updated:** 2026-05-12 (init sync)
+**Last Updated:** 2026-05-15 (init sync)
 
 ## Overview
 
-This diagram shows the major dependencies used by the OppMon (Arkon) platform across all packages in the pnpm + Turborepo monorepo. New since last init: `apps/KnowledgeSearchBackend/` (Python FastAPI mindsearch v2) and the `evals/` workspace (`@oppmon/evals`).
+This diagram shows the major dependencies used by the OppMon (Arkon) platform across all packages in the pnpm + Turborepo monorepo. The Python graph-agent was renamed from `apps/KnowledgeSearchBackend/` → `apps/agent_graph_backend/` on 2026-05-15. TAG-50 epic added Python `asyncpg`, `PyJWT`, `PyNaCl` for the authenticated `/solve` endpoint.
 
 ```mermaid
 graph TB
@@ -13,7 +13,7 @@ graph TB
             Web["@oppmon/web<br/>(Next.js Frontend)"]
             API["@oppmon/api<br/>(Express Backend)"]
             RouterApp["@oppmon/router<br/>(LiteLLM Proxy)"]
-            KSB["KnowledgeSearchBackend<br/>(Python FastAPI v2)"]
+            KSB["agent_graph_backend<br/>(Python FastAPI v2)"]
         end
 
         subgraph Workspaces["workspaces (top-level)"]
@@ -107,16 +107,19 @@ graph TB
         Prom["prom-client (peer)"]
     end
 
-    subgraph KSBDeps["KnowledgeSearchBackend Deps (Python)"]
+    subgraph KSBDeps["agent_graph_backend Deps (Python)"]
         FastAPI["fastapi 0.115"]
         Uvicorn["uvicorn[standard] 0.32"]
         SSE["sse-starlette 2.1"]
         Pydantic["pydantic 2.10 + pydantic-settings"]
         AnthropicPy["anthropic 0.42"]
-        OpenAIPy["openai 1.59"]
-        Httpx["httpx 0.28"]
-        DDGS["ddgs 9.0 (DuckDuckGo)"]
+        OpenAIPy["openai 1.59 (+ Cerebras via base_url)"]
+        Httpx["httpx 0.28 (Tavily/Google CSE)"]
+        DDGS["ddgs 9.0 (DuckDuckGo fallback)"]
         Dotenv["python-dotenv"]
+        AsyncPG["asyncpg 0.30 (TAG-51)"]
+        PyJWT["PyJWT 2.10 (TAG-52)"]
+        PyNaCl["PyNaCl 1.5 (TAG-54)"]
     end
 
     subgraph EvalsDeps["Evals Deps"]
@@ -174,5 +177,5 @@ graph TB
 | Skill Framework | yaml, glob, chokidar |
 | Observability (peer) | langfuse, prom-client |
 | Build / DevTools | turbo, typescript, tsx, eslint |
-| Graph-Mode (Python) | fastapi, uvicorn, sse-starlette, pydantic, anthropic, openai, httpx, ddgs, python-dotenv |
+| Graph-Mode (Python) | fastapi, uvicorn, sse-starlette, pydantic, anthropic, openai, httpx, ddgs, python-dotenv, asyncpg, PyJWT, PyNaCl |
 | Eval Harness | @anthropic-ai/sdk, dotenv, tsx |
