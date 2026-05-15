@@ -1,0 +1,27 @@
+{
+  "$comment": [
+    "TAG-64 — golden snapshot of the SSE event SHAPE produced by /solve_v2",
+    "for a single-turn 'what is 2+2?' request with the FakeLLMClient running",
+    "a minimal finalize-only script (planner emits one STREAM_ING + one",
+    "ANSWER_ING + the END frame). The snapshot intentionally captures the",
+    "(type, state) tuple per frame — NOT the full content payload — so",
+    "planner reword tweaks don't churn this file. Re-record only when the",
+    "SSE wire contract changes (UPDATE_SNAPSHOTS=1).",
+    "",
+    "Encoding: each entry is 'type:state' produced by event_types() in",
+    "conftest.py. The first frame is always a STREAM_ING planner kick-off",
+    "and the last frame is always 'planner:END'."
+  ],
+  "version": 1,
+  "request": {
+    "inputs": "what is 2+2?",
+    "enable_tools": false,
+    "web_fallback": true,
+    "collection_ids": []
+  },
+  "events": [
+    "planner:STREAM_ING",
+    "planner:ANSWER_ING",
+    "planner:END"
+  ]
+}

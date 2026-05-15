@@ -1,0 +1,39 @@
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "I",   # isort
+]
+ignore = [
+    "E501",  # line length — handled by formatter
+]
+
+[lint.per-file-ignores]
+"agent_search/tests/**" = ["B018", "F841"]
+
+[lint.flake8-bugbear]
+# FastAPI / Pydantic idioms that intentionally use function-call defaults.
+# `Depends(...)`, `Header(...)`, `Query(...)`, `Path(...)`, `Body(...)`,
+# `Form(...)`, `File(...)`, `Cookie(...)`, `Security(...)` are all
+# canonical and ruff's B008 should not flag them.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Header",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Cookie",
+    "fastapi.Security",
+]
+
+[format]
+quote-style = "double"

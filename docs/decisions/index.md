@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-**Last Updated:** 2026-05-11 (init sync — no new ADRs; deps unchanged since 2026-05-07)
+**Last Updated:** 2026-05-15 (init sync — no new ADRs; existing ADR-0011/ADR-0014 still cover the graph-agent rename from `KnowledgeSearchBackend` → `agent_graph_backend`)
 
 This directory contains Architecture Decision Records (ADRs) for the OppMon (Arkon) project.
 
@@ -33,6 +33,10 @@ An Architecture Decision Record captures an important architectural decision mad
 | [0008](ADR-0008-agent-engine-subsystem.md) | [AUTO] Agent Engine Subsystem with Oracle Loop and Semantic Cache | Accepted | 2026-05-07 |
 | [0009](ADR-0009-guardrails-and-observability.md) | [AUTO] Guardrails and Observability Packages | Accepted | 2026-05-07 |
 | [0010](ADR-0010-document-ingestion-pipeline.md) | [AUTO] Document Ingestion Pipeline (PDF / DOCX / Multipart) | Accepted | 2026-05-07 |
+| [0011](ADR-0011-fastapi-knowledgesearch-backend.md) | [AUTO] FastAPI Python KnowledgeSearchBackend for Graph-Mode Chat | Accepted | 2026-05-12 |
+| [0012](ADR-0012-residency-model.md) | Residency Model — Centralize Metadata, Isolate Content | Accepted | 2026-05-14 |
+| [0013](ADR-0013-byo-vpc-upgrade-channel.md) | BYO-VPC Upgrade Channel — Customer-Managed Image Tag Policy | Accepted | 2026-05-14 |
+| [0014](ADR-0014-authenticated-solve-endpoint.md) | Authenticated `/solve` Endpoint (TAG-50 epic) | Accepted | 2026-05-14 |
 
 ## Status Definitions
 

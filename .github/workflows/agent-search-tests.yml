@@ -1,0 +1,155 @@
+name: agent-search-tests
+
+# TAG-64 — gates merges to ``main`` on the Python integration suite.
+# Runs hermetically (DATABASE_URL empty) by default. The Postgres-bound
+# cross-tenant SQL test inside the suite is skipped at this tier and
+# only activated when the workflow is dispatched with ``with-postgres:
+# true`` (see ``workflow_dispatch`` inputs below) so contributor PRs
+# don't pay for a database service container on every push.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/agent_graph_backend/**"
+      - "evals/corpus-questions.json"
+      - ".github/workflows/agent-search-tests.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/agent_graph_backend/**"
+      - "evals/corpus-questions.json"
+      - ".github/workflows/agent-search-tests.yml"
+  workflow_dispatch:
+    inputs:
+      with-postgres:
+        description: "Run the Postgres-bound integration test path"
+        required: false
+        default: "false"
+
+jobs:
+  pytest:
+    name: pytest (agent_search)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/agent_graph_backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install runtime + test deps
+        run: |
+          python -m pip install --upgrade pip
+          # Runtime deps for the agent_search package.
+          pip install -r requirements-v2.txt
+          # Test-only deps. These are NOT in requirements-v2.txt because
+          # they should not ship in the runtime image.
+          pip install pytest pytest-asyncio pytest-cov httpx pyjwt ruff
+
+      - name: Run unit + integration suites
+        env:
+          # Hermetic by default — every integration test that needs a
+          # real database is gated behind the ``requires_postgres`` marker
+          # and skipped here.
+          DATABASE_URL: ""
+          LLM_PROVIDER: fake
+          ANTHROPIC_API_KEY: test-anthropic-key
+          OPENAI_API_KEY: test-openai-key
+        run: |
+          pytest agent_search/tests/ -v --tb=short \
+            --cov=agent_search/agent_v2 \
+            --cov-report=term-missing \
+            --cov-fail-under=70
+
+      - name: Out-of-process integration smoke
+        run: python scripts/TAG_64_integration.py
+
+      - name: Ruff lint (new test surface)
+        run: |
+          ruff check \
+            agent_search/tests/integration/ \
+            scripts/TAG_64_integration.py \
+            --select E,F,W,B,UP,SIM
+
+      - name: Secret scan (regex grep)
+        run: |
+          set +e
+          pattern='sk-[A-Za-z0-9]{20,}|csk-[A-Za-z0-9]{20,}|tvly-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}'
+          # Allow-list the documented canary strings in TC-11 / TC-12.
+          if grep -rEn "$pattern" agent_search/tests/integration/ scripts/TAG_64_integration.py \
+              | grep -vE 'sk-secret-canary|csk-secret-not'; then
+            echo "::error::secret-like string found in new test surface"
+            exit 1
+          fi
+          echo "no secrets"
+
+  pytest-with-postgres:
+    name: pytest (real DB)
+    # Only run when explicitly requested via workflow_dispatch.
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.with-postgres == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/agent_graph_backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: arkon
+          POSTGRES_PASSWORD: arkon_test
+          POSTGRES_DB: arkon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://arkon:arkon_test@localhost:5432/arkon_test
+      LLM_PROVIDER: fake
+      ANTHROPIC_API_KEY: test-anthropic-key
+      OPENAI_API_KEY: test-openai-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-v2.txt
+          pip install pytest pytest-asyncio httpx pyjwt
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Push Prisma schema
+        working-directory: ${{ github.workspace }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm turbo run db:generate
+          pnpm turbo run db:push
+
+      - name: Seed two-tenant fixture
+        run: |
+          PGPASSWORD=arkon_test psql -h localhost -U arkon -d arkon_test \
+            -f agent_search/tests/integration/fixtures/seed_two_tenants.sql
+
+      - name: Run integration suite (real DB path enabled)
+        run: pytest agent_search/tests/integration/ -v --tb=short

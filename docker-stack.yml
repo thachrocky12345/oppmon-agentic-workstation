@@ -18,7 +18,7 @@ version: "3.8"
 
 services:
   api:
-    image: thachrocky/oppmon-api:v35495
+    image: thachrocky/oppmon-api:webs.v2
     networks:
       - oppmon-net
     ports:
@@ -72,7 +72,7 @@ services:
         failure_action: rollback
 
   web:
-    image: thachrocky/oppmon-web:v35643
+    image: thachrocky/oppmon-web:webs.v2
     networks:
       - oppmon-net
     ports:
@@ -93,6 +93,14 @@ services:
       # non-matching default and rejects every JWT (see deploy-retro-2026-05-07.md
       # item C). Keep parity with `services.api.environment.JWT_SECRET`.
       JWT_SECRET: development-secret-key-change-in-production
+      # ----- Graph mode -----
+      # The graph-agent service below listens on container port 8002 (NOT 7002 —
+      # that's only the dev-time host mapping). Web reaches it via Swarm overlay DNS.
+      GRAPH_BACKEND_URL: http://graph-agent:8002
+      GRAPH_BACKEND_TOKEN: ""
+      # NOTE: NEXT_PUBLIC_GRAPH_ENABLED is build-time only — it must be passed
+      # via --build-arg when building thachrocky/oppmon-web. Setting it here
+      # has no effect on the already-built image.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
       interval: 30s
@@ -110,6 +118,83 @@ services:
       update_config:
         order: start-first
         failure_action: rollback
+
+  # ===========================================================================
+  # Graph-mode agent - mindsearch v2 (FastAPI)
+  # ===========================================================================
+  # Serves POST /solve_v2 (SSE) for OppMon Chat's Graph mode. Source is in
+  # apps/agent_graph_backend/ in this repo. See docs/solve-v2.md.
+  #
+  # Bump the image tag every push so swarm workers actually pull. Always use
+  # a tag whose source actually exposes /solve_v2 — the legacy
+  # `backend.<year>` tags pre-date that endpoint.
+  graph-agent:
+    image: thachrocky/mindsearch:webs.v2
+    networks:
+      - oppmon-net
+    # Graph-agent config is read at boot. The vars the v2 server reads:
+    # LLM_PROVIDER, ANTHROPIC_API_KEY, ANTHROPIC_MODEL, OPENAI_API_KEY,
+    # WEB_SEARCH_PROVIDER, TAVILY_API_KEY, TAVILY_SEARCH_TIMEOUT,
+    # TAVILY_SEARCH_DEPTH, PLANNER_MAX_ITERATIONS, SEARCHER_MAX_ITERATIONS,
+    # MINDSEARCH_DEBUG.
+    #
+    # TAG-65: the authenticated /solve route (TAG-50 epic) needs four
+    # additional secrets — DATABASE_URL, JWT_SECRET, TAG_ENCRYPTION_MASTER_KEY,
+    # OPENAI_EMBED_API_KEY — plus the embedding model/dim pair so the boot-
+    # time dim guard agrees with the Express side. `mount_v2()` runs
+    # `check_required_env()` at startup and CrashLoopBackOffs if any of
+    # these are empty while ENABLE_SOLVE_V3=true.
+    #
+    # IMPORTANT: every `${VAR:-}` resolves from the SHELL that runs
+    # `docker stack deploy`, not from any .env file. Source apps/api/.env
+    # first:  `set -a && . apps/api/.env && set +a`. See
+    # .claude/skills/swarm-debug/SKILL.md §solve-v3-check.
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Web search: Tavily primary, DDG fallback (built into the v2 image via
+      # ChainedWebSearch in mindsearch.agent_v2.app._build_web_search).
+      WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-tavily}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      TAVILY_SEARCH_TIMEOUT: ${TAVILY_SEARCH_TIMEOUT:-8}
+      TAVILY_SEARCH_DEPTH: ${TAVILY_SEARCH_DEPTH:-basic}
+      PLANNER_MAX_ITERATIONS: ${PLANNER_MAX_ITERATIONS:-6}
+      SEARCHER_MAX_ITERATIONS: ${SEARCHER_MAX_ITERATIONS:-3}
+      # ----- TAG-65: authenticated /solve route -----
+      # MUST equal services.api.environment.JWT_SECRET (env_file: apps/api/.env).
+      # Mismatch = every JWT rejected; verify with scripts/check-jwt-parity.sh.
+      JWT_SECRET: ${JWT_SECRET:-}
+      # MUST equal apps/api's TAG_ENCRYPTION_MASTER_KEY — ciphertext written
+      # by Express decrypts here. Empty value triggers CrashLoopBackOff.
+      TAG_ENCRYPTION_MASTER_KEY: ${TAG_ENCRYPTION_MASTER_KEY:-}
+      # Rotation chain (oldest first). Optional; empty is fine.
+      TAG_ENCRYPTION_LEGACY_KEYS: ${TAG_ENCRYPTION_LEGACY_KEYS:-}
+      # Direct asyncpg URL — host LAN IP, NOT localhost.
+      DATABASE_URL: ${DATABASE_URL:-}
+      # Embed-side key (operator pool, NOT a per-user model).
+      OPENAI_EMBED_API_KEY: ${OPENAI_EMBED_API_KEY:-}
+      OPENAI_EMBED_API_BASE: ${OPENAI_EMBED_API_BASE:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
+      # Rollback knob: flip to "false" and redeploy to un-mount /solve
+      # without removing code or rotating any secret.
+      ENABLE_SOLVE_V3: ${ENABLE_SOLVE_V3:-true}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == old_windows
+      restart_policy:
+        condition: any
+        delay: 5s
 
 networks:
   oppmon-net:

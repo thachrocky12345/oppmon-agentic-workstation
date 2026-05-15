@@ -1,0 +1,112 @@
+# KnowledgeSearchBackend (v2-only)
+
+Trimmed fork of [InternLM/MindSearch](https://github.com/InternLM/MindSearch)
+that serves only `POST /solve_v2`. The legacy `/solve` route and its
+`mindsearch.agent` package have been deleted — see
+[`docs/solve-v2.md`](../../docs/solve-v2.md) for the wire contract.
+
+Used by Arkon's chat page when **Graph mode** is enabled. The browser hits
+the same-origin Next.js proxy at `/api/graph/solve`, which forwards to this
+service. Source for the proxy is in
+[`apps/web/src/app/api/graph/solve/route.ts`](../web/src/app/api/graph/solve/route.ts).
+
+## Layout
+
+```
+KnowledgeSearchBackend/
+├── dockerfile                         # builds the v2-only image (~250 MB)
+├── requirements-v2.txt                # minimal pip deps (~10 packages)
+├── .env / .env.example                # LLM + search keys
+└── mindsearch/
+    ├── __init__.py                    # empty
+    ├── v2_server.py                   # entry point — uvicorn on :8002
+    └── agent_v2/                      # the v2 implementation
+        ├── app.py                     # mount_v2(app) — adds /solve_v2
+        ├── config.py                  # Settings (reads from env)
+        ├── orchestrator/              # planner + searcher loop
+        ├── llm/                       # anthropic / openai / fake clients
+        ├── rag/                       # hybrid_search, retriever, web_search
+        ├── memory/                    # conversational + tool_log
+        ├── tools/                     # planner & searcher tool registries
+        └── guardrails/                # constitution checks
+```
+
+## Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/healthz` | Liveness probe — `{"status": "ok", "service": "mindsearch-v2"}` |
+| GET | `/` | FastAPI Swagger UI |
+| POST | `/solve_v2` | SSE-streaming planner → searcher → synthesis |
+
+## Run
+
+### Locally (no Docker)
+
+```bash
+cd apps/KnowledgeSearchBackend
+pip install -r requirements-v2.txt
+cp .env.example .env       # then fill in ANTHROPIC_API_KEY etc.
+python -m mindsearch.v2_server
+```
+
+### With Docker (recommended)
+
+The service is wired into the monorepo's docker-compose under the `graph`
+profile. From the repo root:
+
+```bash
+set -a && . apps/api/.env && set +a    # load secrets into shell
+docker compose --profile dev --profile graph up --build
+```
+
+Then verify:
+
+```bash
+curl http://localhost:7002/healthz
+curl -N -X POST http://localhost:7002/solve_v2 \
+     -H 'Content-Type: application/json' \
+     -d '{"inputs":"hello","web_fallback":false,"enable_tools":false,"collection_ids":[]}'
+```
+
+Inside the docker network the web app reaches this service at
+`http://graph-agent:8002` — see `GRAPH_BACKEND_URL` in `apps/api/.env`.
+
+## Required environment
+
+| Var | Purpose | Default |
+|---|---|---|
+| `LLM_PROVIDER` | `anthropic` \| `openai` \| `fake` | `anthropic` |
+| `ANTHROPIC_API_KEY` | Required if `LLM_PROVIDER=anthropic` | — |
+| `OPENAI_API_KEY` | Required if `LLM_PROVIDER=openai` | — |
+| `WEB_SEARCH_PROVIDER` | `google` \| `duckduckgo` \| empty (auto) | empty |
+| `GOOGLE_SEARCH_API_KEY` | For Google Custom Search | — |
+| `GOOGLE_SEARCH_ENGINE_ID` | For Google Custom Search | — |
+| `PLANNER_MAX_ITERATIONS` | Planner loop cap | `8` |
+| `SEARCHER_MAX_ITERATIONS` | Per-searcher loop cap | `4` |
+| `MINDSEARCH_DEBUG` | `1` or `true` for DEBUG logs | unset |
+| `MINDSEARCH_PORT` | Server port | `8002` |
+
+Full list in [`.env.example`](.env.example). Keys must come from env — they
+must never be hardcoded in `mindsearch/` source (push protection enforces).
+
+## Image
+
+Pushed to Docker Hub as `thachrocky/mindsearch:backend.v2.<N>`. The legacy
+`backend.<year>` tags point at the old image without `/solve_v2` — do **not**
+use them. Always bump `<N>` on every push so swarm workers actually pull the
+new digest.
+
+Build / push:
+
+```bash
+NEXT_GRAPH_TAG=backend.v2.$(($(date +%s) % 100000))
+docker build -f apps/KnowledgeSearchBackend/dockerfile \
+  -t thachrocky/mindsearch:$NEXT_GRAPH_TAG apps/KnowledgeSearchBackend
+docker push thachrocky/mindsearch:$NEXT_GRAPH_TAG
+```
+
+## License
+
+Apache 2.0. See [`LICENSE`](LICENSE). Original MindSearch:
+[arxiv:2407.20183](https://arxiv.org/abs/2407.20183).

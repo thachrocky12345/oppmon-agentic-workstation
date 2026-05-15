@@ -1,6 +1,6 @@
 # OppMon (Arkon) Architecture
 
-**Last Updated:** 2026-05-11 (init sync)
+**Last Updated:** 2026-05-15 (init sync — KnowledgeSearchBackend renamed to agent_graph_backend; authenticated `/solve` endpoint + TAG-50 epic landed)
 
 ## Important: Repository Structure
 
@@ -11,6 +11,8 @@ This is a **pnpm + Turborepo monorepo** with the following structure:
 | `apps/api/` | **ACTIVE** | Express API server (@oppmon/api) |
 | `apps/router/` | **ACTIVE** | LiteLLM proxy router (@oppmon/router) |
 | `apps/web/` | **ACTIVE** | Next.js frontend (@oppmon/web) |
+| `apps/agent_graph_backend/` | **ACTIVE** | Python FastAPI `agent_search` (graph-mode chat: `/solve_v2` + authenticated `/solve` behind `ENABLE_SOLVE_V3`) — renamed from `apps/KnowledgeSearchBackend/` on 2026-05-15 |
+| `evals/` | **ACTIVE** | Regression eval harness (@oppmon/evals) |
 | `packages/database/` | **ACTIVE** | Prisma schema and client (@oppmon/database) |
 | `packages/shared/` | **ACTIVE** | Shared TypeScript types (@oppmon/shared) |
 | `packages/cli/` | **ACTIVE** | CLI tool for AI Gateway management (@oppmon/cli) |
@@ -53,14 +55,32 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **Real-time**: WebSocket (ws), Web Push
 - **Security**: Helmet, CORS, compression
 
+### Graph-Mode Backend (`apps/agent_graph_backend/`)
+- **Runtime**: Python 3.12
+- **Framework**: FastAPI 0.115 + Uvicorn (ASGI)
+- **Streaming**: SSE via sse-starlette
+- **LLM**: Anthropic + OpenAI + Cerebras (OpenAI-compatible) SDKs (lazy-imported)
+- **Web Search**: Tavily → Google CSE → DuckDuckGo (auto-pick by env)
+- **HTTP Client**: httpx 0.28 (Google CSE + Tavily)
+- **DB**: asyncpg 0.30 — model registry, tenant-scoped corpus search
+- **Auth**: PyJWT 2.10 (HS256, shared `JWT_SECRET` with `apps/api`)
+- **Vault**: PyNaCl 1.5 (XSalsa20-Poly1305 — parity with TS `tweetnacl`)
+- **Endpoints**:
+  - `POST /solve_v2` — planner→searcher DAG with synthesis (unauthenticated, trusts proxy boundary)
+  - `POST /solve` — authenticated, tenant-scoped, with per-request LLMSpec resolution and audit row (TAG-58, gated by `ENABLE_SOLVE_V3=true`)
+- **Port**: 8002 container / 7002 host (graph profile in docker-compose)
+- **Wire contract**: `docs/solve-v2.md`
+- **Renamed from**: `apps/KnowledgeSearchBackend/` (Python module also moved `mindsearch/` → `agent_search/`)
+
 ### Rust Engine (`packages/engine-core/`)
 - **Common**: Envelope<T>, Error types, SHA-256 hashing
 - **NAPI**: Node.js bindings (planned)
 
 ### Infrastructure
-- **Monorepo**: pnpm + Turborepo
-- **Containerization**: Docker, Docker Compose
+- **Monorepo**: pnpm + Turborepo (workspaces: apps/*, packages/*, evals)
+- **Containerization**: Docker, Docker Compose (profiles: dev, prod, full, graph)
 - **Database**: TimescaleDB (PostgreSQL extension)
+- **Production**: Docker Swarm (`docker-stack.yml`, v2.x image tag convention)
 - **CI/CD**: GitHub Actions
 
 ## System Layers
@@ -76,19 +96,20 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 │                    Frontend (Next.js)                       │
 │  - Server Components     - React Flow diagrams             │
 │  - Client Components     - Real-time updates               │
-│  - API Routes            - Dashboard & Analytics           │
+│  - API Routes            - /api/graph/solve proxy          │
+│  - Dashboard & Analytics - AgentGraphPanel                 │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Backend API (Express)                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │ Middleware  │  │  Services   │  │  WebSocket  │         │
-│  │ - OAuth     │  │  - Agents   │  │  - Events   │         │
-│  │ - JWT       │  │  - Workflows│  │  - Alerts   │         │
-│  │ - Validate  │  │  - Analytics│  │             │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
+              │                              │
+              ▼                              ▼
+┌──────────────────────────────┐ ┌──────────────────────────────┐
+│   Backend API (Express)      │ │  agent_graph_backend         │
+│  ┌──────────┐ ┌──────────┐   │ │  (Python FastAPI v2)         │
+│  │ Middleware│ │ Services │   │ │  - /solve_v2 (SSE, public)   │
+│  │ - OAuth   │ │ - Agents │   │ │  - /solve   (SSE, JWT auth)  │
+│  │ - JWT     │ │ - LLM    │   │ │  - planner + searcher DAG   │
+│  │ - Tenant  │ │ - RAG    │   │ │  - asyncpg model registry   │
+│  └──────────┘ └──────────┘   │ │  - PyNaCl secret vault      │
+└──────────────────────────────┘ └──────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -98,6 +119,7 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 │  │  - Tenants, Teams     │  │  - Events (time-series)    │ │
 │  │  - Users, Agents      │  │  - Metrics                 │ │
 │  │  - Workflows          │  │  - Audit Logs              │ │
+│  │  - pgvector embeds    │  │                            │ │
 │  └───────────────────────┘  └────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -145,6 +167,25 @@ Arkon is an AI Gateway platform that provides observability, security, and manag
 - **@arkon/skill-framework**: YAML frontmatter skill registry and workflow runner
 - **@arkon/integration-tests**: Cross-package smoke + integration tests
 - **engine-core**: Rust workspace for high-performance utilities
+
+### Graph-Mode Modules (Python — apps/agent_graph_backend/agent_search/agent_v2/)
+- **Orchestrator**: planner + searcher loop, graph state, SSE streaming, mode selection (`hybrid_mode`, `web_mode`, `modes`), RAG planner prompt + tools
+- **API**: authenticated `/solve` router and request schema (TAG-58)
+- **Auth**: HS256 JWT verify, FastAPI deps, LLMSpec resolver (TAG-52/TAG-57)
+- **Crypto**: PyNaCl-based secret vault (XSalsa20-Poly1305 — TAG-54)
+- **DB**: asyncpg pool, model_registry, queries, models (TAG-51)
+- **LLM**: anthropic + openai + cerebras clients with a factory + fake client for tests; `spec.py` / `base.py` for the LLMSpec contract (TAG-56)
+- **RAG**: hybrid_search, retriever, web_search (Tavily/Google/DDG), citation, embedding (TAG-60), corpus_search, web_search_factory
+- **Memory**: conversational history, tool log, history (planner turn log)
+- **Prompts**: YAML-schema prompt catalog warmed at boot (TAG-72)
+- **Tools**: planner_tools, searcher_tools, registry
+- **Guardrails**: constitution checks (surface-only, non-blocking)
+
+### Evaluation Harness (evals/)
+- **Questions**: `evals/questions.json` (10 baseline questions Q01–Q10)
+- **References**: ChatGPT and Claude reference answers
+- **Scripts**: `run.ts` (execute), `judge.ts` (LLM-as-judge), `report.ts` (aggregate scores)
+- **Runs**: Recorded under `evals/runs/<name>/` with manifest + scores
 
 ## Multi-Tenancy Model
 
@@ -209,7 +250,28 @@ See [Admin User Guide](admin-user-guide.md) for admin features and [Runbooks](ru
 - [x] Multi-tenancy isolation approach — **Resolved: Tenant/Team/User model with Prisma**
 - [x] Admin action framework — **Resolved: Decorator-based actions with audit logging**
 - [x] Deployment procedures — **Resolved: Runbooks created**
+- [x] Parallel backend consideration — **Resolved 2026-05-12: FastAPI Python service (KnowledgeSearchBackend) for graph-mode chat. See ADR-0011.**
 - [ ] Redis caching strategy for high-volume events
 - [ ] Message queue for async processing (considering BullMQ)
 - [ ] Rate limiting strategy per tenant
-- [ ] Parallel backend consideration (FastAPI Python or Rust+Go) — deferred
+
+## Residency Layer
+
+Cross-cutting layer governing data residency, cross-tenant isolation, and
+deployment topologies (SaaS / single-tenant managed / BYO-VPC). The model is
+"centralize metadata, isolate content" — control-plane metadata stays in
+Arkon-operated tables, customer content is partitioned by `tenant_id` and
+pinned to the contracted region. Provider seams (storage, embedding, LLM)
+are pluggable so a BYO-VPC customer can swap each endpoint without forking
+the codebase. The cross-tenant isolation contract is enforced by a
+mandatory SQL-predicate negative test (TAG-59, with TAG-81 parity on the TS
+side).
+
+Locked-in decisions:
+[ADR-0012 — Residency Model](decisions/ADR-0012-residency-model.md),
+[ADR-0013 — BYO-VPC Upgrade Channel](decisions/ADR-0013-byo-vpc-upgrade-channel.md).
+
+Full residency story (architecture, topologies, control-plane vs data-plane
+split, isolation flow) lives in [docs/residency/](residency/index.md). The
+implementation arc is tracked under epic
+[TAG-78](jira/TAG-78-residency-governance-hardening-epic.md).

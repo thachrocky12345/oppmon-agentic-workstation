@@ -26,48 +26,57 @@ export default function ArchitecturePage() {
       >
         <div className="space-y-6">
           <p className="text-gray-400">
-            OppMon is a pnpm + Turborepo monorepo with separate apps for the API, web frontend,
-            and CLI tool, plus shared packages for database schema and types.
+            OppMon is a pnpm + Turborepo monorepo with separate apps for the Express API, Next.js
+            web frontend, LiteLLM router, and the FastAPI{' '}
+            <code className="text-cyan-300">agent_graph_backend</code>{' '}
+            (graph-mode chat), plus shared packages for the Prisma schema, types, agent engine,
+            guardrails, observability, and the skill framework.
           </p>
 
           {/* Architecture Diagram */}
           <div className="bg-black/30 rounded-xl p-6 border border-white/10 overflow-x-auto">
             <pre className="text-xs text-gray-400 font-mono">{`┌─────────────────────────────────────────────────────────────┐
 │                      Client Layer                           │
-│  Browser / Mobile / CLI / AI Agents                        │
+│  Browser / Mobile / CLI / AI Agents                         │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (Next.js)                       │
-│  - Server Components     - React Flow diagrams             │
-│  - Client Components     - Real-time updates               │
-│  - API Routes            - Dashboard & Analytics           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Backend API (Express)                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │ Middleware  │  │  Services   │  │  WebSocket  │         │
-│  │ - OAuth     │  │  - Skills   │  │  - Events   │         │
-│  │ - JWT       │  │  - RAG      │  │  - Alerts   │         │
-│  │ - RBAC      │  │  - LLM      │  │             │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+│                    Frontend (Next.js 15)                    │
+│  - Server Components     - React Flow diagrams              │
+│  - Client Components     - Real-time updates                │
+│  - API Routes (proxies)  - Dashboard & Analytics            │
+│  - middleware.ts (jose JWT verify)                          │
+└──────┬──────────────────────────────┬───────────────────────┘
+       │ /api/* (REST)                │ /api/graph/solve(_v2) (SSE proxy)
+       ▼                              ▼
+┌──────────────────────────┐   ┌───────────────────────────────┐
+│   Backend API (Express)  │   │  agent_graph_backend (Python) │
+│  ┌────────┐ ┌──────────┐ │   │  FastAPI 0.115 · port 8002    │
+│  │ Middle │ │ Services │ │   │  ┌──────────┐  ┌───────────┐  │
+│  │ -ware  │ │ - Skills │ │   │  │ Planner  │  │ Searcher  │  │
+│  │ - OAuth│ │ - RAG    │ │   │  │ (DAG)    │  │ (RAG+web) │  │
+│  │ - JWT  │ │ - LLM    │ │   │  └──────────┘  └───────────┘  │
+│  │ - RBAC │ │ - Agent  │ │   │  /solve_v2 (public, SSE)      │
+│  │ - RLS  │ │ - Models │ │   │  /solve    (JWT auth, SSE)    │
+│  └────────┘ └──────────┘ │   │  asyncpg · PyJWT · PyNaCl     │
+│  WebSocket (events)      │   │  ENABLE_SOLVE_V3 flag         │
+└─────────┬────────────────┘   └────────────┬──────────────────┘
+          │                                 │
+          └──────────────┬──────────────────┘
+                         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    Data Layer                               │
-│  ┌───────────────────────┐  ┌────────────────────────────┐ │
-│  │  PostgreSQL (Prisma)  │  │  TimescaleDB               │ │
-│  │  - Tenants, Teams     │  │  - Events (time-series)    │ │
-│  │  - Users, Agents      │  │  - Metrics                 │ │
-│  │  - Skills, Models     │  │  - Audit Logs              │ │
-│  └───────────────────────┘  └────────────────────────────┘ │
-│  ┌───────────────────────────────────────────────────────┐ │
-│  │  pgvector - Vector embeddings for semantic search     │ │
-│  └───────────────────────────────────────────────────────┘ │
+│  ┌───────────────────────┐  ┌────────────────────────────┐  │
+│  │  PostgreSQL (Prisma)  │  │  TimescaleDB               │  │
+│  │  - Tenants, Teams     │  │  - Events (time-series)    │  │
+│  │  - Users, Agents      │  │  - Metrics                 │  │
+│  │  - Skills, Models     │  │  - Audit Logs              │  │
+│  │  - RLS by tenant_id   │  │                            │  │
+│  └───────────────────────┘  └────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  pgvector - Vector embeddings for semantic search     │  │
+│  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘`}</pre>
           </div>
         </div>
@@ -168,6 +177,54 @@ export default function ArchitecturePage() {
               </li>
             </ul>
           </div>
+
+          <div>
+            <h4 className="text-white font-medium mb-3">Graph backend (apps/agent_graph_backend)</h4>
+            <ul className="space-y-2 text-gray-400 text-sm">
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">▸</span>
+                <span><strong className="text-white">FastAPI</strong> 0.115 + Uvicorn (Python 3.11)</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">▸</span>
+                <span><strong className="text-white">sse-starlette</strong> for streaming planner/searcher events</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">▸</span>
+                <span><strong className="text-white">asyncpg</strong> read-only pool with RLS GUCs</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">▸</span>
+                <span><strong className="text-white">PyJWT + PyNaCl</strong> JWT verify + vault parity with the API</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">▸</span>
+                <span><strong className="text-white">Tavily / Google / DDG</strong> web-search chain</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">▸</span>
+                <span>Renamed from <code className="text-cyan-300">KnowledgeSearchBackend</code> (TAG-50 epic)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-white font-medium mb-3">Router (apps/router)</h4>
+            <ul className="space-y-2 text-gray-400 text-sm">
+              <li className="flex items-center gap-2">
+                <span className="text-pink-400">▸</span>
+                <span><strong className="text-white">Express</strong> 4.21 + http-proxy-middleware</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-pink-400">▸</span>
+                <span><strong className="text-white">LiteLLM</strong> proxy for <code className="text-cyan-300">/v1/chat/completions</code></span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-pink-400">▸</span>
+                <span><strong className="text-white">Virtual keys</strong> resolved per-tenant</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </TutorialSection>
 
@@ -185,39 +242,61 @@ export default function ArchitecturePage() {
         <div className="bg-black/30 rounded-xl p-6 border border-white/10 overflow-x-auto">
           <pre className="text-xs text-gray-400 font-mono">{`oppmon-workstation/
 ├── apps/
-│   ├── api/                    # Express API server
+│   ├── api/                    # Express API server (@oppmon/api)
 │   │   ├── src/
 │   │   │   ├── routes/         # API route handlers
 │   │   │   ├── services/       # Business logic
-│   │   │   ├── lib/            # Database, JWT, LLM, RAG
-│   │   │   └── middleware/     # Auth, RBAC, rate limiting
+│   │   │   ├── lib/            # Database, JWT, LLM, RAG, vault
+│   │   │   ├── middleware/     # Auth, RBAC, RLS, rate limiting
+│   │   │   ├── agent/          # Oracle loop, memory, toolbox
+│   │   │   └── crypto/         # XChaCha20-Poly1305 secret vault
 │   │   └── package.json
 │   │
-│   └── web/                    # Next.js frontend
+│   ├── agent_graph_backend/    # FastAPI graph-mode service (Python 3.11)
+│   │   ├── agent_search/
+│   │   │   ├── v2_server.py    # Uvicorn entry (port 8002)
+│   │   │   └── agent_v2/
+│   │   │       ├── app.py      # mount_v2(app) — /solve + /solve_v2
+│   │   │       ├── orchestrator/  # planner, searcher, modes, loop
+│   │   │       ├── llm/        # anthropic, openai, cerebras, fake
+│   │   │       ├── rag/        # hybrid_search, retriever, corpus
+│   │   │       ├── auth/       # PyJWT verify + tenancy deps
+│   │   │       ├── crypto/     # PyNaCl vault (parity with api)
+│   │   │       ├── db/         # asyncpg pool + RLS GUCs
+│   │   │       └── prompts/    # YAML prompt registry + warmup
+│   │   ├── requirements-v2.txt
+│   │   └── dockerfile
+│   │
+│   ├── router/                 # LiteLLM proxy (@oppmon/router)
+│   │   └── src/                # Express + http-proxy-middleware
+│   │
+│   └── web/                    # Next.js frontend (@oppmon/web)
 │       ├── src/
 │       │   ├── app/            # App Router pages
-│       │   ├── components/     # React components
+│       │   │   └── api/graph/solve/    # SSE proxy → agent_graph_backend
+│       │   ├── components/     # React components (incl. AgentGraphPanel)
+│       │   ├── middleware.ts   # jose JWT verify
 │       │   └── lib/            # Utilities, API client
 │       └── package.json
 │
 ├── packages/
 │   ├── cli/                    # CLI tool (tag command)
-│   │   ├── src/commands/       # CLI commands
-│   │   └── src/services/       # CLI business logic
-│   │
-│   ├── database/               # Prisma schema
-│   │   ├── prisma/schema.prisma
-│   │   └── prisma/seed.ts
-│   │
-│   └── shared/                 # Shared types
-│       └── src/types.ts        # JWTClaims, Role, etc.
+│   ├── database/               # Prisma schema (snake_case @map)
+│   ├── shared/                 # JWTClaims, Role, provider templates
+│   ├── agent-engine/           # Oracle loop, replay, risk primitives
+│   ├── guardrails/             # Constitution, scope, filter, audit
+│   ├── observability/          # Tracing, metrics, Langfuse
+│   ├── skill-framework/        # YAML skill registry + workflow
+│   └── engine-core/            # Rust utilities (Envelope, Hash)
 │
 ├── docs/                       # Documentation
 │   ├── architecture.md
+│   ├── decisions/              # ADRs (incl. ADR-0011, ADR-0014)
 │   ├── diagrams/               # Mermaid diagrams
 │   └── flows/                  # Flow diagrams
 │
-├── docker-compose.yml          # Development stack
+├── docker-compose.yml          # Dev stack (profiles: dev, prod, full, graph)
+├── docker-stack.yml            # Production Docker Swarm stack
 ├── turbo.json                  # Turborepo config
 └── pnpm-workspace.yaml         # Workspace definition`}</pre>
         </div>

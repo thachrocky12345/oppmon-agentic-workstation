@@ -33,6 +33,7 @@ const navSections = [
     title: 'Features',
     items: [
       { id: 'rag', title: 'RAG & Chat', href: '/docs/features/rag' },
+      { id: 'graph', title: 'Graph Mode', href: '/docs/features/graph' },
       { id: 'mcp', title: 'MCP Servers', href: '/docs/features/mcp' },
       { id: 'analytics', title: 'Usage Analytics', href: '/docs/features/analytics' },
     ]

@@ -8,10 +8,11 @@ build/
 .next/
 out/
 *.tsbuildinfo
-
+docs/jira/
+scripts/
 # Turbo
 .turbo/
-
+.claude/
 # Environment files (contain secrets)
 .env
 .env.local

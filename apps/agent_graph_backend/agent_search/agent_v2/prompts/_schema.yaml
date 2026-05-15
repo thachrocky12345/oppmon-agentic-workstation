@@ -1,0 +1,220 @@
+# TAG-72 production prompt schema (extended by TAG-73).
+#
+# This is the runtime-enforced catalog of slugs that the loader (loader.py)
+# warms at boot. It matches docs/prompts/_schema.yaml (the TAG-71 inventory)
+# 1:1 after TAG-73 — every slug listed in the inventory has a .md file on
+# disk and an entry below.
+#
+# Adding / removing a slug requires three coordinated edits (CI lints these):
+#   1. The .md file under the matching path (slug -> path: dots become /).
+#   2. An entry in the `slugs` list below.
+#   3. A call site swap in the agent code from the inline constant to
+#      get_prompt() / render_prompt().
+#
+# Schema entry fields:
+#   slug              : full dotted slug (must match the frontmatter slug
+#                        on disk and the file path)
+#   placeholders      : list of {placeholder} tokens the body uses
+#                        ([] = pure static prompt)
+#   min_chars         : minimum body length AFTER frontmatter strip
+#   max_chars         : maximum body length AFTER frontmatter strip
+#   must_contain      : list of substrings required in the body (smoke
+#                        checks; catch obviously corrupt files)
+#   must_not_contain  : list of substrings forbidden in the body
+#                        (secret prefixes etc.)
+
+slugs:
+  # ----- system prompts ---------------------------------------------------
+  - slug: system.web_planner
+    placeholders: []
+    min_chars: 200
+    max_chars: 8000
+    must_contain:
+      - "plan"
+      - "tool"
+    must_not_contain:
+      - "sk-"
+      - "csk-"
+      - "tvly-"
+
+  - slug: system.searcher
+    placeholders: []
+    min_chars: 100
+    max_chars: 4000
+    must_contain:
+      - "grounding"
+    must_not_contain:
+      - "sk-"
+      - "csk-"
+      - "tvly-"
+
+  - slug: system.rag_planner
+    placeholders: []
+    min_chars: 400
+    max_chars: 8000
+    must_contain:
+      - "HARD RULES"
+      - "citations"
+    must_not_contain:
+      - "sk-"
+      - "csk-"
+      - "tvly-"
+
+  # ----- templates --------------------------------------------------------
+  - slug: template.searcher_simple_user
+    placeholders:
+      - question
+      - context
+    min_chars: 50
+    max_chars: 2000
+
+  - slug: template.searcher_tools_user
+    placeholders:
+      - question
+    min_chars: 50
+    max_chars: 2000
+
+  - slug: template.rag_refusal
+    placeholders: []
+    min_chars: 20
+    max_chars: 400
+
+  - slug: template.history_summarizer
+    placeholders: []
+    min_chars: 80
+    max_chars: 1000
+
+  - slug: template.history_summary_prefix
+    placeholders: []
+    min_chars: 5
+    max_chars: 100
+
+  # ----- web planner tool descriptions ------------------------------------
+  - slug: tool.web_planner.add_node.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 800
+
+  - slug: tool.web_planner.link_nodes.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 800
+
+  - slug: tool.web_planner.search_node.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 800
+
+  - slug: tool.web_planner.read_node_answer.description
+    placeholders: []
+    min_chars: 20
+    max_chars: 800
+
+  - slug: tool.web_planner.finalize.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 800
+
+  # ----- web planner tool param descriptions ------------------------------
+  - slug: tool.web_planner.add_node.params.question
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.web_planner.add_node.params.node_id
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.web_planner.add_node.params.depends_on
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.web_planner.search_node.params.node_id
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.web_planner.finalize.params.answer
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.web_planner.finalize.params.citations
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  # ----- rag planner tool descriptions ------------------------------------
+  - slug: tool.rag_planner.add_node.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 800
+
+  - slug: tool.rag_planner.search_corpus_node.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 800
+
+  - slug: tool.rag_planner.read_node_answer.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 800
+
+  - slug: tool.rag_planner.finalize.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 800
+
+  # ----- rag planner tool param descriptions ------------------------------
+  - slug: tool.rag_planner.add_node.params.question
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.rag_planner.add_node.params.node_id
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.rag_planner.add_node.params.depends_on
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.rag_planner.search_corpus_node.params.node_id
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.rag_planner.search_corpus_node.params.question
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  - slug: tool.rag_planner.finalize.params.answer
+    placeholders: []
+    min_chars: 10
+    max_chars: 600
+
+  - slug: tool.rag_planner.finalize.params.citations
+    placeholders: []
+    min_chars: 10
+    max_chars: 400
+
+  # ----- searcher tool descriptions ---------------------------------------
+  - slug: tool.searcher.web_search.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 600
+
+  - slug: tool.searcher.advanced_retrieve.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 600
+
+  - slug: tool.searcher.answer.description
+    placeholders: []
+    min_chars: 30
+    max_chars: 600

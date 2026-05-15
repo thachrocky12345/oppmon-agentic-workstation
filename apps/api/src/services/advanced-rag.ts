@@ -503,14 +503,83 @@ async function multiVectorSearch(
 // ============================================================================
 
 /**
- * Search the web when RAG has no results
- * This is a placeholder - integrate with actual web search API
+ * Search the web when RAG has no results.
+ *
+ * Backed by Tavily (https://tavily.com) — LLM-optimized search that returns
+ * deduped, snippet-trimmed results in a single POST. Reads TAVILY_API_KEY
+ * from the environment; returns [] (and logs once) if the key is missing
+ * so callers degrade gracefully.
  */
+const TAVILY_URL = 'https://api.tavily.com/search';
+const WEB_BLOCKLIST = ['youtube.com', 'bilibili.com', 'researchgate.net'];
+let _tavilyKeyMissingWarned = false;
+
 export async function webSearch(queryText: string): Promise<WebSearchResult[]> {
-  // TODO: Integrate with web search API (e.g., Tavily, Serper, Brave)
-  // For now, return empty results
-  console.log(`[WebSearch] Would search for: ${queryText}`);
-  return [];
+  const apiKey = process.env.TAVILY_API_KEY;
+  if (!apiKey) {
+    if (!_tavilyKeyMissingWarned) {
+      console.warn('[WebSearch] TAVILY_API_KEY not set — web search disabled.');
+      _tavilyKeyMissingWarned = true;
+    }
+    return [];
+  }
+
+  const maxResults = Number(process.env.TAVILY_MAX_RESULTS || 5);
+  const searchDepth = process.env.TAVILY_SEARCH_DEPTH || 'basic';
+  const timeoutMs = Number(process.env.TAVILY_TIMEOUT_MS || 8000);
+
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const resp = await fetch(TAVILY_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query: queryText.trim().replace(/^['"]|['"]$/g, ''),
+        search_depth: searchDepth,
+        max_results: Math.max(maxResults, 5),
+        include_answer: false,
+        include_raw_content: false,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      console.warn(`[WebSearch] Tavily ${resp.status} for query=${JSON.stringify(queryText)}`);
+      return [];
+    }
+
+    const data = (await resp.json()) as {
+      results?: Array<{ title?: string; url?: string; content?: string; score?: number }>;
+    };
+
+    const hits: WebSearchResult[] = [];
+    for (const r of data.results ?? []) {
+      const url = r.url ?? '';
+      if (!url) continue;
+      if (WEB_BLOCKLIST.some((b) => url.includes(b))) continue;
+      if (url.endsWith('.pdf')) continue;
+      hits.push({
+        title: r.title ?? '',
+        url,
+        snippet: r.content ?? '',
+        source: 'tavily',
+      });
+      if (hits.length >= maxResults) break;
+    }
+    return hits;
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'AbortError') {
+      console.warn(`[WebSearch] Tavily timeout after ${timeoutMs}ms for query=${JSON.stringify(queryText)}`);
+    } else {
+      console.warn('[WebSearch] Tavily error:', err);
+    }
+    return [];
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 /**

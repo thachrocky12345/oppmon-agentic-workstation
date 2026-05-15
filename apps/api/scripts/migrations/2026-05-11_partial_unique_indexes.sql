@@ -38,6 +38,7 @@ DECLARE
   ];
   arr TEXT[];
   is_partial BOOLEAN;
+  has_constraint BOOLEAN;
 BEGIN
   -- Process the user-named entity tables.
   FOR i IN 1 .. array_length(fixes, 1) LOOP
@@ -56,7 +57,17 @@ BEGIN
       RAISE NOTICE 'Skipping %: already partial', arr[2];
       CONTINUE;
     END IF;
-    EXECUTE format('DROP INDEX IF EXISTS %I', arr[2]);
+    -- If the index is backed by a UNIQUE CONSTRAINT (created via UNIQUE in
+    -- CREATE TABLE), Postgres refuses DROP INDEX and demands DROP CONSTRAINT.
+    SELECT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = arr[2] AND conrelid = format('public.%I', arr[1])::regclass
+    ) INTO has_constraint;
+    IF has_constraint THEN
+      EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', arr[1], arr[2]);
+    ELSE
+      EXECUTE format('DROP INDEX IF EXISTS %I', arr[2]);
+    END IF;
     EXECUTE format(
       'CREATE UNIQUE INDEX %I ON %I %s WHERE deleted_at IS NULL',
       arr[2], arr[1], arr[3]
@@ -69,7 +80,15 @@ BEGIN
     SELECT (indexdef ~* 'WHERE') INTO is_partial
       FROM pg_indexes WHERE indexname=models_fix[2];
     IF NOT is_partial THEN
-      EXECUTE format('DROP INDEX IF EXISTS %I', models_fix[2]);
+      SELECT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = models_fix[2] AND conrelid = format('public.%I', models_fix[1])::regclass
+      ) INTO has_constraint;
+      IF has_constraint THEN
+        EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', models_fix[1], models_fix[2]);
+      ELSE
+        EXECUTE format('DROP INDEX IF EXISTS %I', models_fix[2]);
+      END IF;
       EXECUTE format(
         'CREATE UNIQUE INDEX %I ON %I %s WHERE deleted_at IS NULL',
         models_fix[2], models_fix[1], models_fix[3]

@@ -12,6 +12,8 @@
 #   --profile dev           # Development mode with hot reload
 #   --profile prod          # Production mode with built images
 #   --profile full          # All services including Redis
+#   --profile graph         # KnowledgeSearchBackend (graph-mode agent /solve_v2)
+#                           # See docs/solve-v2.md
 #
 # =============================================================================
 
@@ -163,6 +165,17 @@ services:
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
       NEXT_TELEMETRY_DISABLED: 1
+      # ----- Graph mode (optional) -----
+      # GRAPH_BACKEND_URL: server-side proxy target for /api/graph/solve.
+      # Unset = the Next.js proxy returns 503 and the toggle is hidden.
+      # When the graph-agent profile is active, this points at the service
+      # name on the overlay network.
+      GRAPH_BACKEND_URL: ${GRAPH_BACKEND_URL:-}
+      GRAPH_BACKEND_TOKEN: ${GRAPH_BACKEND_TOKEN:-}
+      # Feature flag that controls whether the Graph toggle renders. Build-time
+      # only — flip to "true" and rebuild the web image once the graph-agent
+      # service is up.
+      NEXT_PUBLIC_GRAPH_ENABLED: ${NEXT_PUBLIC_GRAPH_ENABLED:-false}
     ports:
       - "${FRONTEND_PORT:-3002}:3002"
     volumes:
@@ -193,6 +206,8 @@ services:
       args:
         NODE_ENV: production
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        # NEXT_PUBLIC_* must be baked in at build time, not runtime.
+        NEXT_PUBLIC_GRAPH_ENABLED: ${NEXT_PUBLIC_GRAPH_ENABLED:-false}
     container_name: oppmon-web
     restart: unless-stopped
     profiles:
@@ -200,6 +215,9 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      # See web-dev block for what these do.
+      GRAPH_BACKEND_URL: ${GRAPH_BACKEND_URL:-}
+      GRAPH_BACKEND_TOKEN: ${GRAPH_BACKEND_TOKEN:-}
     ports:
       - "${FRONTEND_PORT:-3002}:3000"
     depends_on:
@@ -209,6 +227,53 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - oppmon-network
+
+  # ===========================================================================
+  # Graph-mode agent - KnowledgeSearchBackend (opt-in via --profile graph)
+  # ===========================================================================
+  # Serves POST /solve_v2 (SSE). Source lives at apps/KnowledgeSearchBackend/.
+  # Consumed by the Next.js proxy at apps/web/src/app/api/graph/solve/route.ts
+  # via GRAPH_BACKEND_URL.
+  #
+  # The app inside the container listens on port 8002 (hardcoded in
+  # mindsearch.app). We publish it on host port 7002 to avoid the local 8002
+  # collision. Inside the docker network, web reaches it at graph-agent:8002.
+  #
+  # To enable graph mode in dev:
+  #   1. Set in apps/api/.env (or shell):
+  #        GRAPH_BACKEND_URL=http://graph-agent:8002      # docker DNS, container port
+  #        NEXT_PUBLIC_GRAPH_ENABLED=true
+  #        ANTHROPIC_API_KEY=...                          # required by mindsearch
+  #   2. Bring up the full stack:
+  #        docker compose --profile dev --profile graph up --build
+  #
+  # When the profile is inactive (default), the rest of the stack continues
+  # to work and the Graph toggle is hidden in the UI.
+  graph-agent:
+    build:
+      context: apps/agent_graph_backend
+      dockerfile: dockerfile
+    container_name: oppmon-graph-agent
+    restart: unless-stopped
+    profiles:
+      - graph
+    # mindsearch reads its config from .env via python-dotenv (LLM provider,
+    # API keys, search engine, loop limits). env_file pulls the file at deploy
+    # time on the host machine and bakes the values into the container env.
+    env_file:
+      - apps/agent_graph_backend/.env
+    ports:
+      # Host:Container — mindsearch hardcodes 8002 inside the container.
+      - "${GRAPH_AGENT_PORT:-7002}:8002"
+    healthcheck:
+      # v2_server.py exposes /healthz that returns {"status": "ok", ...}
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8002/healthz\", timeout=3)'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       - oppmon-network
 

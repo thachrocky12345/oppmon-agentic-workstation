@@ -1,0 +1,90 @@
+[
+  {
+    "$comment": [
+      "TAG-64 — corpus-mode eval set for /solve.",
+      "Two halves:",
+      "  - category=grounded: question is fully answerable from the seeded",
+      "    chunk (see fixtures/seed_two_tenants.sql). expected_citations[]",
+      "    lists the [[doc:chunk]] markers that MUST appear in the final",
+      "    answer. The gate enforces 'citation precision >= 0.95'.",
+      "  - category=ood: question is OUT-OF-CORPUS — the planner must",
+      "    emit the verbatim REFUSAL_TEXT string. The gate enforces",
+      "    'refusal recall >= 0.90'."
+    ]
+  },
+  {
+    "id": "corpus-001",
+    "category": "grounded",
+    "question": "Does Tenant A's policy allow extensions?",
+    "collection_ids": ["col_alpha"],
+    "expected_citations": ["[[doc_alpha:chk_alpha_1]]"],
+    "expected_keypoints": ["30-day", "extension"]
+  },
+  {
+    "id": "corpus-002",
+    "category": "grounded",
+    "question": "How long are extensions granted under policy X?",
+    "collection_ids": ["col_alpha"],
+    "expected_citations": ["[[doc_alpha:chk_alpha_1]]"],
+    "expected_keypoints": ["30-day"]
+  },
+  {
+    "id": "corpus-003",
+    "category": "grounded",
+    "question": "What does Tenant B require for customer onboarding?",
+    "collection_ids": ["col_beta"],
+    "expected_citations": ["[[doc_beta:chk_beta_1]]"],
+    "expected_keypoints": ["KYC", "documentation"]
+  },
+  {
+    "id": "corpus-004",
+    "category": "grounded",
+    "question": "Summarize the KYC requirement in Beta Corpus.",
+    "collection_ids": ["col_beta"],
+    "expected_citations": ["[[doc_beta:chk_beta_1]]"],
+    "expected_keypoints": ["KYC"]
+  },
+  {
+    "id": "corpus-005",
+    "category": "grounded",
+    "question": "Does production work get a 30-day grace period?",
+    "collection_ids": ["col_alpha"],
+    "expected_citations": ["[[doc_alpha:chk_alpha_1]]"],
+    "expected_keypoints": ["production", "30-day"]
+  },
+  {
+    "id": "corpus-006",
+    "category": "ood",
+    "question": "What is the airspeed velocity of an unladen swallow?",
+    "collection_ids": ["col_alpha"],
+    "expected_refusal": true
+  },
+  {
+    "id": "corpus-007",
+    "category": "ood",
+    "question": "Who wrote the United States Constitution?",
+    "collection_ids": ["col_alpha"],
+    "expected_refusal": true
+  },
+  {
+    "id": "corpus-008",
+    "category": "ood",
+    "question": "Translate 'good morning' into French.",
+    "collection_ids": ["col_beta"],
+    "expected_refusal": true
+  },
+  {
+    "id": "corpus-009",
+    "category": "ood",
+    "question": "Recite the first ten digits of pi.",
+    "collection_ids": ["col_beta"],
+    "expected_refusal": true
+  },
+  {
+    "id": "corpus-010",
+    "category": "ood",
+    "question": "What is the boiling point of mercury?",
+    "collection_ids": ["col_alpha"],
+    "expected_refusal": true
+  }
+]

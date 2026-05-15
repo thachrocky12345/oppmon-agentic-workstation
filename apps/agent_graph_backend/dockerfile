@@ -1,0 +1,45 @@
+ARG PYTHON_VERSION=3.12-bullseye
+
+FROM python:${PYTHON_VERSION} AS base
+
+# Turn off debconf messages during build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERM=linux
+
+# Set working directory
+WORKDIR /root
+
+# Install minimal system dependencies. The v2 server only needs curl for
+# healthchecks; everything else is pure Python (anthropic/openai SDKs use
+# urllib3 under the hood — no native compilation required).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy minimal v2 requirements (the old locked file was for legacy mindsearch
+# and pinned torch/jupyter/streamlit/gradio/lmdeploy which v2 doesn't use).
+COPY requirements-v2.txt ./
+
+# Install Python dependencies
+# This layer rebuilds only when requirements-v2.txt changes.
+RUN pip3 install --no-cache-dir -r requirements-v2.txt
+
+# Create a non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /root
+USER appuser
+
+# Copy the application code LAST (this changes most frequently)
+# This ensures code changes don't invalidate the dependency cache
+COPY --chown=appuser:appuser mindsearch /root/mindsearch
+
+# Expose the application port
+EXPOSE 8002
+
+# Health check — v2_server.py exposes a dedicated /healthz endpoint.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8002/healthz || exit 1
+
+# Start the v2-only FastAPI server (mounts /solve_v2). The legacy /solve
+# entrypoint and its `mindsearch.agent` package were deleted intentionally.
+CMD ["python3", "-m", "mindsearch.v2_server"]

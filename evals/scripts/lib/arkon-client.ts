@@ -1,7 +1,7 @@
 /**
  * Clients for the two Arkon chat backends:
  *   - simple mode: Arkon /api/rag/chat/stream
- *   - graph mode:  KnowledgeSearchBackend /solve_v2 (mounted on :8002)
+ *   - graph mode:  KnowledgeSearchBackend /solve_v2 (LAN at 192.168.1.195:8002)
  *
  * Both speak SSE; this module hides the parsing differences and returns a
  * uniform { answer, citations, graph?, latency_ms, raw_events_count }.
