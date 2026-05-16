@@ -81,6 +81,11 @@ class WebSearchGraph:
         self.nodes: dict[str, Node] = {}
         self.adjacency: dict[str, list[Edge]] = {}
         self.references: dict[str, str] = {}  # citation index -> url
+        # citation_meta mirrors `references` keys but carries the full
+        # per-citation payload the frontend bibliography needs
+        # (title, score, page_number, doc_id, chunk_id, source_url).
+        # Populated by ``flush_node_citations`` at SSE-emit time.
+        self.citation_meta: dict[str, dict[str, Any]] = {}
         self._auto_idx = 0
         self._citation_ptr = 1  # next 1-based citation number
 
@@ -159,15 +164,72 @@ class WebSearchGraph:
         return node
 
     def register_citations(self, citations: list[dict[str, Any]]) -> int:
-        """Add citations to `references`, returning the next ptr."""
+        """Add citations to `references`, returning the next ptr.
+
+        Accepts either ``url`` (web citations) or ``source_url`` (RAG
+        citations) as the URL key. Both shapes coexist in the wild —
+        the web planner writes ``url`` (planner.py:168), rag_tools
+        writes ``source_url`` (rag_tools.py:241). Be permissive on
+        input so the corpus path doesn't silently drop citations.
+        """
         for c in citations:
-            url = c.get("url")
+            url = c.get("url") or c.get("source_url")
             if not url:
                 continue
             idx = c.get("index") or self._citation_ptr
             self.references[str(idx)] = url
-            self._citation_ptr = max(self._citation_ptr, int(idx) + 1)
+            self._citation_ptr = max(
+                self._citation_ptr,
+                # ``index`` may be a doc:chunk string (RAG) or an int
+                # (web) — only bump ptr when it's int-coercible.
+                (int(idx) + 1) if str(idx).isdigit() else self._citation_ptr,
+            )
         return self._citation_ptr
+
+    def flush_node_citations(self) -> None:
+        """Aggregate every node's citations into ``references`` and
+        ``citation_meta``.
+
+        Idempotent — safe to call repeatedly (e.g. on every SSE event).
+        When the same citation key surfaces from multiple searcher nodes,
+        keep the higher-scoring entry's metadata. This matters for the
+        bibliography sort: a chunk that ranked #1 for one sub-question
+        shouldn't be displaced by the same chunk ranking #4 for a
+        different sub-question.
+
+        The URL map (``references``) is populated for back-compat with
+        the existing frontend; the full per-citation payload is
+        populated into ``citation_meta`` for the new bibliography
+        renderer (TAG-CR follow-up).
+        """
+        for node in self.nodes.values():
+            for c in node.citations or []:
+                idx = c.get("index")
+                if idx is None:
+                    continue
+                key = str(idx)
+                url = c.get("url") or c.get("source_url")
+                if url:
+                    # Last-write wins on URL is fine — same key implies
+                    # same chunk implies same URL by construction.
+                    self.references[key] = url
+                prev = self.citation_meta.get(key)
+                prev_score = (prev or {}).get("score")
+                new_score = c.get("score")
+                # Keep the higher-scoring metadata. Treat None as -inf
+                # so a real score always wins over an absent one.
+                prev_cmp = float("-inf") if prev_score is None else float(prev_score)
+                new_cmp = float("-inf") if new_score is None else float(new_score)
+                if prev is None or new_cmp > prev_cmp:
+                    self.citation_meta[key] = {
+                        "index": key,
+                        "doc_id": c.get("doc_id"),
+                        "chunk_id": c.get("chunk_id"),
+                        "title": c.get("title"),
+                        "source_url": url,
+                        "score": new_score,
+                        "page_number": c.get("page_number"),
+                    }
 
     # ---- export ----
 

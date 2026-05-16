@@ -186,6 +186,7 @@ async def run_corpus_solve(
     from ..tools.registry import ToolContext, ToolRegistry
     from .graph import GraphState, WebSearchGraph
     from .loop import run_reactive_loop
+    from .rag_bootstrap import bootstrap_document_context, render_context_block
     from .rag_planner_prompt import REFUSAL_TEXT, _rag_planner_system
     from .rag_tools import register_rag_planner_tools
     from .sse import end_event, planner_event, searcher_event, warning_event
@@ -215,18 +216,96 @@ async def run_corpus_solve(
         max_parallel=cfg.tool_dispatch_max_parallel,
         per_tool_timeout_s=cfg.tool_dispatch_timeout_s,
     )
+    # TAG-CR: resolve the per-request contextual-retrieval flag —
+    # request-level explicit bool wins; otherwise fall back to the
+    # server-side default in settings. Threaded through to the planner
+    # tool so its tool-result JSON either does or does not surface
+    # ``document_summary`` / ``context_prefix``.
+    use_cr = (
+        req.use_contextual_retrieval
+        if req.use_contextual_retrieval is not None
+        else cfg.use_contextual_retrieval
+    )
     register_rag_planner_tools(
         registry,
         corpus=corpus,
         tenant_id=user.tenant_id,
         collection_ids=req.collection_ids,
         top_k=cfg.rag_top_k * 2,
+        use_contextual_retrieval=use_cr,
     )
 
     memory = ConversationalMemory(
         max_context_tokens=80_000, summarize_when_over=0.8
     )
     memory.append(LLMChatMessage(role="system", content=_rag_planner_system()))
+
+    # Pre-planner RAG context bootstrap (TAG-CR follow-up). One
+    # corpus.search call against the user question, deduped to one
+    # entry per doc, rendered as a ``<document_context>`` block and
+    # appended as a SECOND system message. The planner uses this
+    # landscape to decompose informed sub-questions; the same block
+    # stays in memory through ``finalize`` so the final answer can
+    # lean on the summaries when synthesizing.
+    #
+    # Best-effort: a bootstrap failure must not sink the request. We
+    # surface zero / empty as no-op. When the bootstrap does fire, we
+    # also emit a graph "context" node so the React panel can show the
+    # operator that priors were primed.
+    if cfg.rag_bootstrap_enabled:
+        bootstrap = await bootstrap_document_context(
+            corpus=corpus,
+            user_question=user_question,
+            tenant_id=user.tenant_id,
+            collection_ids=req.collection_ids,
+            top_k=cfg.rag_bootstrap_top_k,
+        )
+        if bootstrap is not None and not bootstrap.is_empty:
+            context_block = render_context_block(bootstrap)
+            memory.append(
+                LLMChatMessage(role="system", content=context_block)
+            )
+            # Surface the bootstrap to the UI as a synthetic "context"
+            # node so operators can see priors were primed. Citations
+            # written here flow through ``flush_node_citations`` into
+            # the END envelope's ``citation_meta`` map, so the
+            # bibliography renderer can still link to the docs even
+            # when the planner doesn't pick them as sub-question hits.
+            ctx_node = graph.add_searcher_node(
+                content=f"Document context for: {user_question}",
+                node_id="context",
+                depends_on=[graph.ROOT],
+            )
+            graph.write_searcher_result(
+                ctx_node.name,
+                response=context_block,
+                detail={
+                    "kind": "bootstrap",
+                    "docs_primed": len(bootstrap.docs),
+                },
+                source="rag",
+                citations=[
+                    {
+                        "index": f"{d.doc_id}:bootstrap",
+                        "doc_id": d.doc_id,
+                        "chunk_id": "bootstrap",
+                        "title": d.title,
+                        "source_url": None,
+                        "score": d.score,
+                        "page_number": None,
+                    }
+                    for d in bootstrap.docs
+                ],
+            )
+            yield searcher_event(
+                graph,
+                node_id=ctx_node.name,
+                state=GraphState.END,
+                response_text=context_block,
+                content=ctx_node.content,
+                detail=ctx_node.detail or {},
+            )
+
     for prior in trimmed_history:
         memory.append(LLMChatMessage(role=prior.role, content=prior.content))
     memory.append(LLMChatMessage(role="user", content=user_question))

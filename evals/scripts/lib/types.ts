@@ -58,6 +58,23 @@ export interface RunResult {
     adj: Record<string, unknown>;
     references: Record<string, string>;
   };
+  /**
+   * TAG-CR — retrieval-quality fields for the contextual-retrieval A/B
+   * eval. Both arrays hold normalized citation keys ("doc_id:chunk_id"),
+   * stripped of the [[...]] sentinel.
+   *
+   *   - retrieved[]: union of every chunk id surfaced by ANY searcher
+   *                  event during the run (the retriever's recall set).
+   *   - cited[]:     chunk ids that the planner's final synthesis
+   *                  references (what the answer actually drew on).
+   *
+   * These are computed in `arkon-client.ts:askGraph` from the SSE stream's
+   * `response.references` dict; the dict keys are already in
+   * `doc:chunk` form per the rag-mode citation contract in
+   * `agent_v2/orchestrator/rag_tools.py`.
+   */
+  retrieved?: string[];
+  cited?: string[];
   /** Raw SSE events for debugging — capped to avoid GB-scale files. */
   raw_events_count: number;
   /** True if the run threw before completion. */

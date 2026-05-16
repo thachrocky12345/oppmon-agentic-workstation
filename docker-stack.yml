@@ -72,7 +72,7 @@ services:
         failure_action: rollback
 
   web:
-    image: thachrocky/oppmon-web:webs.v2
+    image: thachrocky/oppmon-web:webs.v3
     networks:
       - oppmon-net
     ports:

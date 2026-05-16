@@ -70,6 +70,23 @@ class Settings(BaseSettings):
     # ---- RAG ----
     rag_score_threshold: float = 0.4
     rag_top_k: int = 5
+    # TAG-CR: surface Anthropic Contextual Retrieval fields
+    # (document_summary, context_prefix) to the planner LLM and into
+    # the searcher's context block. Process-wide default; the
+    # per-request ``useContextualRetrieval`` field on SolveRequest
+    # overrides this for A/B traffic.
+    use_contextual_retrieval: bool = True
+    # Pre-planner RAG bootstrap (TAG-CR follow-up): run a single
+    # corpus.search against the user question BEFORE the planner loop
+    # starts, dedupe to one hit per doc, and inject the per-document
+    # summaries into the planner's system memory as a
+    # ``<document_context>`` block. The planner uses this landscape
+    # to decompose informed sub-questions; the same summaries stay
+    # in memory through finalize so the final answer can lean on
+    # them. Pure improvement — no extra LLM cost. Disable with
+    # AGENT_RAG_BOOTSTRAP_ENABLED=false.
+    rag_bootstrap_enabled: bool = True
+    rag_bootstrap_top_k: int = 5
 
     # ---- Embeddings (TAG-60) ----
     # Source of truth: apps/api/src/lib/embedding/index.ts:31-32 ships

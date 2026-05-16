@@ -7,7 +7,8 @@
   "scripts": {
     "run": "tsx scripts/run.ts",
     "judge": "tsx scripts/judge.ts",
-    "report": "tsx scripts/report.ts"
+    "report": "tsx scripts/report.ts",
+    "test": "tsx --test scripts/lib/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -401,10 +401,16 @@ export default function ChatPage() {
         content: m.content,
       }))
 
+    // Resolve the chosen model once — both graph and simple paths need it.
+    // `/solve` (TAG-50) rejects bodies without a non-empty `model`+`provider`,
+    // so this is no longer optional for graph mode.
+    const modelConfig = selectedModel ? models.find(m => m.id === selectedModel) : undefined
+
     try {
       // -------------------------------------------------------------------
-      // Graph mode: call KnowledgeSearchBackend /solve_v2 and stream a
-      // planner+searcher graph into the right-side panel. Final answer is
+      // Graph mode: call the authenticated agent_graph_backend /solve route
+      // (TAG-50). Streams the same planner+searcher SSE envelopes as
+      // /solve_v2 — AgentGraphPanel's parser is unchanged. Final answer is
       // appended to the assistant message just like simple mode.
       // -------------------------------------------------------------------
       if (graphMode) {
@@ -431,16 +437,32 @@ export default function ChatPage() {
         const resp = await fetch(GRAPH_AGENT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          // Same-origin proxy at /api/graph/solve forwards the auth_token
+          // cookie as a Bearer token; credentials: 'include' guarantees the
+          // cookie is sent even when NEXT_PUBLIC_GRAPH_AGENT_URL points
+          // somewhere off-origin.
+          credentials: 'include',
           body: JSON.stringify({
-            inputs: messageText,
+            // /solve takes typed chat history, not a single `inputs` string.
+            // Pydantic enforces messages[-1].role === 'user', which the UI
+            // already guarantees by appending the new user turn into
+            // `apiMessages` before this call.
+            messages: apiMessages,
+            // model+provider are required (min_length=1). Use the same
+            // selection the simple-mode call uses below.
+            model: modelConfig?.modelIdentifier,
+            provider: modelConfig?.providerTemplateId || 'anthropic',
+            // camelCase aliases — accepted by Pydantic populate_by_name.
+            collectionIds: selectedCollections,
+            enableTools,
             // Graph mode has no RAG corpus behind it — without web fallback,
             // every searcher node returns "no grounding". Force web on when
             // the user hasn't explicitly enabled it AND no collections are
-            // selected. If they did pick collections, respect their choice.
-            web_fallback:
+            // selected. The /solve schema also rejects
+            // `webFallback=false && collectionIds=[]` with a 422, so this
+            // is both UX and a guard against a hard validator failure.
+            webFallback:
               enableWebFallback || selectedCollections.length === 0,
-            enable_tools: enableTools,
-            collection_ids: selectedCollections.length > 0 ? selectedCollections : [],
           }),
         })
         if (!resp.ok || !resp.body) {
@@ -534,8 +556,6 @@ export default function ChatPage() {
         }
         return // graph-mode path complete
       }
-
-      const modelConfig = selectedModel ? models.find(m => m.id === selectedModel) : undefined
 
       const response = await fetch('/api/rag/chat/stream', {
         method: 'POST',

@@ -59,6 +59,13 @@ class SolveRequest(BaseModel):
     provider: str = Field(min_length=1)
     enable_tools: bool = Field(default=True, alias="enableTools")
     web_fallback: bool = Field(default=True, alias="webFallback")
+    # TAG-CR: per-request override for Anthropic Contextual Retrieval
+    # display. None = use server default from settings; explicit bool
+    # forces on/off. Used by the A/B eval harness to compare baseline
+    # vs contextual without restarting the service.
+    use_contextual_retrieval: bool | None = Field(
+        default=None, alias="useContextualRetrieval"
+    )
 
     @model_validator(mode="after")
     def _at_least_one_grounding_source(self) -> SolveRequest:
