@@ -148,6 +148,11 @@ export async function askGraph(opts: AskOptions): Promise<Omit<RunResult, 'quest
   const timer = opts.timeoutMs ? setTimeout(() => ctrl.abort(), opts.timeoutMs) : null;
   let answer = '';
   const referencesAcc: Record<string, string> = {};
+  // citation_meta accumulator: keyed by "doc:chunk" (RAG) or numeric
+  // string (web). Last-write wins matches the backend's
+  // ``flush_node_citations`` behavior, which already prefers the
+  // higher-scoring metadata before emitting the event.
+  const citationMetaAcc: Record<string, import('./types').CitationMeta> = {};
   const retrievedSet = new Set<string>();
   let lastEndReferences: Record<string, string> | undefined;
   let lastGraphState: RunResult['graph'] | undefined;
@@ -214,6 +219,7 @@ export async function askGraph(opts: AskOptions): Promise<Omit<RunResult, 'quest
               nodes?: Record<string, unknown>;
               adj?: Record<string, unknown>;
               references?: Record<string, string>;
+              citation_meta?: Record<string, import('./types').CitationMeta>;
             };
             current_node?: string | null;
             error?: { msg?: string; details?: string };
@@ -231,11 +237,15 @@ export async function askGraph(opts: AskOptions): Promise<Omit<RunResult, 'quest
             // is the recall set for retrieval-quality metrics.
             for (const k of Object.keys(r.references)) retrievedSet.add(k);
           }
+          if (r.citation_meta) {
+            Object.assign(citationMetaAcc, r.citation_meta);
+          }
           if (r.nodes && r.adj) {
             lastGraphState = {
               nodes: r.nodes,
               adj: r.adj,
               references: { ...referencesAcc },
+              citation_meta: { ...citationMetaAcc },
             };
           }
           if (r.state === 'END' && r.response) {
