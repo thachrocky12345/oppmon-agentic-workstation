@@ -68,6 +68,25 @@ class Settings(BaseSettings):
     tool_dispatch_timeout_s: float = 30.0
 
     # ---- RAG ----
+    # Chunk-size tuning playbook (companion to ingest-side chunk_size):
+    # The ingest pipeline in apps/api/ owns chunking; agent_search only
+    # consumes pre-built chunks via SQL (rag/corpus_search.py reads
+    # c.content, c.context_prefix, c.content_search). With TAG-CR
+    # (context_prefix + document_summary) AND rag_bootstrap_enabled=True,
+    # Anthropic's 2024 guidance + Firecrawl's 2026 chunking survey both
+    # land on 200-400 tokens / ~17% overlap as the sweet spot. When the
+    # operator flips ingest chunk_size to ~300 tokens, override these
+    # env-driven knobs in the same release to keep recall steady:
+    #
+    #   RAG_TOP_K=8                    # was 5; smaller chunks = pull more
+    #   RAG_SCORE_THRESHOLD=0.35       # was 0.4; verify in eval first
+    #   AGENT_RAG_BOOTSTRAP_TOP_K=5    # unchanged; doc summaries are
+    #                                  # already per-doc, not per-chunk
+    #
+    # If BM25 rare-term recall regresses on the 300-token corpus, the
+    # overfetch ratio in rag/corpus_search.py (per_list = top_k * 3)
+    # is the next dial — bump to top_k * 4 before touching _RRF_K.
+    # Full investigation: docs/rag-graph-chunk-size-investigation.md
     rag_score_threshold: float = 0.4
     rag_top_k: int = 5
     # TAG-CR: surface Anthropic Contextual Retrieval fields

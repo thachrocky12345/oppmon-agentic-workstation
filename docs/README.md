@@ -1,6 +1,6 @@
 # Arkon Documentation
 
-**Last Updated:** May 4, 2026
+**Last Updated:** 2026-05-16 (init sync — RAG-Graph deep-dive + chunk-size investigation added)
 
 ---
 
@@ -9,6 +9,9 @@
 | Document | Description | Audience |
 |----------|-------------|----------|
 | [Architecture](./architecture.md) | System architecture and tech stack | All Engineers |
+| [RAG-Graph Deep-Dive](./rag-graph-deep-dive.md) | Architecture, pros/cons, improvement roadmap, model selection for `apps/agent_graph_backend/` | Backend, ML, Senior Engineers |
+| [RAG-Graph Chunk-Size Investigation](./rag-graph-chunk-size-investigation.md) | Optimal chunk size + agent_search tuning playbook under TAG-CR + bootstrap injection | Backend, ML |
+| [Solve v2 Wire Contract](./solve-v2.md) | SSE envelope and `/solve_v2` endpoint contract | Backend, Frontend |
 | [Local Development](./LOCAL_DEVELOPMENT.md) | Setup guide for local development | All Engineers |
 | [Database Migrations](./DATABASE_MIGRATIONS.md) | Prisma migration workflow per Jira ticket | All Engineers |
 | [Deployment](./DEPLOYMENT.md) | CI/CD, staging, and production deployment | DevOps, SRE, Senior Engineers |
