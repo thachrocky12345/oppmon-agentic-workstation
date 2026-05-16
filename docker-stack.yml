@@ -18,7 +18,7 @@ version: "3.8"
 
 services:
   api:
-    image: thachrocky/oppmon-api:webs.v2
+    image: thachrocky/oppmon-api:v53809
     networks:
       - oppmon-net
     ports:
@@ -72,7 +72,7 @@ services:
         failure_action: rollback
 
   web:
-    image: thachrocky/oppmon-web:webs.v3
+    image: thachrocky/oppmon-web:v53809
     networks:
       - oppmon-net
     ports:
@@ -129,7 +129,7 @@ services:
   # a tag whose source actually exposes /solve_v2 — the legacy
   # `backend.<year>` tags pre-date that endpoint.
   graph-agent:
-    image: thachrocky/mindsearch:webs.v2
+    image: thachrocky/mindsearch:backend.v2.53809
     networks:
       - oppmon-net
     # Graph-agent config is read at boot. The vars the v2 server reads:

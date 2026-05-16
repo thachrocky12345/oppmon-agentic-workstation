@@ -31,7 +31,8 @@ USER appuser
 
 # Copy the application code LAST (this changes most frequently)
 # This ensures code changes don't invalidate the dependency cache
-COPY --chown=appuser:appuser mindsearch /root/mindsearch
+# Package was renamed from `mindsearch` to `agent_search`.
+COPY --chown=appuser:appuser agent_search /root/agent_search
 
 # Expose the application port
 EXPOSE 8002
