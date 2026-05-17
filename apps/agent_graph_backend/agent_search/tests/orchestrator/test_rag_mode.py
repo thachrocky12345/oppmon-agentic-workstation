@@ -118,12 +118,19 @@ def _make_hit(*, doc_id: str, chunk_id: str, text: str) -> CorpusHit:
 
 
 def _settings() -> Settings:
-    """Tight loop limits keep tests fast — 3 iterations is plenty."""
+    """Tight loop limits keep tests fast — 3 iterations is plenty.
+
+    Bootstrap is disabled here so these pre-bootstrap tests can keep
+    asserting on ``corpus.calls`` counts that reflect *planner-issued*
+    searches only. The bootstrap itself has its own coverage in
+    ``test_rag_bootstrap.py``.
+    """
     s = Settings()
     s.planner_max_iterations = 4
     s.tool_dispatch_max_parallel = 4
     s.tool_dispatch_timeout_s = 5.0
     s.rag_top_k = 4
+    s.rag_bootstrap_enabled = False
     return s
 
 

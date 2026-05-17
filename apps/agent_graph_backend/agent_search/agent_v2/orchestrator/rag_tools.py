@@ -129,6 +129,7 @@ def register_rag_planner_tools(
     tenant_id: str,
     collection_ids: list[str],
     top_k: int = 8,
+    use_contextual_retrieval: bool = True,
 ) -> None:
     """Register the four RAG-mode planner tools on ``registry``.
 
@@ -201,17 +202,44 @@ def register_rag_planner_tools(
                 "chunks": [],
             }
 
-        chunks_out = [
-            {
-                "id": f"{h.doc_id}:{h.chunk_id}",
-                "text": h.text,
-                "score": h.score,
-                "title": h.title,
-            }
-            for h in hits
-        ]
+        # Contextual Retrieval (TAG-CR): when the flag is on, surface
+        # ``document_summary`` and ``context_prefix`` to the planner LLM
+        # as separate keys on each chunk. The model is instructed in the
+        # system prompt to treat them as situating context, not as the
+        # authoritative source — citations still resolve to the chunk
+        # text. When the flag is off we emit the legacy shape so the A/B
+        # harness can pin down whether the win comes from the embedding
+        # change (always on) or from the display change (this flag).
+        if use_contextual_retrieval:
+            chunks_out = [
+                {
+                    "id": f"{h.doc_id}:{h.chunk_id}",
+                    "text": h.text,
+                    "score": h.score,
+                    "title": h.title,
+                    "document_summary": h.document_summary,
+                    "context_prefix": h.context_prefix,
+                    "section_path": h.section_path,
+                    "page_number": h.page_number,
+                }
+                for h in hits
+            ]
+        else:
+            chunks_out = [
+                {
+                    "id": f"{h.doc_id}:{h.chunk_id}",
+                    "text": h.text,
+                    "score": h.score,
+                    "title": h.title,
+                }
+                for h in hits
+            ]
         # Write citations into the graph node so the SSE searcher_event
-        # downstream can surface them to the frontend.
+        # downstream can surface them to the frontend. ``score`` and
+        # ``page_number`` are surfaced here (rather than only on the
+        # internal CorpusHit) so the END envelope's ``citation_meta``
+        # map can sort the bibliography by relevance and deep-link to
+        # the right page in the viewer.
         citations = [
             {
                 "index": f"{h.doc_id}:{h.chunk_id}",
@@ -219,6 +247,8 @@ def register_rag_planner_tools(
                 "chunk_id": h.chunk_id,
                 "title": h.title,
                 "source_url": h.source_url,
+                "score": h.score,
+                "page_number": h.page_number,
             }
             for h in hits
         ]

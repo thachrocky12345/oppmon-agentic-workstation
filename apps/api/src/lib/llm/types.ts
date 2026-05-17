@@ -17,7 +17,12 @@
 /**
  * Supported LLM providers
  */
-export type LLMProvider = 'ollama' | 'cerebras' | 'anthropic';
+export type LLMProvider =
+  | 'ollama'
+  | 'cerebras'
+  | 'anthropic'
+  | 'openai'
+  | 'openai-compatible';
 
 /**
  * Message role in a conversation
@@ -161,6 +166,19 @@ export interface CerebrasConfig {
 export interface AnthropicConfig {
   apiKey: string;
   defaultModel: string;
+  timeout?: number;
+}
+
+/**
+ * OpenAI-specific configuration. Also used by the generic
+ * `openai-compatible` provider — pass a custom `baseUrl` to point at
+ * Together / Groq / Fireworks / vLLM / self-hosted endpoints.
+ */
+export interface OpenAIConfig {
+  apiKey: string;
+  defaultModel: string;
+  /** Override the API base URL. Defaults to https://api.openai.com/v1. */
+  baseUrl?: string;
   timeout?: number;
 }
 

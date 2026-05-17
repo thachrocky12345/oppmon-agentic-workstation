@@ -122,6 +122,118 @@ async function loadMigrations(): Promise<Migration[]> {
   return migrations;
 }
 
+/**
+ * Strip SQL line comments (-- ...) and block comments so we can scan the
+ * actual statements for transaction-incompatible directives. Cheap, not
+ * a full SQL parser — good enough to spot CREATE INDEX CONCURRENTLY when
+ * an author writes it in plain SQL.
+ */
+function stripSqlComments(sql: string): string {
+  // Remove block comments first (greedy across newlines), then line comments.
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/--[^\n]*/g, '');
+}
+
+/**
+ * Some Postgres statements (notably ``CREATE INDEX CONCURRENTLY``,
+ * ``REINDEX CONCURRENTLY``, ``VACUUM``) cannot run inside a transaction
+ * block. If a migration file contains any of them, we must skip the
+ * BEGIN/COMMIT wrapper and rely on the file's own idempotency
+ * (``IF NOT EXISTS``) for crash safety.
+ */
+function needsAutocommit(sql: string): boolean {
+  const stripped = stripSqlComments(sql);
+  return /\bCONCURRENTLY\b/i.test(stripped) || /\bVACUUM\b/i.test(stripped);
+}
+
+/**
+ * Naive top-level statement splitter for autocommit migrations.
+ * Postgres's simple-query protocol implicitly wraps a multi-statement
+ * string in a transaction (which defeats the whole point of autocommit
+ * mode), so we have to issue each statement as its own ``client.query``.
+ *
+ * The splitter respects:
+ *   - single-quoted string literals  (``'...''...'``)
+ *   - dollar-quoted strings          (``$$ ... $$``, ``$tag$ ... $tag$``)
+ *   - line comments                  (``-- ...``)
+ *   - block comments                 (``/* ... *\/``)
+ *
+ * It's intentionally simple — sufficient for the DDL we write in
+ * migrations, but NOT a general-purpose SQL parser. If a migration
+ * needs constructs this can't handle, split it into smaller files.
+ */
+function splitStatements(sql: string): string[] {
+  const out: string[] = [];
+  let buf = '';
+  let i = 0;
+  const n = sql.length;
+  while (i < n) {
+    const c = sql[i];
+    const c2 = sql[i + 1];
+    // Line comment
+    if (c === '-' && c2 === '-') {
+      const nl = sql.indexOf('\n', i);
+      const end = nl === -1 ? n : nl;
+      buf += sql.slice(i, end);
+      i = end;
+      continue;
+    }
+    // Block comment
+    if (c === '/' && c2 === '*') {
+      const end = sql.indexOf('*/', i + 2);
+      const stop = end === -1 ? n : end + 2;
+      buf += sql.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    // Single-quoted string (with '' escape handling).
+    if (c === "'") {
+      buf += c;
+      i++;
+      while (i < n) {
+        if (sql[i] === "'") {
+          if (sql[i + 1] === "'") {
+            buf += "''";
+            i += 2;
+            continue;
+          }
+          buf += "'";
+          i++;
+          break;
+        }
+        buf += sql[i];
+        i++;
+      }
+      continue;
+    }
+    // Dollar-quoted string: $tag$ ... $tag$
+    if (c === '$') {
+      const tagMatch = sql.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/);
+      if (tagMatch) {
+        const tag = tagMatch[0];
+        const end = sql.indexOf(tag, i + tag.length);
+        const stop = end === -1 ? n : end + tag.length;
+        buf += sql.slice(i, stop);
+        i = stop;
+        continue;
+      }
+    }
+    if (c === ';') {
+      const stmt = buf.trim();
+      if (stmt) out.push(stmt);
+      buf = '';
+      i++;
+      continue;
+    }
+    buf += c;
+    i++;
+  }
+  const tail = buf.trim();
+  if (tail) out.push(tail);
+  return out;
+}
+
 async function applyMigration(client: pg.Client, migration: Migration): Promise<void> {
   console.log(`  Applying: ${migration.name}`);
 
@@ -131,11 +243,32 @@ async function applyMigration(client: pg.Client, migration: Migration): Promise<
     return;
   }
 
+  const autocommit = needsAutocommit(migration.sql);
+  if (autocommit) {
+    console.log(
+      '    (autocommit mode — file contains CONCURRENTLY/VACUUM, ' +
+        'transaction wrapper skipped; relies on IF NOT EXISTS for re-run safety)',
+    );
+  }
+
   const start = Date.now();
-  await client.query('BEGIN');
+  if (!autocommit) await client.query('BEGIN');
   try {
-    await client.query(migration.sql);
+    if (autocommit) {
+      // pg's simple-query protocol wraps a multi-statement string in an
+      // implicit transaction. Splitting into individual statements is
+      // the only way to keep ``CREATE INDEX CONCURRENTLY`` out of one.
+      const statements = splitStatements(migration.sql);
+      for (const stmt of statements) {
+        await client.query(stmt);
+      }
+    } else {
+      await client.query(migration.sql);
+    }
     const durationMs = Date.now() - start;
+    // Bookkeeping insert. In transaction mode it lives in the same txn
+    // as the migration body; in autocommit mode it's a standalone write
+    // after the body has already committed statement-by-statement.
     await client.query(
       `INSERT INTO _migrations (name, checksum, duration_ms, status, executed_by)
        VALUES ($1, $2, $3, 'applied', $4)
@@ -148,13 +281,15 @@ async function applyMigration(client: pg.Client, migration: Migration): Promise<
          executed_by   = EXCLUDED.executed_by`,
       [migration.name, migration.checksum, durationMs, executor()],
     );
-    await client.query('COMMIT');
+    if (!autocommit) await client.query('COMMIT');
     console.log(`    Applied successfully (${durationMs}ms)`);
   } catch (error) {
-    await client.query('ROLLBACK');
-    // Record the failure outside the rolled-back transaction so operators can
-    // see what blew up. The migration body is rolled back; only this
-    // bookkeeping insert persists.
+    if (!autocommit) {
+      await client.query('ROLLBACK');
+    }
+    // Record the failure outside the rolled-back transaction (or as a
+    // standalone insert in autocommit mode) so operators can see what
+    // blew up.
     const errMsg = error instanceof Error ? error.message : String(error);
     try {
       await client.query(

@@ -36,7 +36,7 @@ const ChatRequestSchema = z.object({
   messages: z.array(ChatMessageSchema).min(1),
   collectionIds: z.array(z.string()).optional(),
   model: z.string().optional(),
-  provider: z.enum(['anthropic', 'openai', 'ollama', 'cerebras']).optional(),
+  provider: z.enum(['anthropic', 'openai', 'openai-compatible', 'ollama', 'cerebras']).optional(),
   webFallback: z.boolean().optional(),
   enableTools: z.boolean().optional(),
   maxTokens: z.number().min(1).max(128000).optional(),
@@ -115,9 +115,18 @@ async function getModelCredentials(
       apiKey = secrets.api_key;
     }
 
+    // Templates aren't consistent about the base-URL key name:
+    //   - ollama.ts writes `api_base`
+    //   - openai-compatible.ts writes `api_base`
+    //   - some older rows wrote `base_url`
+    // Accept either so the LLM client always sees a baseUrl when one is set.
+    const baseUrl =
+      (publicConfig.api_base as string | undefined) ??
+      (publicConfig.base_url as string | undefined);
+
     return {
       apiKey,
-      baseUrl: publicConfig.base_url as string | undefined,
+      baseUrl,
       timeout: publicConfig.timeout as number | undefined,
     };
   } catch (err) {

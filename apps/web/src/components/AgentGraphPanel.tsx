@@ -68,11 +68,33 @@ export interface AdjEdge {
   state: NodeState
 }
 
+/**
+ * Per-citation metadata mirrored from
+ * ``agent_v2/orchestrator/graph.py:flush_node_citations``. Keep in
+ * lock-step with ``apps/web/src/lib/citations/renderCitations.ts``.
+ */
+export interface CitationMeta {
+  index: string
+  doc_id?: string | null
+  chunk_id?: string | null
+  title?: string | null
+  source_url?: string | null
+  score?: number | null
+  page_number?: number | null
+}
+
 export interface AgentGraphState {
   nodes: Record<string, AgentNode>
   /** Flat adjacency: parent -> children edges */
   adj: Record<string, AdjEdge[]>
   references: Record<string, string>
+  /**
+   * Rich per-citation metadata keyed by "doc_id:chunk_id" (RAG) or
+   * numeric string (web). Populated on every SSE event by
+   * ``planner_event``. Optional for back-compat with old backends
+   * that haven't been redeployed yet.
+   */
+  citationMeta?: Record<string, CitationMeta>
   currentNode: string | null
   /** True once the planner emits state=END */
   done: boolean

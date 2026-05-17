@@ -47,16 +47,41 @@ class RetrievalResult:
             )
         return out
 
-    def context_block(self) -> str:
-        """A markdown-ish block the searcher LLM can read."""
+    def context_block(self, *, show_context: bool = True) -> str:
+        """A markdown-ish block the searcher LLM can read.
+
+        Contextual Retrieval (TAG-CR): when ``show_context`` is True and a
+        hit carries ``document_summary`` / ``context_prefix`` (populated by
+        the ingest-time contextualizer), prepend them so the LLM gets the
+        situating context Anthropic's pattern depends on. The flag exists
+        so the A/B harness can compare display-on vs display-off without
+        re-ingesting.
+
+        NULL-tolerant: hits without contextual fields render exactly the
+        same as before — that's the rollback path if the column writes
+        are unwound.
+        """
         if not self.hits:
             return "(no results)"
         lines: list[str] = []
         for i, h in enumerate(self.hits, 1):
             head = h.title or h.url or h.document_id or f"result {i}"
+            page = (
+                f" — page {h.page_number}"
+                if getattr(h, "page_number", None) is not None
+                else ""
+            )
             tag = "[rag]" if h.source == "rag" else "[web]"
+            lines.append(f"[{i}] {tag} {head}{page}")
+            if show_context:
+                doc_sum = getattr(h, "document_summary", None)
+                ctx_pref = getattr(h, "context_prefix", None)
+                if doc_sum:
+                    lines.append(f"    Doc summary: {doc_sum}")
+                if ctx_pref:
+                    lines.append(f"    Context: {ctx_pref}")
             body = (h.snippet or h.chunk_text or "").strip()
-            lines.append(f"[{i}] {tag} {head}\n    {body}")
+            lines.append(f"    {body}")
         return "\n".join(lines)
 
 

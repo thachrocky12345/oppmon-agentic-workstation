@@ -92,7 +92,7 @@ Whenever `/init` is run:
 ## Known Dependencies
 <!-- Claude auto-updates this section on every /init — do not edit manually -->
 
-**Last synced:** 2026-05-15 (init sync — `apps/KnowledgeSearchBackend/` renamed to `apps/agent_graph_backend/agent_search/`; TAG-50 epic added asyncpg/PyJWT/PyNaCl + Cerebras LLM client)
+**Last synced:** 2026-05-16 (init sync — RAG-Graph deep-dive added at `docs/rag-graph-deep-dive.md`; covers architecture, pros/cons, improvement roadmap, model selection for `apps/agent_graph_backend/`. No dependency changes since 2026-05-15.)
 
 ### Reference Only (arkon-reference-only/) — DO NOT MODIFY
 | Package | Version | Category |

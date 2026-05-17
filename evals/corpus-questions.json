@@ -1,90 +1,211 @@
 [
   {
     "$comment": [
-      "TAG-64 — corpus-mode eval set for /solve.",
-      "Two halves:",
-      "  - category=grounded: question is fully answerable from the seeded",
-      "    chunk (see fixtures/seed_two_tenants.sql). expected_citations[]",
-      "    lists the [[doc:chunk]] markers that MUST appear in the final",
-      "    answer. The gate enforces 'citation precision >= 0.95'.",
-      "  - category=ood: question is OUT-OF-CORPUS — the planner must",
-      "    emit the verbatim REFUSAL_TEXT string. The gate enforces",
-      "    'refusal recall >= 0.90'."
+      "TAG-CR — contextual-retrieval A/B eval question bank.",
+      "Three sections:",
+      "  - TAG-64 legacy (corpus-001..010): pre-existing two-tenant smoke set",
+      "    against fixtures/seed_two_tenants.sql. Kept for backward compat.",
+      "  - TAG-CR fixture (corpus-CR-eng-*, -hr-*, -sec-*, -fin-*): 25+ grounded",
+      "    questions over the 4 fixture docs in evals/corpus-fixtures/. The",
+      "    collection_ids field is a TEMPLATE — the A/B driver swaps in",
+      "    _baseline / _contextual suffixes per arm. See contextual-retrieval-eval.ts.",
+      "  - OOD (corpus-CR-ood-*): out-of-corpus negative controls.",
+      "",
+      "Citation key format: [[doc_id:chunk_id]]. The doc_id and chunk_id values",
+      "must match the seed SQL in evals/fixtures/contextual-AB-seed.sql.",
+      "Chunk indexing: chunks are numbered 1..N in file order; the SQL inserts",
+      "preserve that order so chk_eng_1 corresponds to the first chunk of",
+      "evals/corpus-fixtures/alpha-engineering-handbook.md."
     ]
   },
-  {
-    "id": "corpus-001",
-    "category": "grounded",
+
+  { "id": "corpus-001", "category": "grounded",
     "question": "Does Tenant A's policy allow extensions?",
     "collection_ids": ["col_alpha"],
     "expected_citations": ["[[doc_alpha:chk_alpha_1]]"],
-    "expected_keypoints": ["30-day", "extension"]
-  },
-  {
-    "id": "corpus-002",
-    "category": "grounded",
+    "expected_keypoints": ["30-day", "extension"] },
+
+  { "id": "corpus-002", "category": "grounded",
     "question": "How long are extensions granted under policy X?",
     "collection_ids": ["col_alpha"],
     "expected_citations": ["[[doc_alpha:chk_alpha_1]]"],
-    "expected_keypoints": ["30-day"]
-  },
-  {
-    "id": "corpus-003",
-    "category": "grounded",
+    "expected_keypoints": ["30-day"] },
+
+  { "id": "corpus-003", "category": "grounded",
     "question": "What does Tenant B require for customer onboarding?",
     "collection_ids": ["col_beta"],
     "expected_citations": ["[[doc_beta:chk_beta_1]]"],
-    "expected_keypoints": ["KYC", "documentation"]
-  },
-  {
-    "id": "corpus-004",
-    "category": "grounded",
+    "expected_keypoints": ["KYC", "documentation"] },
+
+  { "id": "corpus-004", "category": "grounded",
     "question": "Summarize the KYC requirement in Beta Corpus.",
     "collection_ids": ["col_beta"],
     "expected_citations": ["[[doc_beta:chk_beta_1]]"],
-    "expected_keypoints": ["KYC"]
-  },
-  {
-    "id": "corpus-005",
-    "category": "grounded",
+    "expected_keypoints": ["KYC"] },
+
+  { "id": "corpus-005", "category": "grounded",
     "question": "Does production work get a 30-day grace period?",
     "collection_ids": ["col_alpha"],
     "expected_citations": ["[[doc_alpha:chk_alpha_1]]"],
-    "expected_keypoints": ["production", "30-day"]
-  },
-  {
-    "id": "corpus-006",
-    "category": "ood",
+    "expected_keypoints": ["production", "30-day"] },
+
+  { "id": "corpus-CR-eng-1", "category": "grounded",
+    "question": "What is the engineering code review SLA?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_eng:chk_eng_1]]"],
+    "expected_keypoints": ["24 hours", "business days"] },
+
+  { "id": "corpus-CR-eng-2", "category": "grounded",
+    "question": "Who needs to approve a production deployment?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_eng:chk_eng_2]]"],
+    "expected_keypoints": ["senior", "staff engineer"] },
+
+  { "id": "corpus-CR-eng-3", "category": "grounded",
+    "question": "Who gets paged first when a production incident fires?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_eng:chk_eng_3]]"],
+    "expected_keypoints": ["on-call"] },
+
+  { "id": "corpus-CR-eng-4", "category": "grounded",
+    "question": "How quickly must a post-mortem be filed after an incident?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_eng:chk_eng_4]]"],
+    "expected_keypoints": ["five business days"] },
+
+  { "id": "corpus-CR-eng-5", "category": "grounded",
+    "question": "What observability is required from each service?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_eng:chk_eng_5]]"],
+    "expected_keypoints": ["Prometheus", "metrics"] },
+
+  { "id": "corpus-CR-hr-1", "category": "grounded",
+    "question": "How many days of standard PTO does the company offer?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_hr:chk_hr_1]]"],
+    "expected_keypoints": ["20", "PTO"] },
+
+  { "id": "corpus-CR-hr-2", "category": "grounded",
+    "question": "How long is paid parental leave?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_hr:chk_hr_2]]"],
+    "expected_keypoints": ["16 weeks"] },
+
+  { "id": "corpus-CR-hr-3", "category": "grounded",
+    "question": "Do I need approval for an extended remote-work arrangement?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_hr:chk_hr_3]]"],
+    "expected_keypoints": ["manager", "approval"] },
+
+  { "id": "corpus-CR-hr-4", "category": "grounded",
+    "question": "Does unused sick leave carry over to the next year?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_hr:chk_hr_4]]"],
+    "expected_keypoints": ["does not roll over"] },
+
+  { "id": "corpus-CR-hr-5", "category": "grounded",
+    "question": "How often are performance reviews held?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_hr:chk_hr_5]]"],
+    "expected_keypoints": ["twice yearly"] },
+
+  { "id": "corpus-CR-sec-1", "category": "grounded",
+    "question": "Are company laptops required to be encrypted?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_sec:chk_sec_1]]"],
+    "expected_keypoints": ["full-disk encryption"] },
+
+  { "id": "corpus-CR-sec-2", "category": "grounded",
+    "question": "What are the password length and rotation requirements?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_sec:chk_sec_2]]"],
+    "expected_keypoints": ["16 characters", "annually"] },
+
+  { "id": "corpus-CR-sec-3", "category": "grounded",
+    "question": "How frequently do phishing simulations run?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_sec:chk_sec_3]]"],
+    "expected_keypoints": ["monthly"] },
+
+  { "id": "corpus-CR-sec-4", "category": "grounded",
+    "question": "Who has to approve storing customer PII?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_sec:chk_sec_4]]"],
+    "expected_keypoints": ["VP"] },
+
+  { "id": "corpus-CR-sec-5", "category": "grounded",
+    "question": "Is multi-factor authentication mandatory for production access?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_sec:chk_sec_5]]"],
+    "expected_keypoints": ["MFA", "YubiKey"] },
+
+  { "id": "corpus-CR-fin-1", "category": "grounded",
+    "question": "By when must I file an expense report?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_fin:chk_fin_1]]"],
+    "expected_keypoints": ["30 calendar days"] },
+
+  { "id": "corpus-CR-fin-2", "category": "grounded",
+    "question": "What expenses require a receipt?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_fin:chk_fin_2]]"],
+    "expected_keypoints": ["$25"] },
+
+  { "id": "corpus-CR-fin-3", "category": "grounded",
+    "question": "Where do I book business travel?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_fin:chk_fin_3]]"],
+    "expected_keypoints": ["Concur"] },
+
+  { "id": "corpus-CR-fin-4", "category": "grounded",
+    "question": "Who signs off on procurement contracts over $50k?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_fin:chk_fin_4]]"],
+    "expected_keypoints": ["CFO"] },
+
+  { "id": "corpus-CR-fin-5", "category": "grounded",
+    "question": "How long does reimbursement take after approval?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_fin:chk_fin_5]]"],
+    "expected_keypoints": ["two weeks"] },
+
+  { "id": "corpus-CR-cross-1", "category": "grounded",
+    "question": "When is a senior engineer's approval required for production work?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_eng:chk_eng_2]]"],
+    "expected_keypoints": ["senior engineer", "deployment"] },
+
+  { "id": "corpus-CR-cross-2", "category": "grounded",
+    "question": "How long does a review take to complete?",
+    "collection_ids": ["col_eval"],
+    "expected_citations": ["[[doc_eng:chk_eng_1]]", "[[doc_hr:chk_hr_5]]"],
+    "expected_keypoints": ["24 hours", "twice yearly"] },
+
+  { "id": "corpus-006", "category": "ood",
     "question": "What is the airspeed velocity of an unladen swallow?",
-    "collection_ids": ["col_alpha"],
-    "expected_refusal": true
-  },
-  {
-    "id": "corpus-007",
-    "category": "ood",
+    "collection_ids": ["col_alpha"], "expected_refusal": true },
+
+  { "id": "corpus-007", "category": "ood",
     "question": "Who wrote the United States Constitution?",
-    "collection_ids": ["col_alpha"],
-    "expected_refusal": true
-  },
-  {
-    "id": "corpus-008",
-    "category": "ood",
+    "collection_ids": ["col_alpha"], "expected_refusal": true },
+
+  { "id": "corpus-008", "category": "ood",
     "question": "Translate 'good morning' into French.",
-    "collection_ids": ["col_beta"],
-    "expected_refusal": true
-  },
-  {
-    "id": "corpus-009",
-    "category": "ood",
+    "collection_ids": ["col_beta"], "expected_refusal": true },
+
+  { "id": "corpus-009", "category": "ood",
     "question": "Recite the first ten digits of pi.",
-    "collection_ids": ["col_beta"],
-    "expected_refusal": true
-  },
-  {
-    "id": "corpus-010",
-    "category": "ood",
+    "collection_ids": ["col_beta"], "expected_refusal": true },
+
+  { "id": "corpus-010", "category": "ood",
     "question": "What is the boiling point of mercury?",
-    "collection_ids": ["col_alpha"],
-    "expected_refusal": true
-  }
+    "collection_ids": ["col_alpha"], "expected_refusal": true },
+
+  { "id": "corpus-CR-ood-1", "category": "ood",
+    "question": "What is the current price of Bitcoin?",
+    "collection_ids": ["col_eval"], "expected_refusal": true },
+
+  { "id": "corpus-CR-ood-2", "category": "ood",
+    "question": "Who won the 2024 Nobel Prize in Physics?",
+    "collection_ids": ["col_eval"], "expected_refusal": true }
 ]

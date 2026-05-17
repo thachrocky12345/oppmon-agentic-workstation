@@ -1,6 +1,6 @@
 # OppMon (Arkon) Architecture
 
-**Last Updated:** 2026-05-15 (init sync — KnowledgeSearchBackend renamed to agent_graph_backend; authenticated `/solve` endpoint + TAG-50 epic landed)
+**Last Updated:** 2026-05-16 (init sync — RAG-Graph deep-dive added at `docs/rag-graph-deep-dive.md`. Covers component map, SSE envelope, mode selection truth table, retrieval pipeline, pros/cons, 10 improvement areas, and model evaluation matrix.)
 
 ## Important: Repository Structure
 
