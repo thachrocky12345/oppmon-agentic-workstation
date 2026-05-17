@@ -94,9 +94,10 @@ services:
       # item C). Keep parity with `services.api.environment.JWT_SECRET`.
       JWT_SECRET: development-secret-key-change-in-production
       # ----- Graph mode -----
-      # The graph-agent service below listens on container port 8002 (NOT 7002 —
-      # that's only the dev-time host mapping). Web reaches it via Swarm overlay DNS.
-      GRAPH_BACKEND_URL: http://graph-agent:8002
+      # graph-agent listens on container port 7002 (the standard contract;
+      # 8002 conflicts with another local service on old_windows). Web reaches
+      # it via Swarm overlay DNS.
+      GRAPH_BACKEND_URL: http://graph-agent:7002
       GRAPH_BACKEND_TOKEN: ""
       # NOTE: NEXT_PUBLIC_GRAPH_ENABLED is build-time only — it must be passed
       # via --build-arg when building thachrocky/oppmon-web. Setting it here
@@ -150,6 +151,15 @@ services:
     # first:  `set -a && . apps/api/.env && set +a`. See
     # .claude/skills/swarm-debug/SKILL.md §solve-v3-check.
     environment:
+      # v53809 image bug: v2_server.py does `from agent_v2.app import mount_v2`
+      # which only resolves if /root/agent_search is on PYTHONPATH (CMD runs
+      # from /root). Remove this when the image fixes the import to use the
+      # full agent_search.agent_v2.app path.
+      PYTHONPATH: /root/agent_search
+      # Contract is :7002 inside the container. 8002 is already used by
+      # another local service on old_windows — see deploy_ubuntu.md and the
+      # prod-swarm-deploy skill. Image default is 7002, so leave MINDSEARCH_PORT
+      # unset.
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
@@ -160,7 +170,7 @@ services:
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       TAVILY_SEARCH_TIMEOUT: ${TAVILY_SEARCH_TIMEOUT:-8}
       TAVILY_SEARCH_DEPTH: ${TAVILY_SEARCH_DEPTH:-basic}
-      PLANNER_MAX_ITERATIONS: ${PLANNER_MAX_ITERATIONS:-6}
+      PLANNER_MAX_ITERATIONS: ${PLANNER_MAX_ITERATIONS:-10}
       SEARCHER_MAX_ITERATIONS: ${SEARCHER_MAX_ITERATIONS:-3}
       # ----- TAG-65: authenticated /solve route -----
       # MUST equal services.api.environment.JWT_SECRET (env_file: apps/api/.env).
@@ -182,7 +192,7 @@ services:
       # without removing code or rotating any secret.
       ENABLE_SOLVE_V3: ${ENABLE_SOLVE_V3:-true}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:7002/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3

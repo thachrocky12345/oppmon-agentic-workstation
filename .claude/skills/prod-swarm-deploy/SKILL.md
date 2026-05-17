@@ -1,7 +1,7 @@
 ---
 name: prod-swarm-deploy
 description: Build, push, and deploy OppMon to the production Docker Swarm (old_windows + z800), apply DB schema changes, and triage common deploy failures. Use when asked to "deploy to prod", "push to swarm", "redeploy api/web", "apply schema", or when fixing 500s/proxy errors after a deploy.
-argument-hint: [build-api|build-web|push-web|deploy|deploy-graph|apply-schema|smoke|logs|rollback]
+argument-hint: [build-api|build-web|push-web|deploy|deploy-graph|bump-graph-env|apply-schema|smoke|logs|rollback]
 ---
 
 # Prod Swarm Deploy
@@ -175,7 +175,10 @@ Notes:
   httpx, ddgs, python-dotenv). The legacy `requirement.locked.txt` is no
   longer read.
 - Entry point is `python3 -m mindsearch.v2_server` — listens on container
-  port **8002**, exposes `/healthz`, `/`, and `POST /solve_v2`.
+  port **7002** in prod (image default `MINDSEARCH_PORT=7002`), exposes
+  `/healthz`, `/`, and `POST /solve_v2`. The local dev `docker compose
+  --profile graph` flow maps host 7002 → container 8002 — that mapping is
+  ONLY for local dev, prod is 7002 inside and outside the container.
 - Build cost: ~30s on a warm cache. Image size: ~250 MB (vs the legacy
   ~6.8 GB image with torch + jupyter + streamlit + transformers).
 - Local smoke-test before pushing:
@@ -205,8 +208,12 @@ docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
 
 Make sure `docker-stack.yml` has:
 - `services.graph-agent` uncommented, pointing at `thachrocky/mindsearch:$NEXT_GRAPH_TAG`
-- `services.web.environment.GRAPH_BACKEND_URL: http://graph-agent:8002`
-  (container port — NOT 7002, which is only the local dev host mapping)
+- `services.web.environment.GRAPH_BACKEND_URL: http://graph-agent:7002`
+  (prod container listens on 7002 — image default `MINDSEARCH_PORT=7002`.
+  8002 is the LOCAL dev container port — wrong here will yield `502
+  graph_backend_unreachable` even though `docker service ps` shows Running.)
+- `services.graph-agent.healthcheck` uses `http://localhost:7002/healthz`
+  (same port — mismatch = healthcheck red but the container is fine).
 - Web image rebuilt with `--build-arg NEXT_PUBLIC_GRAPH_ENABLED=true` so the
   Graph toggle renders in `/chat`.
 
@@ -229,6 +236,44 @@ Expect a stream of `data: {...}` lines. Failure modes:
 
 See [docs/solve-v2.md](../../../docs/solve-v2.md) for the full architecture
 and the SSE envelope shape.
+
+## Step: bump-graph-env (change one knob without a full stack redeploy)
+
+For one-off tuning of graph-agent env vars (e.g. bumping
+`PLANNER_MAX_ITERATIONS`, `SEARCHER_MAX_ITERATIONS`,
+`TAVILY_SEARCH_TIMEOUT`), **prefer `docker service update --env-add` over
+`docker stack deploy`**. A full stack deploy re-evaluates every `${VAR:-}`
+against the current shell — if you forget `set -a && . apps/api/.env && set
++a`, four required secrets (`JWT_SECRET`, `TAG_ENCRYPTION_MASTER_KEY`,
+`DATABASE_URL`, `OPENAI_EMBED_API_KEY`) become empty strings, the TAG-65
+fail-fast check trips, and every replica CrashLoopBackOffs (502 at the web
+proxy). Service-update touches only the keys you name.
+
+```bash
+# 1) Update the source-of-truth files so they don't drift
+#    - apps/agent_graph_backend/.env  (local-dev value)
+#    - docker-stack.yml               (prod default)
+
+# 2) Apply to the running service — no shell env sourcing needed
+docker service update --update-order stop-first \
+  --env-add PLANNER_MAX_ITERATIONS=10 \
+  oppmon_graph-agent
+
+# 3) Verify
+docker service inspect oppmon_graph-agent \
+  --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}' \
+  | grep PLANNER_MAX_ITERATIONS
+docker service ps oppmon_graph-agent --filter desired-state=running
+```
+
+If a full `docker stack deploy` IS required (image bump, port change,
+healthcheck change), the env-sourcing line is **mandatory**:
+```bash
+set -a && . apps/api/.env && set +a
+docker stack deploy --with-registry-auth -c docker-stack.yml oppmon --prune=false
+```
+Without it, expect the CrashLoopBackOff above and a `502
+graph_backend_unreachable` at the proxy until you re-deploy with env sourced.
 
 ## Step: apply-schema (Prisma push + pgvector)
 
