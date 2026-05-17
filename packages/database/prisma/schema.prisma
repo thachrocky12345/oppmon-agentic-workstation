@@ -873,6 +873,10 @@ model RagDocument {
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
   deletedAt        DateTime?        @map("deleted_at") // Soft delete
+  // Contextual Retrieval (Anthropic Sept 2024) — see migration 2026-05-15_contextual_retrieval.sql
+  summary          String?          @map("summary")            // ~150-word LLM-generated document summary
+  summaryModel     String?          @map("summary_model")      // model id that produced the summary
+  summaryUpdatedAt DateTime?        @map("summary_updated_at") @db.Timestamptz
 
   // Relations
   collection RagCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
@@ -894,6 +898,12 @@ model RagChunk {
   pageNumber  Int?     @map("page_number") // For PDFs
   tokenCount  Int      @map("token_count") // Token count for context budget
   // embedding vector(1536) - stored via raw SQL migration
+  // Contextual Retrieval (Anthropic Sept 2024) — see migration 2026-05-15_contextual_retrieval.sql
+  contextPrefix String? @map("context_prefix") // ~50-100 token chunk-situating prefix
+  sectionPath   String? @map("section_path")   // breadcrumb e.g. "Ch.2 > Pricing"
+  // content_search is a GENERATED ALWAYS AS STORED column ("(prefix || content)")
+  // managed by the migration. Prisma can't model generated columns; introspect
+  // ignores it. Do NOT add it here — raw SQL is the source of truth.
   metadata    Json     @default("{}")
   createdAt   DateTime @default(now()) @map("created_at")
 

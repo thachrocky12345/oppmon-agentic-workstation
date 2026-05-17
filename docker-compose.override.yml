@@ -25,12 +25,12 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
       TAG_ENCRYPTION_MASTER_KEY: ${TAG_ENCRYPTION_MASTER_KEY:-}
-      DB_AUTO_PUSH: "true"
+      DB_AUTO_PUSH: "false"
       TAG_DOCUMENT_ROOT: /app/data/documents
 
   web:
     build: !reset null
-    image: thachrocky/oppmon-web:latest
+    image: thachrocky/oppmon-web:webs.v3
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:3001
       GRAPH_BACKEND_URL: http://graph-agent:8002
@@ -53,10 +53,7 @@ services:
       TAVILY_SEARCH_DEPTH: basic
       PLANNER_MAX_ITERATIONS: "6"
       SEARCHER_MAX_ITERATIONS: "3"
-    # The published image bakes /root/mindsearch from an older snapshot that
-    # lacks TavilyWebSearch. Mount our host source over it so the container
-    # runs the live code (web_search.py with TavilyWebSearch + app.py factory).
-    volumes:
-      - ./apps/agent_graph_backend/mindsearch:/root/mindsearch:ro
+    # NOTE: Source was renamed mindsearch/ -> agent_search/ on this branch,
+    # so the prior bind mount is removed — use the baked module in the image.
     ports:
       - "7002:8002"

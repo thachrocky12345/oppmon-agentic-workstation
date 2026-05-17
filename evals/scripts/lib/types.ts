@@ -37,6 +37,24 @@ export type CoreAxis = (typeof CORE_AXES)[number];
 export type GraphAxis = (typeof GRAPH_BONUS_AXES)[number];
 export type RubricAxis = CoreAxis | GraphAxis;
 
+/**
+ * Per-citation metadata mirrored from the graph-mode backend
+ * (`WebSearchGraph.citation_meta` in
+ * `agent_v2/orchestrator/graph.py:flush_node_citations`).
+ *
+ * Keys are stringly-typed because web citations carry integer indices
+ * while RAG citations carry "doc_id:chunk_id" strings — both coexist.
+ */
+export interface CitationMeta {
+  index: string;
+  doc_id?: string | null;
+  chunk_id?: string | null;
+  title?: string | null;
+  source_url?: string | null;
+  score?: number | null;
+  page_number?: number | null;
+}
+
 /** One question×mode result from a single eval run. */
 export interface RunResult {
   question_id: string;
@@ -57,7 +75,35 @@ export interface RunResult {
     nodes: Record<string, unknown>;
     adj: Record<string, unknown>;
     references: Record<string, string>;
+    /**
+     * Rich per-citation metadata keyed by "doc_id:chunk_id" (or numeric
+     * index for web citations). Populated by `flush_node_citations()`
+     * on the backend; consumed by the frontend bibliography renderer
+     * and by the eval scoring layer when it wants per-citation scores
+     * (e.g. for NDCG@k computation).
+     *
+     * Each value carries: index, doc_id?, chunk_id?, title?,
+     * source_url?, score?, page_number?.
+     */
+    citation_meta?: Record<string, CitationMeta>;
   };
+  /**
+   * TAG-CR — retrieval-quality fields for the contextual-retrieval A/B
+   * eval. Both arrays hold normalized citation keys ("doc_id:chunk_id"),
+   * stripped of the [[...]] sentinel.
+   *
+   *   - retrieved[]: union of every chunk id surfaced by ANY searcher
+   *                  event during the run (the retriever's recall set).
+   *   - cited[]:     chunk ids that the planner's final synthesis
+   *                  references (what the answer actually drew on).
+   *
+   * These are computed in `arkon-client.ts:askGraph` from the SSE stream's
+   * `response.references` dict; the dict keys are already in
+   * `doc:chunk` form per the rag-mode citation contract in
+   * `agent_v2/orchestrator/rag_tools.py`.
+   */
+  retrieved?: string[];
+  cited?: string[];
   /** Raw SSE events for debugging — capped to avoid GB-scale files. */
   raw_events_count: number;
   /** True if the run threw before completion. */

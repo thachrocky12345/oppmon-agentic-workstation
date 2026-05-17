@@ -31,7 +31,8 @@ USER appuser
 
 # Copy the application code LAST (this changes most frequently)
 # This ensures code changes don't invalidate the dependency cache
-COPY --chown=appuser:appuser mindsearch /root/mindsearch
+# Package was renamed from `mindsearch` to `agent_search`.
+COPY --chown=appuser:appuser agent_search /root/agent_search
 
 # Expose the application port
 EXPOSE 8002
@@ -41,5 +42,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8002/healthz || exit 1
 
 # Start the v2-only FastAPI server (mounts /solve_v2). The legacy /solve
-# entrypoint and its `mindsearch.agent` package were deleted intentionally.
-CMD ["python3", "-m", "mindsearch.v2_server"]
+# entrypoint and its `agent_search.agent` package were deleted intentionally.
+CMD ["python3", "-m", "agent_search.v2_server"]

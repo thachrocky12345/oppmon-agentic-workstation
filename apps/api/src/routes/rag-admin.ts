@@ -25,6 +25,8 @@ import { AuthenticatedRequest, requireRole } from '../middleware/request-auth.js
 import { logAudit, getClientIp } from '../lib/audit.js';
 import { getDocumentStorage } from '../lib/storage/index.js';
 import { createEmbeddingClient, computeContentHash } from '../lib/embedding/index.js';
+import { contextualize } from '../services/rag-contextualizer.js';
+import { extractText } from '../services/rag-extract.js';
 import { Readable } from 'stream';
 import { createId } from '@paralleldrive/cuid2';
 import busboy from 'busboy';
@@ -830,34 +832,10 @@ async function processDocumentExtraction(documentId: string, tenantId: string): 
     }
     const fileContent = Buffer.concat(chunks);
 
-    // Extract text based on mime type
-    let text: string;
-    switch (doc.mimeType) {
-      case 'text/plain':
-      case 'text/markdown':
-        text = fileContent.toString('utf-8');
-        break;
-      case 'text/html':
-        // Simple HTML to text (strip tags)
-        text = fileContent.toString('utf-8').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        break;
-      case 'application/pdf': {
-        // PDF extraction requires pdf-parse library
-        const pdfParseModule = await import('pdf-parse') as any;
-        const pdfParseFn = pdfParseModule.default || pdfParseModule;
-        const pdfData = await pdfParseFn(fileContent);
-        text = pdfData.text;
-        break;
-      }
-      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-        // DOCX extraction requires mammoth
-        const mammoth = await import('mammoth');
-        const mammothResult = await mammoth.extractRawText({ buffer: fileContent });
-        text = mammothResult.value;
-        break;
-      default:
-        throw new Error(`Unsupported file type: ${doc.mimeType}`);
-    }
+    // Extract text via the shared dispatcher (also used by the
+    // backfill CLI). Throws UnsupportedMimeTypeError for unknown types,
+    // which is caught by the surrounding try/catch and marks the doc FAILED.
+    const text = await extractText(doc.mimeType, fileContent);
 
     // Chunk the text
     const textChunks = chunkText(text, { maxChunkSize: 800, overlap: 200 });
@@ -865,6 +843,40 @@ async function processDocumentExtraction(documentId: string, tenantId: string): 
     if (textChunks.length === 0) {
       throw new Error('No text content extracted from document');
     }
+
+    // ------------------------------------------------------------------
+    // Contextual Retrieval (Anthropic Sept 2024).
+    //
+    // When RAG_CONTEXTUALIZER_ENABLED=true, ask Claude for:
+    //   - a ~150-word document summary  -> stored on rag_documents
+    //   - a ~50-100 token situating prefix per chunk
+    //
+    // We then EMBED `prefix + content` (not bare content) and store the
+    // prefix on rag_chunks. The new `content_search` generated column
+    // gives the BM25 path the same augmented text via to_tsvector.
+    //
+    // Soft-fail: contextualize() never throws. On LLM error it returns
+    // empty strings + model='fallback'. Baseline ingest still succeeds.
+    // ------------------------------------------------------------------
+    const contextualizerEnabled = process.env.RAG_CONTEXTUALIZER_ENABLED === 'true';
+    let summary = '';
+    let prefixes: string[] = textChunks.map(() => '');
+    let summaryModel = 'disabled';
+
+    if (contextualizerEnabled) {
+      const ctx = await contextualize({ fullText: text, chunks: textChunks });
+      summary = ctx.summary;
+      prefixes = ctx.prefixes;
+      summaryModel = ctx.model;
+    }
+
+    // What we actually feed to OpenAI: prefix + "\n\n" + chunk when we
+    // have a prefix, bare chunk otherwise. Mirrors the COALESCE in the
+    // generated `content_search` column so BM25 and vector indexes see
+    // the same surface form.
+    const augmentedChunks = textChunks.map((c, idx) =>
+      prefixes[idx] ? `${prefixes[idx]}\n\n${c}` : c,
+    );
 
     // Get embedding client
     const embeddingClient = createEmbeddingClient('openai');
@@ -874,26 +886,30 @@ async function processDocumentExtraction(documentId: string, tenantId: string): 
     let totalChunks = 0;
 
     for (let i = 0; i < textChunks.length; i += BATCH_SIZE) {
-      const batch = textChunks.slice(i, i + BATCH_SIZE);
+      const augmentedBatch = augmentedChunks.slice(i, i + BATCH_SIZE);
+      const rawBatch = textChunks.slice(i, i + BATCH_SIZE);
+      const prefixBatch = prefixes.slice(i, i + BATCH_SIZE);
 
-      // Generate embeddings - pass as EmbeddingRequest
-      const embeddingResponse = await embeddingClient.embed({ input: batch });
+      // Embed the AUGMENTED text (prefix + content). The bare content is
+      // still stored in rag_chunks.content for display / re-chunking.
+      const embeddingResponse = await embeddingClient.embed({ input: augmentedBatch });
 
-      // Insert chunks with embeddings
-      for (let j = 0; j < batch.length; j++) {
+      for (let j = 0; j < augmentedBatch.length; j++) {
         const chunkIndex = i + j;
-        const chunkContent = batch[j];
+        const chunkContent = rawBatch[j];
+        const chunkPrefix = prefixBatch[j] || null; // store NULL when empty
         const embeddingResult = embeddingResponse.embeddings[j];
 
         await query(`
-          INSERT INTO rag_chunks (id, document_id, tenant_id, chunk_index, content, token_count, embedding, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7::vector, NOW())
+          INSERT INTO rag_chunks (id, document_id, tenant_id, chunk_index, content, context_prefix, token_count, embedding, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, NOW())
         `, [
           createId(),
           documentId,
           tenantId,
           chunkIndex,
           chunkContent,
+          chunkPrefix,
           Math.ceil(chunkContent.length / 4), // Rough token estimate
           `[${embeddingResult.embedding.join(',')}]`,
         ]);
@@ -902,12 +918,19 @@ async function processDocumentExtraction(documentId: string, tenantId: string): 
       }
     }
 
-    // Update document status
+    // Update document status + summary. We write summary even when empty
+    // so the audit trail records *which model* (or 'disabled'/'fallback')
+    // last touched this row.
     await query(`
       UPDATE rag_documents
-      SET extraction_status = 'EXTRACTED', chunk_count = $2, updated_at = NOW()
+      SET extraction_status = 'EXTRACTED',
+          chunk_count = $2,
+          summary = $3,
+          summary_model = $4,
+          summary_updated_at = NOW(),
+          updated_at = NOW()
       WHERE id = $1
-    `, [documentId, totalChunks]);
+    `, [documentId, totalChunks, summary || null, summaryModel]);
 
   } catch (error) {
     console.error(`Document extraction failed for ${documentId}:`, error);

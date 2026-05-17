@@ -8,6 +8,7 @@
 import { OllamaClient } from './ollama.js';
 import { CerebrasClient } from './cerebras.js';
 import { AnthropicClient } from './anthropic.js';
+import { OpenAIClient } from './openai.js';
 import { LLMClient, LLMProvider, LLMError } from './types.js';
 
 // Re-export types for convenience
@@ -15,6 +16,7 @@ export * from './types.js';
 export { OllamaClient } from './ollama.js';
 export { CerebrasClient } from './cerebras.js';
 export { AnthropicClient } from './anthropic.js';
+export { OpenAIClient } from './openai.js';
 
 // Model Registry config type
 export interface ModelRegistryConfig {
@@ -71,6 +73,23 @@ function getAnthropicConfig() {
   };
 }
 
+/**
+ * Get OpenAI configuration from environment
+ */
+function getOpenAIConfig() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is required');
+  }
+
+  return {
+    apiKey,
+    defaultModel: process.env.OPENAI_MODEL || 'gpt-4o',
+    baseUrl: process.env.OPENAI_BASE_URL || undefined,
+    timeout: parseInt(process.env.OPENAI_TIMEOUT || '60000', 10),
+  };
+}
+
 // ============================================================================
 // Factory Functions
 // ============================================================================
@@ -118,6 +137,44 @@ export function createLLMClient(provider: LLMProvider, registryConfig?: ModelReg
       }
       return new AnthropicClient(getAnthropicConfig());
 
+    case 'openai':
+      if (registryConfig) {
+        return new OpenAIClient({
+          apiKey: registryConfig.apiKey,
+          defaultModel: registryConfig.model,
+          // baseUrl is optional for vanilla OpenAI — fall back to the
+          // server-wide OPENAI_BASE_URL env if the model row doesn't pin
+          // one, otherwise the client uses https://api.openai.com/v1.
+          baseUrl: registryConfig.baseUrl || process.env.OPENAI_BASE_URL,
+          timeout: registryConfig.timeout || 60000,
+          provider: 'openai',
+        });
+      }
+      return new OpenAIClient(getOpenAIConfig());
+
+    case 'openai-compatible':
+      // openai-compatible REQUIRES a baseUrl — there is no sensible
+      // default. Surface a clear error rather than silently calling
+      // OpenAI proper with someone else's API key.
+      if (!registryConfig) {
+        throw new Error(
+          'openai-compatible provider requires a registered model with an api_base. ' +
+          'Configure the model in Admin → Models.'
+        );
+      }
+      if (!registryConfig.baseUrl) {
+        throw new Error(
+          'openai-compatible provider requires api_base. Set it on the model row.'
+        );
+      }
+      return new OpenAIClient({
+        apiKey: registryConfig.apiKey,
+        defaultModel: registryConfig.model,
+        baseUrl: registryConfig.baseUrl,
+        timeout: registryConfig.timeout || 60000,
+        provider: 'openai-compatible',
+      });
+
     default:
       throw new Error(`Unknown LLM provider: ${provider}`);
   }
@@ -129,7 +186,10 @@ export function createLLMClient(provider: LLMProvider, registryConfig?: ModelReg
 export function getDefaultProvider(): LLMProvider {
   const provider = process.env.LLM_DEFAULT_PROVIDER as LLMProvider;
 
-  if (provider && ['ollama', 'cerebras', 'anthropic'].includes(provider)) {
+  if (
+    provider &&
+    ['ollama', 'cerebras', 'anthropic', 'openai', 'openai-compatible'].includes(provider)
+  ) {
     return provider;
   }
 
@@ -152,6 +212,14 @@ export function isProviderAvailable(provider: LLMProvider): boolean {
     case 'anthropic':
       return !!process.env.ANTHROPIC_API_KEY;
 
+    case 'openai':
+      return !!process.env.OPENAI_API_KEY;
+
+    case 'openai-compatible':
+      // No env-level availability — these are always configured
+      // per-model via the registry.
+      return true;
+
     default:
       return false;
   }
@@ -161,7 +229,13 @@ export function isProviderAvailable(provider: LLMProvider): boolean {
  * Get list of available providers
  */
 export function getAvailableProviders(): LLMProvider[] {
-  const providers: LLMProvider[] = ['ollama', 'cerebras', 'anthropic'];
+  const providers: LLMProvider[] = [
+    'ollama',
+    'cerebras',
+    'anthropic',
+    'openai',
+    'openai-compatible',
+  ];
   return providers.filter(isProviderAvailable);
 }
 
@@ -169,7 +243,7 @@ export function getAvailableProviders(): LLMProvider[] {
  * Validate that a provider string is valid
  */
 export function isValidProvider(provider: string): provider is LLMProvider {
-  return ['ollama', 'cerebras', 'anthropic'].includes(provider);
+  return ['ollama', 'cerebras', 'anthropic', 'openai', 'openai-compatible'].includes(provider);
 }
 
 /**
@@ -183,6 +257,11 @@ export function getDefaultModel(provider: LLMProvider): string {
       return process.env.CEREBRAS_MODEL || 'llama3.1-70b';
     case 'anthropic':
       return process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+    case 'openai':
+      return process.env.OPENAI_MODEL || 'gpt-4o';
+    case 'openai-compatible':
+      // No env default — must be set per-model in the registry.
+      return process.env.OPENAI_COMPATIBLE_MODEL || 'gpt-4o';
     default:
       throw new Error(`Unknown provider: ${provider}`);
   }
