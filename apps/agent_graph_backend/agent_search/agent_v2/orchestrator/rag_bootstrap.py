@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Pre-planner RAG context bootstrap.
 
 Runs a single ``corpus.search`` against the user's question BEFORE the

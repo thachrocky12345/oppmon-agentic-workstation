@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-CR Phase 3.5 — tests for Contextual Retrieval in corpus_search + retriever.
 
 Seven mandated cases (in order):

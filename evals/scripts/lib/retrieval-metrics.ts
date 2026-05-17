@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Information-retrieval metrics for the TAG-CR contextual-retrieval A/B
  * eval (Phase 4 of the plan).

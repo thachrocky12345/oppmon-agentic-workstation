@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Unit tests for the pre-planner RAG bootstrap (TAG-CR follow-up).
 
 Covers the four contracts the rest of the system relies on:
