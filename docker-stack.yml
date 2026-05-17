@@ -81,6 +81,14 @@ services:
         protocol: tcp
         # ingress for multiple replicas (see api notes above).
         mode: ingress
+    # Shares the api env file so JWT_SECRET (and any other shared secret) has
+    # ONE source of truth — apps/api/.env. Without this, rotating JWT_SECRET
+    # on the api side would leave web verifying with a stale hardcoded value,
+    # silently rejecting every cookie. The `environment:` block below only
+    # holds web-specific or prod-override values; for any shared secret, edit
+    # apps/api/.env and redeploy.
+    env_file:
+      - apps/api/.env
     environment:
       NODE_ENV: production
       # Browser uses relative /api/* (so the UI works from any client network).
@@ -88,11 +96,9 @@ services:
       NEXT_PUBLIC_API_URL: ""
       # Server-side rewrite target (Next.js process inside the container hits this).
       INTERNAL_API_URL: http://192.168.1.195:3001
-      # Must match the API's JWT_SECRET — Next.js edge middleware verifies the
-      # cookie with this. If unset, the middleware silently falls back to a
-      # non-matching default and rejects every JWT (see deploy-retro-2026-05-07.md
-      # item C). Keep parity with `services.api.environment.JWT_SECRET`.
-      JWT_SECRET: development-secret-key-change-in-production
+      # JWT_SECRET intentionally NOT set here — it comes from apps/api/.env via
+      # env_file above, guaranteeing parity with services.api. Next.js edge
+      # middleware (apps/web/src/middleware.ts:32) verifies cookies with it.
       # ----- Graph mode -----
       # graph-agent listens on container port 7002 (the standard contract;
       # 8002 conflicts with another local service on old_windows). Web reaches

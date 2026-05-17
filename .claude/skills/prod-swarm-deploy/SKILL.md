@@ -51,6 +51,32 @@ DB user: `thachbui` / password in `apps/api/.env`. Use the **host LAN IP**
 
 ---
 
+## Pre-flight checklist (prevents the 6 most common hiccups)
+
+Run through these once before each deploy. ~30 seconds, prevents 5-10 minute recoveries.
+
+| # | Check | Why |
+|---|---|---|
+| 1 | `set -a && . apps/api/.env && set +a` was run in THIS shell | `${VAR:-}` in stack file expands from shell, not file. Skipping it empties graph-agent secrets → CrashLoopBackOff. |
+| 2 | If rebuilding web: `--build-arg INTERNAL_API_URL=http://192.168.1.195:3001` (and `NEXT_PUBLIC_GRAPH_ENABLED=true` if graph mode) | Next.js bakes these at build time; runtime env on the service is too late. |
+| 3 | Image tag bumped — never reusing the last one | Workers cache digests; same tag may not pull. |
+| 4 | `apps/api/.env` is the only place shared secrets live (`JWT_SECRET`, `OPENAI_API_KEY`, `DATABASE_URL`, etc.) — NOT hardcoded in `docker-stack.yml` | Both api and web read it via `env_file:`. Hardcoded literals drift on rotation. |
+| 5 | `update_config.order: stop-first` on any service with `mode: host` ports | `start-first` jams — new task can't bind the port the old one holds. |
+| 6 | After deploy: don't trust "Updating service …" output — verify with `docker stack ps oppmon --filter desired-state=running` that timestamps are recent | Stack deploy is a no-op for services whose spec didn't change. Use `service update --force` if you need a guaranteed bounce. |
+
+### Want X to happen? Use this command.
+
+| Goal | Command |
+|---|---|
+| Push new image + run it | build → push → bump tag in stack file → `docker stack deploy …` |
+| Pick up new value from `apps/api/.env` (`env_file:` services: api, web) | edit `.env` → `docker stack deploy …` (re-bakes env into spec) |
+| Pick up new value for graph-agent (still uses `${VAR:-}` substitution) | edit `.env` → `set -a && . apps/api/.env && set +a` → `docker stack deploy …` |
+| Force-restart unchanged services (e.g. clear in-memory cache) | `docker service update --force --update-order stop-first oppmon_<name>` |
+| Tune one graph-agent knob without a full deploy | `docker service update --env-add KEY=VAL --update-order stop-first oppmon_graph-agent` |
+| Apply Prisma schema change | flip `DB_AUTO_PUSH=true` via `service update --env-add`, watch logs, flip back |
+
+---
+
 ## Step: build-api + push-api
 
 ```bash
@@ -122,23 +148,21 @@ docker stack deploy --with-registry-auth -c docker-stack.yml oppmon
 
 `--with-registry-auth` is required so swarm nodes can pull from Docker Hub (both `oppmon_api` on old_windows and `oppmon_web` on z800).
 
-> **Recommended permanent fix.** The `${VAR}` indirection in the stack file is
-> fragile — every deployer has to remember to source `.env`, and a missed
-> export silently produces an empty secret. Pick ONE of these and apply it:
+> **State of the `env_file:` rollout (single-source-of-truth for secrets):**
+> - ✅ **api** — uses `env_file: apps/api/.env` (no shell sourcing needed for its vars).
+> - ✅ **web** — uses `env_file: apps/api/.env` since 2026-05-17 (shares JWT_SECRET with api by construction; no drift on rotation).
+> - ⚠️ **graph-agent** — still uses `${VAR:-}` substitution for JWT_SECRET, DATABASE_URL, OPENAI_EMBED_API_KEY, etc. **This is why shell sourcing is still required.** To eliminate the requirement entirely, add `env_file: - apps/api/.env` to the graph-agent service and drop the `${VAR:-}` block (the boot-time `check_required_env()` will still fail-fast on empty values).
 >
-> 1. **Add `env_file:` to docker-stack.yml.** Reference `env_file: - apps/api/.env`
->    directly on each service that needs API secrets (api, graph-agent).
->    Compose v3 reads it at deploy time on the manager. Keep an `environment:`
->    block only for prod-specific overrides (NODE_ENV, LAN URLs, volume paths)
->    since `environment:` wins over `env_file:`. Net effect: no more
->    `set -a/+a` dance.
+> **Stronger alternative — Docker Swarm secrets.** `docker secret create
+> jwt_secret -` etc., mount under `/run/secrets/*`, read at boot. Rotation
+> doesn't require a redeploy — just `docker secret update`. Bigger change
+> (touches application code), defer until you actually need rotation
+> independent of redeploys.
 >
-> 2. **Move secrets to Docker Swarm secrets.** `docker secret create
->    openai_api_key -` etc., then mount them as files under `/run/secrets/*`
->    and read them in the API at boot. No env-file plumbing, no shell sourcing,
->    and rotated values don't require a redeploy — just `docker secret update`.
->
-> Until one of these lands, the operational fix above is mandatory.
+> **Rule going forward:** shared secrets live in `apps/api/.env` ONLY. Never
+> hardcode `JWT_SECRET`, `OPENAI_API_KEY`, `DATABASE_URL`, `TAG_ENCRYPTION_MASTER_KEY`,
+> etc. as literals in `docker-stack.yml`. Both api and web pull them via
+> `env_file:`. To rotate: edit `.env` → deploy. Done.
 
 Wait for convergence (don't sleep-poll — use a `until` loop with Bash run_in_background):
 
@@ -149,6 +173,26 @@ until ! docker stack ps oppmon --format '{{.CurrentState}}' \
 done
 docker stack ps oppmon --filter "desired-state=running"
 ```
+
+> **Gotcha — "Updating service" does NOT mean restarted.** `docker stack deploy`
+> only bounces a service if its **spec** (image, env, healthcheck, etc.) actually
+> changed. If you edited only `apps/api/.env` and the resolved values happen to
+> match what's already in the spec, swarm prints `Updating service oppmon_api`
+> and does nothing. Verify by checking timestamps in the convergence output:
+>
+> ```bash
+> docker stack ps oppmon --filter desired-state=running \
+>   --format 'table {{.Name}}\t{{.CurrentState}}'
+> ```
+>
+> If `CurrentState` shows "Running 2 hours ago" for a service you expected to
+> bounce, force it:
+>
+> ```bash
+> set -a && . apps/api/.env && set +a  # (only needed for graph-agent)
+> docker service update --force --update-order stop-first oppmon_api
+> docker service update --force --update-order stop-first oppmon_graph-agent
+> ```
 
 ## Step: build-graph + push-graph
 
@@ -299,20 +343,38 @@ expected — pgvector 0.4.2 (Ubuntu 18.04 apt) only supports `ivfflat`. Not bloc
 Always after a deploy:
 
 ```bash
-# Network
-curl -sS -o /dev/null -w "%{http_code}\n" http://192.168.1.195:3001/api/health/live
-curl -sS -o /dev/null -w "%{http_code}\n" http://192.168.1.105/
-curl -sS -o /dev/null -w "%{http_code}\n" http://192.168.1.105/api/health/live   # via proxy
+# Network — three services, three checks
+curl -sS -o /dev/null -w "api direct:      %{http_code}\n" http://192.168.1.195:3001/api/health/live
+curl -sS -o /dev/null -w "web root:        %{http_code}\n" http://192.168.1.105/
+curl -sS -o /dev/null -w "web → api proxy: %{http_code}\n" http://192.168.1.105/api/health/live
 
-# Auth (full register/login round-trip)
+# Auth (full register/login round-trip — also proves JWT_SECRET parity between api and web)
 EMAIL="smoke+$(date +%s)@example.com"
-curl -sS -X POST http://192.168.1.105/api/auth/register \
+RESP=$(curl -sS -X POST http://192.168.1.105/api/auth/register \
   -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"SmokePass123!\",\"name\":\"Smoke\"}" \
-  | python3 -m json.tool
+  -d "{\"email\":\"$EMAIL\",\"password\":\"SmokePass123!\",\"name\":\"Smoke\"}")
+TOKEN=$(echo "$RESP" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("token",""))')
+[ -n "$TOKEN" ] && curl -sS -o /dev/null -w "auth/me via web: %{http_code}\n" \
+  http://192.168.1.105/api/auth/me -H "Authorization: Bearer $TOKEN"
 ```
 
-If `register` succeeds and returns a JWT, the schema and API stack are healthy.
+Pass criteria: all four 200s. The `auth/me` call goes through web's edge
+middleware, which verifies the JWT — if it returns 401, JWT_SECRET drifted
+between api and web (see env_file rollout note above).
+
+> **DO NOT smoke-test graph-agent directly on :7002 from the host.** It has
+> no published port — overlay-only. `curl http://192.168.1.195:7002/...` will
+> return "connection refused" even when the service is perfectly healthy. The
+> only valid graph-agent smoke is through the web proxy:
+>
+> ```bash
+> # Expect: streaming "data: {...}" lines OR an `unauthenticated` JSON error
+> # (which still proves the proxy is reaching the backend). NOT 502/503.
+> curl -sS -N -X POST http://192.168.1.105/api/graph/solve \
+>      -H 'Content-Type: application/json' \
+>      -d '{"inputs":"hello","web_fallback":false,"enable_tools":false,"collection_ids":[]}' \
+>      --max-time 5 | head -3
+> ```
 
 ## Step: logs
 
@@ -372,6 +434,9 @@ curl -s "https://hub.docker.com/v2/repositories/thachrocky/oppmon-web/tags?page_
 | Browser: `Graph agent error: 502 graph_backend_unreachable` | graph-agent service not running / DNS miss | `docker service ps oppmon_graph-agent`; check the service name in `GRAPH_BACKEND_URL` matches the stack service name |
 | Graph toggle missing from `/chat` even though backend is up | Web image was built without `NEXT_PUBLIC_GRAPH_ENABLED=true` | Rebuild with the build-arg (see deploy-graph step) — runtime env doesn't affect baked NEXT_PUBLIC_* |
 | `port 8002 already allocated` | Old port reservation | Graph-agent uses **7002** now, not 8002. Pull latest config. |
+| `docker stack deploy` printed "Updating service oppmon_api" but `docker stack ps` still shows the task running from hours ago | Spec didn't change — swarm treats it as a no-op | Use `docker service update --force --update-order stop-first oppmon_api` to actually bounce |
+| `curl http://192.168.1.195:7002/healthz` → `Connection refused` | graph-agent has no published port (overlay-only by design) | Don't test directly. Smoke via `POST http://192.168.1.105/api/graph/solve` instead |
+| `auth/me` returns 401 even though `/login` succeeded | JWT_SECRET drifted between api and web | Both should use `env_file: apps/api/.env` (see env_file rollout note in deploy step). Compare with `docker service inspect oppmon_api/oppmon_web --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}' \| grep JWT_SECRET` |
 
 ---
 
@@ -383,8 +448,11 @@ curl -s "https://hub.docker.com/v2/repositories/thachrocky/oppmon-web/tags?page_
 - **Don't put `localhost` in DATABASE_URL** if any code might run in a container. Always `192.168.1.195`.
 - **Don't run `prisma db push --accept-data-loss` from `Bash` directly** — it'll be permission-blocked. Use the entrypoint flag.
 - **Don't scale `oppmon_api` past 1 replica** without first switching to `mode: ingress` and adding Redis pubsub for WebSocket fanout. See `deploy_ubuntu.md` for the trade-offs.
-- **Don't forget `set -a && . apps/api/.env && set +a`** before `docker stack deploy`. Missing it silently produces empty `${VAR}` substitutions and your secrets vanish without an error.
+- **Don't forget `set -a && . apps/api/.env && set +a`** before `docker stack deploy`. Missing it silently produces empty `${VAR}` substitutions and your secrets vanish without an error. (Only graph-agent still needs this — api and web read `apps/api/.env` via `env_file:`.)
 - **Don't use port 8002 for graph-agent.** It's already taken by another local service. The contract is **7002**.
+- **Don't hardcode shared secrets in `docker-stack.yml`.** `JWT_SECRET`, `OPENAI_API_KEY`, `DATABASE_URL`, `TAG_ENCRYPTION_MASTER_KEY` etc. belong in `apps/api/.env` and reach the containers via `env_file:`. A literal in the stack file silently drifts the day you rotate the `.env` value.
+- **Don't smoke-test graph-agent directly on `:7002`.** It has no published port. `curl http://192.168.1.195:7002/...` will look broken even when it's healthy. Always test through `http://192.168.1.105/api/graph/solve`.
+- **Don't trust "Updating service …" from `docker stack deploy`.** It's printed unconditionally. The real signal is `docker stack ps oppmon --filter desired-state=running` showing recent timestamps. If you needed a bounce and didn't get one, follow up with `docker service update --force --update-order stop-first oppmon_<name>`.
 
 ---
 
@@ -393,8 +461,9 @@ curl -s "https://hub.docker.com/v2/repositories/thachrocky/oppmon-web/tags?page_
 After every deploy or schema change, run the smoke step. Specifically check:
 
 1. `/api/health/live` returns 200 on both old_windows direct and z800 proxy.
-2. Register + login succeeds end-to-end.
+2. Register + login + `auth/me` succeeds end-to-end (also proves JWT_SECRET parity).
 3. `docker service logs oppmon_api 2>&1 | grep '"level":50'` is empty (or only contains expected `BAD_REQUEST` validation errors).
-4. `docker service ps oppmon` shows both services with `Running` and no recent failures.
+4. `docker stack ps oppmon --filter desired-state=running` shows all services `Running` with **timestamps consistent with what you expected to bounce**. A service still showing "Running 2 hours ago" when you thought you redeployed it = stack deploy was a no-op for that service.
+5. (If graph mode enabled) `POST /api/graph/solve` through the web host returns streaming data or a structured 401, NOT 502/503.
 
 If any of these fail, the failure → fix table is the first place to look.
