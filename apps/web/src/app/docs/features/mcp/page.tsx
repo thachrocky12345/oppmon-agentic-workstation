@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 'use client'
 
 import { CodeSnippet, TutorialSection, FeatureCard } from '@/components/tutorial'

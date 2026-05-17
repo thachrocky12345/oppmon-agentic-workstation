@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for `agent_v2.auth.deps.get_current_user` and `require_role`.
 
 Covers TAG-53's five mandatory cases plus several defensive checks:

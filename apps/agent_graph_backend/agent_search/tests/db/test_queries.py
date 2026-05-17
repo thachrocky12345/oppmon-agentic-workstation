@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for `agent_v2.db.queries` — read-only write-guard + helpers."""
 
 from __future__ import annotations

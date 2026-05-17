@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Progressive Disclosure Workflow System
  * Enables multi-phase workflows with phase gates and approval requirements

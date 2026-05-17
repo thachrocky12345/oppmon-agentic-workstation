@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Within-session conversational memory.
 
 Holds the message list the LLM sees, with cheap token accounting so we know

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """FastAPI integration for the v2 reactive agent.
 
 Mounts `/solve_v2` on the same app that serves the legacy `/solve` endpoint.

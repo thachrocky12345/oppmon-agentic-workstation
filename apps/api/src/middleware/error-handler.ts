@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 import { Request, Response, NextFunction } from 'express';
 import { pino } from 'pino';
 import { ZodError } from 'zod';

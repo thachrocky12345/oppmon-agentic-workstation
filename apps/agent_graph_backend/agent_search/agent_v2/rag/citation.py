@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Citation & search-hit types.
 
 Mirrors Arkon `apps/api/src/services/rag-chat.ts:41-50` so the React frontend

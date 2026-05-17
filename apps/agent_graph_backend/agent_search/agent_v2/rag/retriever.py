@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Source-routing retrieval.
 
 Port of Arkon `apps/api/src/services/advanced-rag.ts:565-581`:

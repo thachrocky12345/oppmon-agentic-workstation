@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-62 — ``run_hybrid_solve`` policy tests.
 
 Three contract assertions from the ticket:

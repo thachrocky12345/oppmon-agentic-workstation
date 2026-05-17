@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tools the SearcherAgent exposes to its LLM (only when `enable_tools=true`).
 
 In default mode, the searcher just runs `advanced_retrieve` once and hands

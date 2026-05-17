@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 

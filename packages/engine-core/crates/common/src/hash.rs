@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 //! Hashing utilities
 //!
 //! Provides SHA-256 hashing for content addressing

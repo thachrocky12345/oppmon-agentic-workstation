@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """``LLMSpec`` — typed wire contract from registry/auth resolution to the
 LLM factory.
 

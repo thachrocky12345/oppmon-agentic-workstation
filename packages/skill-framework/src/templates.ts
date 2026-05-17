@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Structured Output Templates
  * Templates for research artifacts with schema validation

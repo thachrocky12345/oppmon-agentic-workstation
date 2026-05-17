@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """PlannerAgent — top-level reactive loop that grows the WebSearchGraph.
 
 Yields SSE-ready event dicts (see `sse.py`) so the FastAPI layer can stream

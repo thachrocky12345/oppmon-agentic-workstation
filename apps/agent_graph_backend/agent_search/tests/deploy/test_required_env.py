@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-65 — fail-fast env check tests.
 
 These tests exercise `check_required_env()` (in `agent_v2/app.py`) and the

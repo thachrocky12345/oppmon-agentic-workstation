@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Public surface for the prompt loader (TAG-72).
 
 Callers should import :func:`get_prompt` (and friends) from this module

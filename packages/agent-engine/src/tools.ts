@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Parallel Tool Executor
  * TypeScript implementation of parallel tool execution (simulating Rust Rayon)

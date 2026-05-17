@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """HTTP route layer for agent_search.
 
 TAG-58 adds the authenticated ``POST /solve`` endpoint. The legacy

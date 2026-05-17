@@ -1,4 +1,7 @@
 #!/usr/bin/env tsx
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * CLI Week 2 Smoke Test
  *

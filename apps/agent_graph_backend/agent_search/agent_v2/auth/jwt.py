@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """HS256 JWT verifier — mirrors `apps/api/src/lib/jwt.ts`.
 
 Contract:

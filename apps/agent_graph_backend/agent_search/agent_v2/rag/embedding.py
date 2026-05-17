@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Embedding providers for corpus-query vectorisation (TAG-60).
 
 `PgCorpusSearch` (TAG-59) needs to embed the user's natural-language

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-72 — Filesystem-backed prompt loader.
 
 This module owns the public ``get_prompt(slug) -> str`` API the rest of

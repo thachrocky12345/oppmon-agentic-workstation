@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Typed JWT claim shape.
 
 Mirrors `packages/shared/src/types.ts:JWTClaims` and the wire format produced

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Request schema for ``POST /solve``.
 
 Two distinct guardrails the validator enforces — both at construction

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Shared pytest fixtures for agent_search tests.
 
 The autouse session fixture sets a `fake` LLM provider and dummy API keys

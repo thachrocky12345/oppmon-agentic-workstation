@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """RAG-mode planner prompt — TAG-73 thin re-export layer.
 
 Originally hosted the inline ``_RAG_PLANNER_SYSTEM_V1`` constant (TAG-61).

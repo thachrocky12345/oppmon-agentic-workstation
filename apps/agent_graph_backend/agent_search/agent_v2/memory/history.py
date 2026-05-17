@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-63 — Conversation history trim + summarize.
 
 The orchestrator threads prior turns through ``PlannerAgent.run`` so a

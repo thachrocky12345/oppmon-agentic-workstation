@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Skill Body Parser
  * Parses the markdown body of SKILL.md files to extract structured content

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Async web search.
 
 Ports `mindsearch/agent/google_search.py` to httpx + asyncio. No threads,

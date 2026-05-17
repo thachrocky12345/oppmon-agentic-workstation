@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-61 integration smoke — RAG-mode planner orchestrator.
 
 Out-of-process verification that ``run_corpus_solve`` wires up cleanly:

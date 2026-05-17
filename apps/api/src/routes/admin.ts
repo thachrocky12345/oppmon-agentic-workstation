@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { query, transaction } from '../lib/db.js';

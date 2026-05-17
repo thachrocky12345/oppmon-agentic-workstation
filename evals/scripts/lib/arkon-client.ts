@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Clients for the two Arkon chat backends:
  *   - simple mode: Arkon /api/rag/chat/stream

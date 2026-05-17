@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Per-request tool-call log.
 
 Every dispatch through `ToolRegistry` is recorded here with input, output,

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Cross-tenant isolation tests for `model_registry`.
 
 TAG-55 requires that a user from tenant B who guesses a tenant A row id

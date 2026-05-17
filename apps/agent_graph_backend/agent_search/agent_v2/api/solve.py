@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """``POST /solve`` — authenticated, tenant-scoped SSE endpoint.
 
 This module is intentionally thin: it composes building blocks from

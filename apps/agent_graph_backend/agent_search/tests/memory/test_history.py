@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-63 — ``memory.history`` unit tests.
 
 Six contract assertions from the ticket's Tests table plus a small

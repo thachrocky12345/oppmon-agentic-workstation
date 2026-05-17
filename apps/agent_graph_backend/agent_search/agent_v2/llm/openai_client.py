@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """OpenAI Chat Completions provider with function-calling.
 
 Lazy-imports the SDK so environments without it can still use `FakeLLMClient`.

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Reactive agent subsystem (v2). See docs/agent_architecture.md."""
 
 from .config import settings

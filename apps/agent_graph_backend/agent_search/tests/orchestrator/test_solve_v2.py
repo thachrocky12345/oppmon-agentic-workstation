@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Smoke: /solve_v2 still mounts and responds with DATABASE_URL empty.
 
 We don't drive a full streaming run here (that's TAG-58's contract); we

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Authentication for agent_search.
 
 TAG-52 adds HS256 JWT verification mirroring apps/api (Express).

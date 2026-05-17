@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Mode selection + dispatcher for ``POST /solve`` (TAG-58 / TAG-61 / TAG-62).
 
 TAG-62 owns this file. The contract is:

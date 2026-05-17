@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-72 integration smoke — filesystem prompt loader.
 
 The pytest suite under ``agent_search/tests/prompts/test_loader.py``

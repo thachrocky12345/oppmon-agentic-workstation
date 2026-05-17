@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tools the PlannerAgent exposes to its LLM.
 
 These mutate the shared `WebSearchGraph` in `ToolContext`. The handlers are

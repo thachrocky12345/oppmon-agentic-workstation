@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-64 integration smoke — ``/solve`` end-to-end wiring.
 
 The pytest integration suite in ``agent_search/tests/integration/`` is

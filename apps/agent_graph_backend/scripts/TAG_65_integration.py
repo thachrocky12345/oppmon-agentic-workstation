@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-65 integration smoke — Swarm deploy hardening artifacts.
 
 TAG-65 is a DevOps ticket: no new endpoint, no SSE shape to assert. The

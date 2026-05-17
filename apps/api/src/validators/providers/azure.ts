@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Azure OpenAI Connection Validator
  * Tests Azure OpenAI deployment credentials

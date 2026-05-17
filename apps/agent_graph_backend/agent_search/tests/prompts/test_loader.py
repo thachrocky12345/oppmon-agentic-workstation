@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-72 — Filesystem prompt-loader unit tests.
 
 Covers the 10 cases mandated by the ticket plus the AC4 "no I/O after

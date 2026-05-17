@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for ``agent_v2.crypto.vault``.
 
 Mirrors the five test cases listed in TAG-54 plus a few defensive

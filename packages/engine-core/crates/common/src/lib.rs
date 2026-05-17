@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 //! Arkon Common Library
 //!
 //! Provides shared types and utilities for the Arkon engine:

@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { pino } from 'pino';
 import { prisma } from '@oppmon/database';

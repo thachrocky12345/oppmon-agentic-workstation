@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * AWS Bedrock Connection Validator
  * Tests AWS credentials and Bedrock model access

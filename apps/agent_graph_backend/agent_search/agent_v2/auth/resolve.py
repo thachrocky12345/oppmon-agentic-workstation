@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """``resolve_llm_spec`` — glue from authenticated user + request body to ``LLMSpec``.
 
 The single entry point this module exposes binds three previously

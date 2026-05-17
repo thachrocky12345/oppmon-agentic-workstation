@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Process-lifetime asyncpg pool.
 
 Lazy: not opened until the first `get_pool()` call. This keeps `/solve_v2`

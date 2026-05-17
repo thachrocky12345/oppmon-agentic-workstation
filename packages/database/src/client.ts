@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 import { PrismaClient } from "@prisma/client";
 
 // PrismaClient is attached to the `global` object in development to prevent

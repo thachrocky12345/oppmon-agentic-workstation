@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-64 — integration tests for ``POST /solve`` end-to-end.
 
 This is the *integration* layer: real FastAPI ASGI stack, real auth path,

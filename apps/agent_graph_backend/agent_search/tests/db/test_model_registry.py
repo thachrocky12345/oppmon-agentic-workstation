@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for `agent_v2.db.model_registry`.
 
 These exercise the SQL shape and Pydantic mapping with a mocked asyncpg

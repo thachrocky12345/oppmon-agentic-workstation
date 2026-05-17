@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Centralized configuration for the reactive agent (v2).
 
 All values default-load from environment variables. See `.env.example`.

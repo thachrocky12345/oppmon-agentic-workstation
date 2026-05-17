@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Skill Framework Types
  * Defines the structure of skills, frontmatter, and matching results

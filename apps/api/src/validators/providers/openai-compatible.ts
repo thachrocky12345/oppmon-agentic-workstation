@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * OpenAI-Compatible Connection Validator
  * Tests generic OpenAI-compatible API endpoints

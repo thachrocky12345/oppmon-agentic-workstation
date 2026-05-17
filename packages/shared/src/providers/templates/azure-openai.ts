@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Azure OpenAI Provider Template
  * Access OpenAI models via Azure's enterprise deployment

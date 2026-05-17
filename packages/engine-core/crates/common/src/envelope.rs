@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 //! Envelope<T> - Message wrapper with metadata
 //!
 //! The Envelope type wraps any payload with:

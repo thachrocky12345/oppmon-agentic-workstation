@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Cryptographic helpers for agent_search.
 
 TAG-54 adds ``vault.decrypt_secret`` — XSalsa20-Poly1305 decryption that

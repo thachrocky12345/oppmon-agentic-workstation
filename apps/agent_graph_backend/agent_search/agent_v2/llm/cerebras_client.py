@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Cerebras Chat Completions provider.
 
 Cerebras Cloud serves an OpenAI-compatible API at https://api.cerebras.ai/v1,

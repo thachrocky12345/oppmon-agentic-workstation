@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-62 — Hybrid mode: corpus first, web fall-through.
 
 Policy (from the ticket):

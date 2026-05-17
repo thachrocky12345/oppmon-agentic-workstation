@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Anthropic Claude provider.
 
 Uses native `tool_use` blocks (Anthropic Messages API). The official `anthropic`

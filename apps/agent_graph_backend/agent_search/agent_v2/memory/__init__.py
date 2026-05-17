@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 from .conversational import ConversationalMemory
 from .history import (
     MAX_TOTAL_CHARS,

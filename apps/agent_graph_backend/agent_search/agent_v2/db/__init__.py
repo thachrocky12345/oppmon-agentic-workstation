@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Database access for agent_v2.
 
 This subpackage exposes a process-lifetime asyncpg pool and thin

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Secret-vault decryption — Python mirror of ``apps/api/src/crypto/secret-vault.ts``.
 
 The Express signer stores per-tenant API keys (Anthropic / OpenAI / Cerebras / …)

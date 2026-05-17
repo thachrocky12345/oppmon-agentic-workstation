@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-64 — integration suite fixtures.
 
 The goal of the integration suite (per the ticket) is "real DB, fake

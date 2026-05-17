@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """SearcherAgent — answers a single sub-question.
 
 Default mode (`enable_tools=false`): pulls grounding once via the retriever,

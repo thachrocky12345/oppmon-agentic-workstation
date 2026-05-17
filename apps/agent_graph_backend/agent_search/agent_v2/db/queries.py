@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Thin asyncpg query helpers with a read-only write-guard.
 
 All three helpers assert that the SQL string starts with `SELECT` unless

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-63 — PlannerAgent threads conversation history into the LLM call.
 
 Contract assertions:

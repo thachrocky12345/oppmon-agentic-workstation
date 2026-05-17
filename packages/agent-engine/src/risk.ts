@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Risk Gate - Interceptor Chain
  * Security layer for filtering and modifying agent requests/responses

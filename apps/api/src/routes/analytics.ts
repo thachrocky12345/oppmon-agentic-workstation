@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 import { Router, Response } from 'express';
 import { query } from '../lib/db.js';
 import { asyncHandler } from '../middleware/error-handler.js';

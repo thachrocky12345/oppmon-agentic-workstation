@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-63 integration smoke — conversation history threading.
 
 The unit-test suite covers ``trim_history`` / ``summarize_oldest_half``

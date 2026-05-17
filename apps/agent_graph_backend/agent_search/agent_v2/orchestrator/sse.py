@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """SSE envelope builder.
 
 Produces dicts matching the legacy frontend's expectations:

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Pydantic row models for ``agent_v2.db.model_registry`` reads.
 
 The ticket spec for TAG-55 references column names that pre-date the

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """FastAPI auth dependencies.
 
 Single import for any authenticated route under `agent_search`:

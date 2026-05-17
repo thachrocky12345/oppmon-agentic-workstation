@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tool registry and dispatcher.
 
 Port of Arkon's `apps/api/src/agent/toolbox.ts`:

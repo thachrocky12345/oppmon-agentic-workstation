@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """V2-only FastAPI server.
 
 Skips the legacy mindsearch/app.py entirely (which depends on the `class_registry`

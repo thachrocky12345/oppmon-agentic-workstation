@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-61 — RAG-mode planner orchestrator tests.
 
 The four mandatory tests from the ticket (`TAG-61-rag-planner-prompt.md`):

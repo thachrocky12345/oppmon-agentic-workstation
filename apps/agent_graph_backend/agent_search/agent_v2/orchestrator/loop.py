@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Shared reactive loop primitive.
 
 Mirrors Arkon `apps/api/src/agent/oracle-loop.ts:227-400`:

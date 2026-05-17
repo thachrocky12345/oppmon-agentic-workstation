@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * AWS Bedrock Provider Template
  * Access Claude and other models via AWS Bedrock

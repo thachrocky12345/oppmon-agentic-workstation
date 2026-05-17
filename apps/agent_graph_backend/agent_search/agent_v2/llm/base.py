@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Provider-agnostic LLM interface.
 
 Mirrors Arkon's `apps/api/src/lib/llm/types.ts` and oracle-loop wire format:

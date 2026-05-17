@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Hybrid retrieval stub.
 
 Port of Arkon `apps/api/src/lib/search/` (BM25 + vector + RRF) — kept as

@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Authenticated graph-agent SSE proxy (TAG-65 / TAG-50 epic).
  *

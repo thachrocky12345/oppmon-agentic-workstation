@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for ``POST /solve`` (TAG-58).
 
 Covers the eight cases mandated by the ticket plus a body-size

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """WebSearchGraph state.
 
 The planner mutates this through tool calls (`add_node`, `link_nodes`, …).

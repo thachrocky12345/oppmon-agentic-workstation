@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-62 integration smoke — mode selection + dispatch end-to-end.
 
 Out-of-process verification that the four-quadrant decision table

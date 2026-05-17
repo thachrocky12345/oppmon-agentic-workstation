@@ -1,4 +1,7 @@
 #!/bin/sh
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 set -e
 
 # Gated, one-shot schema sync. Set DB_AUTO_PUSH=true once after a deploy,

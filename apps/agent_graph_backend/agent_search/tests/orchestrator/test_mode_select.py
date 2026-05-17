@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-62 — ``select_mode`` quadrant tests.
 
 The four (``web_fallback``, ``collection_ids``) quadrants map to

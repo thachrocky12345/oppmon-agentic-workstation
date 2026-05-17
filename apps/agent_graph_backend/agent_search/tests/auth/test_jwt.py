@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for `agent_v2.auth.jwt.verify_jwt`.
 
 Covers the six cases mandated by TAG-52:

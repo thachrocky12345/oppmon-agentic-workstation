@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 from .citation import Citation, SearchHit, Source
 from .corpus_search import CorpusHit, CorpusSearch, PgCorpusSearch
 from .embedding import (

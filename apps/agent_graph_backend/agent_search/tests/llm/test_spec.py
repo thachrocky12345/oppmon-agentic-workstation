@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for ``agent_v2.llm.spec`` — typed LLM construction spec.
 
 The tests cover three concerns, in order of regression risk:

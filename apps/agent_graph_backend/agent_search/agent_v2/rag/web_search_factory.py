@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-62 — Shared web-search provider factory.
 
 Extracted from :mod:`agent_v2.app` so the legacy ``/solve_v2`` handler

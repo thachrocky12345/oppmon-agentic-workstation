@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 //! Error types for the Arkon engine
 //!
 //! Provides a unified error type for all engine operations

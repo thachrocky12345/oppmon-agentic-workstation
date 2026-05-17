@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """Tests for ``agent_v2.auth.resolve.resolve_llm_spec``.
 
 The resolver is the gluing layer between TAG-52/53 auth, TAG-55 registry

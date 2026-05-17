@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 import { Router, Request, Response } from 'express';
 import { healthCheck } from '../lib/db.js';
 

@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-61 — Planner tools that hit :class:`CorpusSearch` instead of web search.
 
 Same four-tool shape as the web planner in

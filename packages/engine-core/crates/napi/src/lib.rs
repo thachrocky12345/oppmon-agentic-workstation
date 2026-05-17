@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 //! Arkon NAPI - Node.js Bindings (Stub)
 //!
 //! This crate will provide Node.js bindings for the Arkon engine

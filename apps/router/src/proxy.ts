@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Proxy Middleware
  * Routes requests to tenant-specific LiteLLM containers

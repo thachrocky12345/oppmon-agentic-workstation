@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * Agent Engine Types
  * Defines wire format, messages, and execution types for Go/Rust engine

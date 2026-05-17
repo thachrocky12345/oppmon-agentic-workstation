@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Oppmon. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """TAG-59 — Tenant-scoped hybrid corpus search (pgvector + BM25 + RRF).
 
 Replaces the stub :class:`NullCorpusSearch` (see ``hybrid_search.py``) with

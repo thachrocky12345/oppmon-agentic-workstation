@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright (c) 2024 Oppmon. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 /**
  * OppMon CLI - oppmon command
  *
