@@ -24,6 +24,13 @@ class SearchHit(BaseModel):
     document_id: str | None = None  # for internal RAG chunks
     chunk_text: str | None = None
     score: float = 0.0
+    # Contextual Retrieval (TAG-CR): populated for RAG hits when the
+    # contextualizer ran at ingest. None on web hits and on RAG hits whose
+    # documents predate the contextualizer rollout.
+    document_summary: str | None = None
+    context_prefix: str | None = None
+    section_path: str | None = None
+    page_number: int | None = None
 
 
 class Citation(BaseModel):

@@ -20,7 +20,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from mindsearch.agent_v2.app import mount_v2
+from agent_v2.app import mount_v2
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -49,6 +49,6 @@ async def healthz():
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("MINDSEARCH_PORT", "8002"))
+    port = int(os.getenv("MINDSEARCH_PORT", "7002"))
     log.info("Starting MindSearch v2 server on :%s", port)
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

@@ -59,6 +59,14 @@ class CorpusHit(BaseModel):
     title: str | None = None
     source_url: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # Contextual Retrieval (TAG-CR): populated when the rag_documents /
+    # rag_chunks rows carry summary + context_prefix written by the
+    # contextualizer at ingest. None when the document predates the
+    # rollout or the contextualizer soft-failed.
+    document_summary: str | None = None
+    context_prefix: str | None = None
+    section_path: str | None = None
+    page_number: int | None = None
 
 
 @runtime_checkable
@@ -97,6 +105,14 @@ class CorpusSearch(Protocol):
 #      and same ``1 - distance`` similarity convention so the RRF
 #      input ordering is consistent.
 
+# NOTE on tenant isolation: every projection here joins rag_chunks ⨝
+# rag_documents and filters BOTH ``c.tenant_id = $2`` AND
+# ``d.tenant_id = $2``. The new ``d.summary`` and ``c.context_prefix``
+# columns carry summarized PII / proprietary text — losing either filter
+# would leak per-tenant summaries through ranked results. The mandatory
+# cross-tenant test (``tests/rag/test_corpus_search_contextual.py``)
+# pins both filters in place.
+
 _BM25_SQL = """
 SELECT
   c.id                AS chunk_id,
@@ -105,8 +121,12 @@ SELECT
   c.content           AS text,
   c.metadata          AS metadata,
   d.original_filename AS title,
+  d.summary           AS document_summary,
+  c.context_prefix    AS context_prefix,
+  c.section_path      AS section_path,
+  c.page_number       AS page_number,
   ts_rank_cd(
-    to_tsvector('english', c.content),
+    to_tsvector('english', c.content_search),
     plainto_tsquery('english', $1),
     {bm25_norm}
   ) AS score
@@ -116,7 +136,7 @@ WHERE c.tenant_id = $2
   AND d.tenant_id = $2
   AND d.collection_id = ANY($3::text[])
   AND d.deleted_at IS NULL
-  AND to_tsvector('english', c.content) @@ plainto_tsquery('english', $1)
+  AND to_tsvector('english', c.content_search) @@ plainto_tsquery('english', $1)
 ORDER BY score DESC
 LIMIT $4
 """.format(bm25_norm=_BM25_NORMALIZATION)
@@ -130,6 +150,10 @@ SELECT
   c.content           AS text,
   c.metadata          AS metadata,
   d.original_filename AS title,
+  d.summary           AS document_summary,
+  c.context_prefix    AS context_prefix,
+  c.section_path      AS section_path,
+  c.page_number       AS page_number,
   1 - (c.embedding <=> $1::vector) AS score
 FROM rag_chunks c
 JOIN rag_documents d ON d.id = c.document_id
@@ -159,6 +183,11 @@ def _row_to_hit_dict(row: Any) -> dict[str, Any]:
     when no JSON codec is registered; we accept both shapes so tests
     that monkeypatch ``pg_fetch_all`` with a list of plain dicts work
     without extra ceremony.
+
+    Contextual Retrieval fields (``document_summary``, ``context_prefix``,
+    ``section_path``, ``page_number``) are pulled with ``.get`` so that
+    older test fixtures and pre-contextualizer rows that don't carry
+    them still round-trip cleanly with ``None`` defaults.
     """
     md = row["metadata"]
     if isinstance(md, str):
@@ -166,6 +195,20 @@ def _row_to_hit_dict(row: Any) -> dict[str, Any]:
             md = json.loads(md)
         except json.JSONDecodeError:
             md = {}
+    # ``asyncpg.Record`` doesn't implement ``.get``; we have to probe by
+    # key. Test fixtures pass plain dicts (which do have ``.get``), so
+    # branch on that.
+    if isinstance(row, dict):
+        document_summary = row.get("document_summary")
+        context_prefix = row.get("context_prefix")
+        section_path = row.get("section_path")
+        page_number = row.get("page_number")
+    else:
+        # asyncpg.Record supports membership check via ``in``.
+        document_summary = row["document_summary"] if "document_summary" in row else None
+        context_prefix = row["context_prefix"] if "context_prefix" in row else None
+        section_path = row["section_path"] if "section_path" in row else None
+        page_number = row["page_number"] if "page_number" in row else None
     return {
         "chunk_id": row["chunk_id"],
         "doc_id": row["doc_id"],
@@ -173,6 +216,10 @@ def _row_to_hit_dict(row: Any) -> dict[str, Any]:
         "text": row["text"],
         "title": row["title"],
         "metadata": md or {},
+        "document_summary": document_summary,
+        "context_prefix": context_prefix,
+        "section_path": section_path,
+        "page_number": page_number,
     }
 
 
@@ -212,6 +259,10 @@ def _rrf_fuse(
             source_url=None,
             metadata=h["metadata"],
             score=scores[h["chunk_id"]],
+            document_summary=h.get("document_summary"),
+            context_prefix=h.get("context_prefix"),
+            section_path=h.get("section_path"),
+            page_number=h.get("page_number"),
         )
         for h in ordered[:top_k]
     ]

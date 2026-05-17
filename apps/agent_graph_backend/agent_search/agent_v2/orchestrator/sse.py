@@ -22,6 +22,11 @@ def planner_event(
     response_text: str = "",
     inner_steps: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    # Flush every node's citations into ``graph.references`` (URL map,
+    # back-compat) and ``graph.citation_meta`` (rich per-citation
+    # payload for the bibliography renderer). Idempotent — calling on
+    # every event is fine; the END event ends up with the full set.
+    graph.flush_node_citations()
     return {
         "response": {
             "type": "planner",
@@ -32,6 +37,7 @@ def planner_event(
             "adj": graph.adjacency_flat(),
             "inner_steps": inner_steps or [],
             "references": dict(graph.references),
+            "citation_meta": dict(graph.citation_meta),
         },
         "current_node": None,
     }
